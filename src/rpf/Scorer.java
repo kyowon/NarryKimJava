@@ -17,6 +17,7 @@ import parser.BedCovFileParser;
 import parser.ScoringOutputParser;
 import parser.ScoringOutputParser.ScoredPosition;
 import parser.ZeroBasedFastaParser;
+import rpf.analysis.CodonFrequency;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class Scorer {
@@ -86,7 +87,7 @@ public class Scorer {
 						}else if(isPlusStrand){
 							codon = fastaParser.getSequence(contig, currentPosition, currentPosition+3);
 						}else{							
-							codon = fastaParser.getSequence(contig, currentPosition-2, currentPosition+1);
+							codon = MakeProteinFasta.getComplementaryCodon(fastaParser.getSequence(contig, currentPosition-2, currentPosition+1));
 						}						
 						
 						boolean isAnnotated = false;
@@ -367,7 +368,7 @@ public class Scorer {
 		String covFileMinus = covFileprefix + ".minus.cov";
 		String paramFile = covFileprefix + ".param";
 		String outFile = covFileprefix + ".out";
-		String fas네ㅇta = "/media/kyowon/Data1/RPF_Project/data/hg19.fa";
+		String fasta = "/media/kyowon/Data1/RPF_Project/data/hg19.fa";
 		String refFlat = "/media/kyowon/Data1/RPF_Project/data/refFlatHuman.txt";
 		
 		//Scorer test = new Scorer(covFilePlus, covFileMinus, paramFile).setAnnotationFileFile(refFlat);

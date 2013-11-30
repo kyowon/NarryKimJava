@@ -112,7 +112,6 @@ public class MergeResults {
 		return pval;//Math.min(pval, 1-pval);
 	}
 	
-	
 	private String getHeader(){
 		String ret = "#Contig\tPosition\tStrand\tCodon\t";
 		for(int i=0;i<scorers.length;i++){
@@ -121,23 +120,20 @@ public class MergeResults {
 			else ret+="\t";
 		}
 		for(int i=0;i<scorers.length;i++){
-			ret+= "HarrQuantities" + (i+1); 
+			ret+= "HarrQuantities" + (i+1);
 			if(i<scorers.length-1) ret+=",";
 			else ret+="\t";
 		}
 		for(int i=0;i<scorers.length;i++){
-			ret+= "RPFQuantities" + (i+1); 
+			ret+= "RPFQuantities" + (i+1);
 			if(i<scorers.length-1) ret+=",";
 			else ret+="\t";
 		}
-		
 		ret += "mostExtremeHarrQuantityRatio\tmostExtremeHarrQuantityRatioPvalue\tmostExtremeRPFQuantityRatio\tmostExtremeRPFQuantityRatioPvalue";
 		ret += "\tIsAnnotated\tContainingGeneName\tContainingGBGeneName\ttxStart\ttxEnd\tcdsStart\tcdsEnd";
 		return ret;
 	}
-	
-	
-	
+		
 	private void getSinglePositionInformation(ScoredPosition position, PrintStream outFileStream, PrintStream outMFileStream){
 		BedCovFileParser[][] bedCovFileParsers = position.isPlusStrand()? bedCovPlusFileParsers : bedCovMinusFileParsers; 
 		double[] scores = new double[scorers.length];
@@ -167,8 +163,7 @@ public class MergeResults {
 		}
 		
 		double[] mostExtremeRatios = new double[2];
-		int[] signs = new int[2];
-				
+		int[] signs = new int[2];		
 		for(int i=0;i<scorers.length;i++){
 			for(int j=i+1;j<scorers.length;j++){	
 				for(int k=0;k<mostExtremeRatios.length;k++){
@@ -185,9 +180,6 @@ public class MergeResults {
 		for(int k=0;k<mostExtremeRatios.length;k++){
 			mostExtremeRatios[k] *= signs[k];
 		}
-		
-		//String ret = "#Contig\tPosition\tStrand\tCodon\tScores\tHarrQuantities\tRPFQuantities"
-		//		+ "\tmaxHarrQuantityRatio\tmaxHarrQuantityRatioPvalue\tmaxHarrRPFQuantityRatio\tmaxHarrRPFQuantityRatioPvalue";
 		
 		StringBuffer sb = new StringBuffer();
 		sb.append(position.getContig()); sb.append('\t');
@@ -216,12 +208,10 @@ public class MergeResults {
 		sb.append('\t'); sb.append(isContained? position.getTxStart() : "_"); 
 		sb.append('\t'); sb.append(isContained? position.getTxEnd() : "_"); 
 		sb.append('\t'); sb.append(isContained? position.getCdsStart() : "_");
-		sb.append('\t'); sb.append(isContained? position.getCdsEnd() : "_"); 
-		
+		sb.append('\t'); sb.append(isContained? position.getCdsEnd() : "_"); 	
 		outFileStream.println(sb.toString());
 	}
-	
-	
+		
 	public static void main(String[] args){ // quantities can be from different files!!!!  param and bedCovPlusFiles should be added for quan.
 		String[] scoreOutFiles = {	"/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/Noco_Harr10m.sorted.out",
 									"/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/Thy_Harr10m.sorted.out"};
@@ -246,6 +236,5 @@ public class MergeResults {
 				
 		MergeResults test = new MergeResults(scoreOutFiles, bedCovPlusFiles, bedCovMinusFiles, paramFiles);
 		test.merge("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/out.txt", 2);
-	}
-	
+	}	
 }

@@ -17,7 +17,7 @@ public class CodonFrequency {
 		int sum = 0;
 		for(ScoredPosition position : parser.getPositions()){
 			if(position.getScore() < scoreThreshold) continue;
-			String codon = position.isPlusStrand()? position.getCodon() : getComplementaryCodon(position.getCodon());
+			String codon = position.getCodon();
 			if(!freqMap.containsKey(codon)) freqMap.put(codon, 0);
 			freqMap.put(codon, freqMap.get(codon) + 1);
 			sum ++;
@@ -46,23 +46,7 @@ public class CodonFrequency {
 		
 	}	
 	
-	private static String getComplementaryCodon(String codon){
-		StringBuffer cc = new StringBuffer();
-		char[] nas = codon.toCharArray();
-		for(int i = nas.length-1;i>=0;i--){
-			char na = nas[i];
-			cc.append(getComplementaryNA(na));
-		}
-		return cc.toString();
-	}
-	
-	private static char getComplementaryNA(char na){
-		if(na == 'A') return 'T';
-		if(na == 'T') return 'A';
-		if(na == 'C') return 'G';
-		return 'C';
-	}
-	
+
 	private static void writeHeader(PrintStream out){
 		out.println("#ScoreThreshold\tATG\tCTG\tAAG\tCGC\tGTG\tOther");
 	}
