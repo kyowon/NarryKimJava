@@ -1,9 +1,12 @@
 package rpf;
 
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.util.HashMap;
+import java.util.HashSet;
 
+import net.sf.samtools.util.BufferedLineReader;
 import parser.ScoringOutputParser;
 import parser.ScoringOutputParser.ScoredPosition;
 import parser.ZeroBasedFastaParser;
@@ -98,22 +101,43 @@ public class MakeProteinFasta {
 		codonTable.put("TGA", "X");
 	}
 	
-	private int peptideLength = 50;
+	private int peptideLength = 33;
 	private ZeroBasedFastaParser fasta = null;
 	private ScoringOutputParser scoringOutputParser = null;
 	private String outFastaFile;
 	private double scoreThreshold;
+	private HashSet<String> excludingKeywords = null;
 	
 	public MakeProteinFasta(String scoringFile, String fastaFile, String outFastaFile, double scoreThreshold){
 		scoringOutputParser = new ScoringOutputParser(scoringFile);
 		fasta = new ZeroBasedFastaParser(fastaFile);
 		this.scoreThreshold = scoreThreshold;
 		this.outFastaFile = outFastaFile;
-		generate();
+	
 	}
 	
+	private void getExcludingKeywords(String blastFile){
+		excludingKeywords = new HashSet<String>();
+		try {
+			BufferedLineReader in = new BufferedLineReader(new FileInputStream(blastFile));
+			String s;
+			while((s=in.readLine())!=null){
+				if(s.startsWith("Query= ")){
+					excludingKeywords.add(s.split(" ")[1]);
+				}
+			}
+			
+			in.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
+	//
 	private void generate(){
 		PrintStream out;
+		HashMap<String, Integer> suffixMap = new HashMap<String, Integer>();
 		try {
 			out = new PrintStream(outFastaFile);
 			for(ScoredPosition position : scoringOutputParser.getPositions()){
@@ -125,7 +149,20 @@ public class MakeProteinFasta {
 				int pos = position.getPosition(); 
 				int start = isPlusStrand? pos : pos - peptideLength * 3 + 1;
 				int end = isPlusStrand? pos + peptideLength * 3 : pos + 1;
-						
+				
+				String suffix = "_etc";
+				if(position.getGeneName() == null) suffix = "_IG";
+				else{
+					if(position.getGBGeneName().startsWith("LINC")) suffix = "_LINC";
+					else{
+						if(pos >= position.getCdsStart() && pos < position.getCdsEnd()) suffix = "_dORF";
+						else{
+							if(isPlusStrand && pos < position.getCdsStart() - peptideLength * 3) suffix = "_uORF";
+							else if(!isPlusStrand && pos > position.getCdsEnd() + peptideLength * 3) suffix = "_uORF";
+						}
+					}				
+				}
+				
 				String nas = fasta.getSequence(contig, start, end);
 				if(nas == null) continue;
 				if(!isPlusStrand){
@@ -144,18 +181,31 @@ public class MakeProteinFasta {
 					for(char na : dst){
 						codon.append(na);
 					}
-					String aa = codonTable.get(codon.toString());
+					String codonString = codon.toString();
+					String aa = codonTable.get(codonString);
+					if(i==0 && (!codonString.equals("ATG") && !codonString.equals("CTG"))){
+						suffix+= "_NonStartCodon"; break;
+					}
 					if(aa.equals("X")) break;
 					peptide.append(aa);
 				}
-				if(peptide.length() < 7) continue;
 				//System.out.println(position);
-				String pepName = ">" + contig+"_" + pos + "_" + (isPlusStrand? '+' : '-');
-				out.println(pepName);
-				out.println(peptide);
+				String pepName = contig+":" + pos + "_" + (isPlusStrand? '+' : '-');
+				if(excludingKeywords != null && excludingKeywords.contains(pepName)) continue;
+				
+				
+				
+				if(!suffixMap.containsKey(suffix)) suffixMap.put(suffix, 0);
+				suffixMap.put(suffix, suffixMap.get(suffix)+1);
 				//if(!isPlusStrand)break;
+				if(suffix.contains("_etc")) continue;	
+				if(peptide.length() < 7) continue;
+				
+				out.println(">" + pepName + suffix);
+				out.println(peptide);
 			}
 			out.close();
+			System.out.println(suffixMap);
 		} catch (FileNotFoundException e) {			
 			e.printStackTrace();
 		}
@@ -181,10 +231,14 @@ public class MakeProteinFasta {
 	}
 	
 	public static void main(String[] args){
-		System.out.println(codonTable.size());
-		MakeProteinFasta test = new MakeProteinFasta("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/Thy_Harr10mNew.sorted.plus.cov.score.tsv.windowed.tsv",
+		String key = "Noco";
+		//System.out.println(codonTable.size());
+		MakeProteinFasta test = new MakeProteinFasta("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/"+ key + "_Harr10mNew.sorted.plus.cov.score.tsv.windowed.tsv",
 				"/media/kyowon/Data1/RPF_Project/data/hg19.fa",
-				"/media/kyowon/Data1/RPF_Project/data/hg19_protein_Thy_2.1.fasta",
+				"/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_2.1.fasta",
 				2.1);
+		
+		//test.getExcludingKeywords("/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_1.8.blast");
+		test.generate();
 	}
 }

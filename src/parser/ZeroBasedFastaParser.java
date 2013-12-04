@@ -62,10 +62,12 @@ public class ZeroBasedFastaParser {
 
 	
 	public static void main(String[] args){
-		ZeroBasedFastaParser test = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/test.fa");
-		System.out.println(test.getContigs());
-		System.out.println(test.getLength("1"));
-		System.out.println(test.getSequence("1", 0, 1000));
+		ZeroBasedFastaParser test = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/data/hg19.fa");
+		//System.out.println(test.getContigs());
+//		System.out.println(test.getLength("1"));
+		System.out.println(test.getSequence("chr20", 62151688, 62151688+150));
+		//chr20_62151688_+
+		//chr18_72057531
 		
 	}
 }
