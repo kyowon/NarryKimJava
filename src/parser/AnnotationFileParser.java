@@ -63,9 +63,36 @@ public class AnnotationFileParser {
 				exonEnds[i++] = Integer.parseInt(t);
 			}
 		}	
+		
+		public AnnotatedGene(){
+			
+		}
+		
 		AnnotatedGene(int txStart, int txEnd){ // constructor for comparison
 			this.txStart = txStart;
 			this.txEnd = txEnd;
+		}
+		
+		public String toString(){
+			StringBuffer sb = new StringBuffer();
+			
+			sb.append(genomeBrowserGeneName); sb.append('\t');
+			sb.append(geneName); sb.append('\t');
+			sb.append(contig); sb.append('\t');
+			sb.append(isPlusStrand); sb.append('\t');
+			sb.append(txStart); sb.append('\t');
+			sb.append(txEnd); sb.append('\t');
+			sb.append(cdsStart); sb.append('\t');
+			sb.append(cdsEnd); sb.append('\t');
+			sb.append(exonCount); sb.append('\t');
+			for(int t : exonStarts){
+				sb.append(t);sb.append(',');
+			}
+			sb.append('\t');
+			for(int t : exonEnds){
+				sb.append(t);sb.append(',');
+			}
+			return sb.toString();
 		}
 		
 		public String getGenomeBrowserGeneName() {

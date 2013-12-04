@@ -11,7 +11,7 @@ import parser.ScoringOutputParser;
 import parser.ScoringOutputParser.ScoredPosition;
 import parser.ZeroBasedFastaParser;
 
-public class MakeProteinFasta {
+public class MakeProteinFastaAndAnnotationFile {
 	private static HashMap<String, String> codonTable;
 	static {
 		codonTable = new HashMap<String, String>();
@@ -105,10 +105,11 @@ public class MakeProteinFasta {
 	private ZeroBasedFastaParser fasta = null;
 	private ScoringOutputParser scoringOutputParser = null;
 	private String outFastaFile;
+	private String outAnnotationFile;
 	private double scoreThreshold;
 	private HashSet<String> excludingKeywords = null;
 	
-	public MakeProteinFasta(String scoringFile, String fastaFile, String outFastaFile, double scoreThreshold){
+	public MakeProteinFastaAndAnnotationFile(String scoringFile, String fastaFile, String outFastaFile, double scoreThreshold){
 		scoringOutputParser = new ScoringOutputParser(scoringFile);
 		fasta = new ZeroBasedFastaParser(fastaFile);
 		this.scoreThreshold = scoreThreshold;
@@ -136,10 +137,13 @@ public class MakeProteinFasta {
 	
 	//
 	private void generate(){
-		PrintStream out;
+		PrintStream outFasta;
+		PrintStream outAnnotation;
+		
 		HashMap<String, Integer> suffixMap = new HashMap<String, Integer>();
 		try {
-			out = new PrintStream(outFastaFile);
+			outFasta = new PrintStream(outFastaFile);
+			outAnnotation = new PrintStream(outAnnotationFile);
 			for(ScoredPosition position : scoringOutputParser.getPositions()){
 				StringBuffer peptide = new StringBuffer();
 				if(position.getScore() < scoreThreshold) continue;
@@ -199,12 +203,13 @@ public class MakeProteinFasta {
 				suffixMap.put(suffix, suffixMap.get(suffix)+1);
 				//if(!isPlusStrand)break;
 				if(suffix.contains("_etc")) continue;	
-				if(peptide.length() < 7) continue;
+				if(peptide.length() < 15) continue;
 				
-				out.println(">" + pepName + suffix);
-				out.println(peptide);
+				outFasta.println(">" + pepName + suffix);
+				outFasta.println(peptide);
 			}
-			out.close();
+			outFasta.close();
+			outAnnotation.close();
 			System.out.println(suffixMap);
 		} catch (FileNotFoundException e) {			
 			e.printStackTrace();
@@ -231,12 +236,12 @@ public class MakeProteinFasta {
 	}
 	
 	public static void main(String[] args){
-		String key = "Noco";
+		String key = "Thy";
 		//System.out.println(codonTable.size());
-		MakeProteinFasta test = new MakeProteinFasta("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/"+ key + "_Harr10mNew.sorted.plus.cov.score.tsv.windowed.tsv",
+		MakeProteinFastaAndAnnotationFile test = new MakeProteinFastaAndAnnotationFile("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/"+ key + "_Harr10mNew.sorted.plus.cov.score.tsv.windowed.tsv",
 				"/media/kyowon/Data1/RPF_Project/data/hg19.fa",
-				"/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_2.1.fasta",
-				2.1);
+				"/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_2.5.fasta",
+				2.5);
 		
 		//test.getExcludingKeywords("/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_1.8.blast");
 		test.generate();

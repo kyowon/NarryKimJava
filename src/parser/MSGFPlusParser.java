@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class MSGFPlusParser {
-	class MSGFPlusPSM{
+	public class MSGFPlusPSM{
 		private String specFile;
 		private String specID;
 		private int scanNumber;

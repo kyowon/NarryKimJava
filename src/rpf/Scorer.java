@@ -87,7 +87,7 @@ public class Scorer {
 						}else if(isPlusStrand){
 							codon = fastaParser.getSequence(contig, currentPosition, currentPosition+3);
 						}else{							
-							codon = MakeProteinFasta.getComplementaryCodon(fastaParser.getSequence(contig, currentPosition-2, currentPosition+1));
+							codon = MakeProteinFastaAndAnnotationFile.getComplementaryCodon(fastaParser.getSequence(contig, currentPosition-2, currentPosition+1));
 						}						
 						
 						boolean isAnnotated = false;
