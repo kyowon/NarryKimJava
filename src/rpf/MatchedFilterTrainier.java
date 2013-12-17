@@ -220,14 +220,16 @@ public class MatchedFilterTrainier {
 	}
 	
 	public static void main(String[] args){
-		String keyword = "Thy_Harr10m";
+		String keyword =  "Thy_Harr10mNew";
+		String annotationkey = "uORF";
 		String covFileprefix = "/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/" + keyword + ".sorted";
 		String covFilePlus = covFileprefix + ".plus.cov";
 		String covFileMinus = covFileprefix + ".minus.cov";
 		String paramFile = covFileprefix + ".param";
-		
-		MatchedFilterTrainier test = new MatchedFilterTrainier(covFilePlus, covFileMinus, "/media/kyowon/Data1/RPF_Project/data/refFlatHuman.txt", paramFile);
-		test.train(30, 150, 7);
+		String annotationFile = "/media/kyowon/Data1/RPF_Project/data/hg19_protein_"+keyword.substring(0, keyword.indexOf('_'))+"_"+ annotationkey + "1.5.txt";
+		//annotationFile = "/media/kyowon/Data1/RPF_Project/data/refFlatHuman.txt";
+		MatchedFilterTrainier test = new MatchedFilterTrainier(covFilePlus, covFileMinus, annotationFile, annotationFile+ keyword + ".param");
+		test.train(30, 50, 7);
 	}
 	
 }

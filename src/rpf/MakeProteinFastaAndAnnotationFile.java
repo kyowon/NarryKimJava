@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 
 import net.sf.samtools.util.BufferedLineReader;
+import parser.AnnotationFileParser;
 import parser.ScoringOutputParser;
 import parser.ScoringOutputParser.ScoredPosition;
 import parser.ZeroBasedFastaParser;
@@ -109,12 +110,12 @@ public class MakeProteinFastaAndAnnotationFile {
 	private double scoreThreshold;
 	private HashSet<String> excludingKeywords = null;
 	
-	public MakeProteinFastaAndAnnotationFile(String scoringFile, String fastaFile, String outFastaFile, double scoreThreshold){
+	public MakeProteinFastaAndAnnotationFile(String scoringFile, String fastaFile, String outFastaFile, String outAnnotationFile, double scoreThreshold){
 		scoringOutputParser = new ScoringOutputParser(scoringFile);
 		fasta = new ZeroBasedFastaParser(fastaFile);
 		this.scoreThreshold = scoreThreshold;
 		this.outFastaFile = outFastaFile;
-	
+		this.outAnnotationFile = outAnnotationFile;
 	}
 	
 	private void getExcludingKeywords(String blastFile){
@@ -136,10 +137,13 @@ public class MakeProteinFastaAndAnnotationFile {
 	
 	
 	//
-	private void generate(){
+	private void generate(String annotationkey){
 		PrintStream outFasta;
 		PrintStream outAnnotation;
 		
+		double q1=0, q2=0;
+		double m1=0, m2=0;
+		int n1=0, n2=0;
 		HashMap<String, Integer> suffixMap = new HashMap<String, Integer>();
 		try {
 			outFasta = new PrintStream(outFastaFile);
@@ -147,17 +151,22 @@ public class MakeProteinFastaAndAnnotationFile {
 			for(ScoredPosition position : scoringOutputParser.getPositions()){
 				StringBuffer peptide = new StringBuffer();
 				if(position.getScore() < scoreThreshold) continue;
-				if(position.isAnnotated()) continue;
+				String suffix = "_etc";
+				
+				if(position.isAnnotated()){
+					//continue; TODO
+				}
 				String contig = position.getContig();
 				boolean isPlusStrand = position.isPlusStrand();
 				int pos = position.getPosition(); 
 				int start = isPlusStrand? pos : pos - peptideLength * 3 + 1;
 				int end = isPlusStrand? pos + peptideLength * 3 : pos + 1;
 				
-				String suffix = "_etc";
+				
 				if(position.getGeneName() == null) suffix = "_IG";
 				else{
-					if(position.getGBGeneName().startsWith("LINC")) suffix = "_LINC";
+					if(position.isAnnotated()) suffix = "ANNO";
+					else if(position.getGBGeneName().startsWith("LINC")) suffix = "_LINC";
 					else{
 						if(pos >= position.getCdsStart() && pos < position.getCdsEnd()) suffix = "_dORF";
 						else{
@@ -166,7 +175,7 @@ public class MakeProteinFastaAndAnnotationFile {
 						}
 					}				
 				}
-				
+				if(start < 0) continue;
 				String nas = fasta.getSequence(contig, start, end);
 				if(nas == null) continue;
 				if(!isPlusStrand){
@@ -203,11 +212,26 @@ public class MakeProteinFastaAndAnnotationFile {
 				suffixMap.put(suffix, suffixMap.get(suffix)+1);
 				//if(!isPlusStrand)break;
 				if(suffix.contains("_etc")) continue;	
+				if(suffix.contains(annotationkey) && !suffix.contains("NonStartCodon")) outAnnotation.println(AnnotationFileParser.getSudoAnnotatedGene(position));
+				
+				if(suffix.contains("uORF")){
+					n1++;
+					q1+=position.getQuantity();
+					if(position.getQuantity() > m1) m1 = position.getQuantity();
+				}else if(suffix.contains("ANNO")){
+					n2++;
+					q2+=position.getQuantity();
+					if(position.getQuantity() > m2) m2 = position.getQuantity();
+				}
+				
 				if(peptide.length() < 15) continue;
 				
 				outFasta.println(">" + pepName + suffix);
+				
 				outFasta.println(peptide);
+				
 			}
+			System.out.println(q1/n1 + " " + q2/n2 + " " + m1 + " " + m2);
 			outFasta.close();
 			outAnnotation.close();
 			System.out.println(suffixMap);
@@ -237,13 +261,16 @@ public class MakeProteinFastaAndAnnotationFile {
 	
 	public static void main(String[] args){
 		String key = "Thy";
+		String annotationkey = "uORF";
+		double score = 1.5;
 		//System.out.println(codonTable.size());
 		MakeProteinFastaAndAnnotationFile test = new MakeProteinFastaAndAnnotationFile("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/"+ key + "_Harr10mNew.sorted.plus.cov.score.tsv.windowed.tsv",
 				"/media/kyowon/Data1/RPF_Project/data/hg19.fa",
-				"/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_2.5.fasta",
-				2.5);
+				"/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_" + String.format("%.1f", score) + ".fasta",
+				"/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_" + annotationkey + String.format("%.1f", score) + ".txt",
+				score);
 		
 		//test.getExcludingKeywords("/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_1.8.blast");
-		test.generate();
+		test.generate(annotationkey);
 	}
 }

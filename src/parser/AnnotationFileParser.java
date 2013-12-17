@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 
+import parser.ScoringOutputParser.ScoredPosition;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class AnnotationFileParser {
@@ -64,11 +65,22 @@ public class AnnotationFileParser {
 			}
 		}	
 		
-		public AnnotatedGene(){
-			
+		// construct sudo annotated gene
+		private AnnotatedGene(ScoredPosition position){ 
+			genomeBrowserGeneName = position.getGBGeneName() != null? position.getGBGeneName() : "Putative";
+			geneName = position.getGeneName() != null? position.getGeneName() : ((Integer)position.getPosition()).toString();
+			contig = position.getContig();
+			isPlusStrand = position.isPlusStrand();
+			txStart = position.getGeneName() != null ? position.getTxStart() : position.getPosition() - 100;
+			txEnd = position.getGeneName() != null? position.getTxEnd() : position.getPosition() + 100;
+			cdsStart = isPlusStrand? position.getPosition() : txStart;
+			cdsEnd = isPlusStrand? txEnd : position.getPosition() + 1;
+			exonCount = 1;
+			exonStarts = new int[exonCount];
+			exonEnds = new int[exonCount];			
 		}
 		
-		AnnotatedGene(int txStart, int txEnd){ // constructor for comparison
+		private AnnotatedGene(int txStart, int txEnd){ // constructor for comparison
 			this.txStart = txStart;
 			this.txEnd = txEnd;
 		}
@@ -79,7 +91,7 @@ public class AnnotationFileParser {
 			sb.append(genomeBrowserGeneName); sb.append('\t');
 			sb.append(geneName); sb.append('\t');
 			sb.append(contig); sb.append('\t');
-			sb.append(isPlusStrand); sb.append('\t');
+			sb.append(isPlusStrand? '+' : '-'); sb.append('\t');
 			sb.append(txStart); sb.append('\t');
 			sb.append(txEnd); sb.append('\t');
 			sb.append(cdsStart); sb.append('\t');
@@ -128,10 +140,17 @@ public class AnnotationFileParser {
 		public int[] getExonEnds() {
 			return exonEnds;
 		}
+		
+		
 	}
 	
 	private HashMap<String, ArrayList<AnnotatedGene>> annotatedGeneSetMap;
 	private HashMap<String, HashMap<Boolean, HashMap<Integer, AnnotatedGene>>> annotatedGenePositionMap;
+	
+	public static AnnotatedGene getSudoAnnotatedGene(ScoredPosition position){
+		return new AnnotationFileParser().new AnnotatedGene(position);
+	}
+	
 	
 	public AnnotationFileParser(String annotationFile){
 		try {
@@ -161,6 +180,10 @@ public class AnnotationFileParser {
 	}
 	
 	
+	private AnnotationFileParser() {
+	}
+
+
 	public AnnotatedGene getAnnotatedGene(String contig, boolean isPlusStrand, int position){
 		HashMap<Boolean, HashMap<Integer, AnnotatedGene>> sub = annotatedGenePositionMap.get(contig);
 		if(sub == null) return null;

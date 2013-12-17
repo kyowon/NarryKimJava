@@ -19,6 +19,7 @@ public class ScoringOutputParser {
 		private boolean isPlusStrand;
 		private int position;
 		private double score;
+		private double quantity;
 		private String codon;
 		private boolean isAnnotated = false;
 		private String geneName;
@@ -39,6 +40,9 @@ public class ScoringOutputParser {
 		}
 		public double getScore() {
 			return score;
+		}
+		public double getQuantity() {
+			return quantity;
 		}
 		public String getCodon() {
 			return codon;
@@ -70,23 +74,25 @@ public class ScoringOutputParser {
 			position = Integer.parseInt(token[1]);
 			isPlusStrand = token[2].equals("+");
 			score = Double.parseDouble(token[3]);
-			codon = token[4];
-			if(!token[5].equals("_")){				
-				isAnnotated = token[5].equals("T");
-				geneName = token[6];
-				gbgeneName = token[7];
-				txStart = Integer.parseInt(token[8]);
-				txEnd = Integer.parseInt(token[9]);
-				cdsStart = Integer.parseInt(token[10]);
-				cdsEnd = Integer.parseInt(token[11]);
+			quantity = Double.parseDouble(token[4]);
+			codon = token[5];
+			if(!token[6].equals("_")){				
+				isAnnotated = token[6].equals("T");
+				geneName = token[7];
+				gbgeneName = token[8];
+				txStart = Integer.parseInt(token[9]);
+				txEnd = Integer.parseInt(token[10]);
+				cdsStart = Integer.parseInt(token[11]);
+				cdsEnd = Integer.parseInt(token[12]);
 			}
 		}
 		
-		private ScoredPosition(String contig, int position, boolean isPlusStrand, double score, String codon, AnnotatedGene gene, boolean isAnnotated){
+		private ScoredPosition(String contig, int position, boolean isPlusStrand, double score, double quantity, String codon, AnnotatedGene gene, boolean isAnnotated){
 			this.contig = contig;
 			this.position = position;
 			this.isPlusStrand = isPlusStrand;
 			this.score = score;
+			this.quantity = quantity;
 			this.codon = codon;
 			if(gene != null){
 				this.geneName = gene.getGeneName();
@@ -124,6 +130,7 @@ public class ScoringOutputParser {
 			sb.append(position); sb.append('\t');
 			sb.append((isPlusStrand? '+': '-')); sb.append('\t');
 			sb.append(score); sb.append('\t');
+			sb.append(quantity); sb.append('\t');
 			sb.append(codon); 
 			if(geneName !=null){
 				sb.append('\t');
@@ -195,8 +202,8 @@ public class ScoringOutputParser {
 	}
 	*/
 	
-	public static ScoredPosition getScoredPosition(String contig, int position, boolean isPlusStrand, double score, String codon, AnnotatedGene gene, boolean isAnnotated){
-		return  new ScoringOutputParser().new ScoredPosition(contig, position, isPlusStrand, score, codon, gene, isAnnotated);			
+	public static ScoredPosition getScoredPosition(String contig, int position, boolean isPlusStrand, double score, double quantity, String codon, AnnotatedGene gene, boolean isAnnotated){
+		return  new ScoringOutputParser().new ScoredPosition(contig, position, isPlusStrand, score, quantity, codon, gene, isAnnotated);			
 	}
 	
 	public static ArrayList<ScoredPosition> getUnionPositions(ScoringOutputParser[] parsers, String contig, double scoreThreshold){

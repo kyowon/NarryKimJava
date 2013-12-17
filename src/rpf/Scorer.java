@@ -79,6 +79,7 @@ public class Scorer {
 					lastConsidered = currentPosition;
 					if(numberOfNonZeroElements(cov) < numberOfNonZeroElements) continue;
 					double score = getLRScore(getRawScore(cov));
+					double quantity = getQuantity(cov);
 					
 					if(score > scoreThreshold){
 						String codon;
@@ -96,7 +97,7 @@ public class Scorer {
 							if(gene != null) isAnnotated = true;
 							else gene = annotationFileParser.getContainingGene(contig, isPlusStrand, currentPosition);								
 						}						
-						ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(contig, currentPosition, isPlusStrand, score, codon, gene, isAnnotated);
+						ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(contig, currentPosition, isPlusStrand, score, quantity, codon, gene, isAnnotated);
 						out.println(scoredPosition);						
 					}						
 				}	
