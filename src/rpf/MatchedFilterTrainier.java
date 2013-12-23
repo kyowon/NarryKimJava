@@ -69,6 +69,7 @@ public class MatchedFilterTrainier {
 			AnnotatedGene gene = iterator.next();
 			if(isPlusStrand != gene.isPlusStrand()) continue;
 			int position = isPlusStrand? gene.getCdsStart() : gene.getCdsEnd() - 1;
+			
 			double[] cov = bedCovFileParser.getSqrtCoverages(gene.getContig(), position, leftWindowSize, rightWindowSize, isPlusStrand);
 			
 			if(Scorer.numberOfNonZeroElements(cov) >= numberOfNonZeroElements){
@@ -87,7 +88,7 @@ public class MatchedFilterTrainier {
 					Scorer.normalize(noisyCov);
 					noise.add(noisyCov);	
 				}
-			}			
+			}	
 		}
 	}
 	
@@ -220,14 +221,15 @@ public class MatchedFilterTrainier {
 	}
 	
 	public static void main(String[] args){
-		String keyword =  "Thy_Harr10mNew";
+		String keyword =  "RPF6_NS_RPF_1";
 		String annotationkey = "uORF";
-		String covFileprefix = "/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/" + keyword + ".sorted";
+		String covFileprefix = "/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/" + keyword + "-uncollapsed";
 		String covFilePlus = covFileprefix + ".plus.cov";
 		String covFileMinus = covFileprefix + ".minus.cov";
-		String paramFile = covFileprefix + ".param";
-		String annotationFile = "/media/kyowon/Data1/RPF_Project/data/hg19_protein_"+keyword.substring(0, keyword.indexOf('_'))+"_"+ annotationkey + "1.5.txt";
-		//annotationFile = "/media/kyowon/Data1/RPF_Project/data/refFlatHuman.txt";
+		String paramFile = covFileprefix + ".test.param";
+		String annotationFile = "/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/"+keyword.substring(0, keyword.indexOf('_'))+"_"+ annotationkey + "1.5.txt";
+		annotationFile = "/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt";
+		
 		MatchedFilterTrainier test = new MatchedFilterTrainier(covFilePlus, covFileMinus, annotationFile, annotationFile+ keyword + ".param");
 		test.train(30, 50, 7);
 	}

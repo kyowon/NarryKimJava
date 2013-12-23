@@ -68,7 +68,7 @@ public class ScoringOutputParser {
 		public int getCdsEnd() {
 			return cdsEnd;
 		}
-		private ScoredPosition(String s){
+		private ScoredPosition(String s){ // TODO
 			String[] token = s.split("\t");
 			contig = token[0];
 			position = Integer.parseInt(token[1]);

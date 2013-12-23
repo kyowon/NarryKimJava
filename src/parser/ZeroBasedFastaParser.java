@@ -34,6 +34,7 @@ public class ZeroBasedFastaParser {
 		StringBuffer seq = new StringBuffer();
 		end = getLength(contig) < end? getLength(contig) : end;
 		for(int i=start;i<end;i++){
+			if(i<0 || i>=refSeq.length) continue;
 			seq.append((char)refSeq[i]);
 		}
 				

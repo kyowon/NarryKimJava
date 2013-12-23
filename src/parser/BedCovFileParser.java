@@ -117,6 +117,28 @@ public class BedCovFileParser {
 		return coverages;
 	}
 	
+	public double[] getCoverages(String contig, int position, int leftWindowSize, int rightWindowSize, boolean isPlusStrand){
+		double[] coverages = new double[leftWindowSize + rightWindowSize];
+		int start, end;
+		if(isPlusStrand){
+			start = position - leftWindowSize;
+			end = position + rightWindowSize;
+		}else{
+			end = position + leftWindowSize + 1;
+			start = position - rightWindowSize + 1;
+		}
+		Iterator<BedCoverage> iterator = getBedCoverageIterator(contig, start, end);
+		
+		while(iterator.hasNext()){
+			BedCoverage bedCoverage = iterator.next();
+			int index = bedCoverage.getPosition() - start;
+			index = isPlusStrand? index : coverages.length - index - 1;
+				coverages[index] = bedCoverage.getCoverage();
+		}		
+		return coverages;
+	}
+	
+	
 	private void read(String bedCovFile){
 		bedCoverageMap = new HashMap<String, ArrayList<BedCoverage>>();
 		try {

@@ -217,6 +217,29 @@ public class AnnotationFileParser {
 		return ret;
 	}
 	
+	public String getGenomicRegionName(String contig, boolean isPlusStrand, int position){
+		String name;
+		AnnotatedGene gene = getAnnotatedGene(contig, isPlusStrand, position);
+		if(gene != null) return "Genic_Start";
+		else gene = getContainingGene(contig, isPlusStrand, position);								
+		
+		if(gene == null) name = "InterGenic";
+		else{
+			if(gene.getGenomeBrowserGeneName().startsWith("LINC")) name = "Genic_LINC";
+			else if(gene.getGeneName().startsWith("NR")) name = "Genic_NR";
+			else{
+				if(position >= gene.getCdsStart() && position < gene.getCdsEnd()) name = "Genic_ORF";
+				else{
+					if(isPlusStrand && position < gene.getCdsStart()) name = "5_UTR";
+					else if(!isPlusStrand && position > gene.getCdsEnd()) name = "5_UTR";
+					else name = "3_UTR";
+				}
+			}				
+		}
+		return name;
+	}
+	
+	
 	public Iterator<AnnotatedGene> getAnnotatedGeneIterator(){
 		ArrayList<AnnotatedGene> allGenes = new ArrayList<AnnotatedGene>();
 		for(String contig : annotatedGeneSetMap.keySet())
