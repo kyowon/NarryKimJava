@@ -23,6 +23,7 @@ public class GenomicRegionComposition {
 			String name = annotationFileParser.getGenomicRegionName(position.getContig(), position.isPlusStrand(), position.getPosition());
 			if(!positions.containsKey(name)) positions.put(name, new ArrayList<ScoredPosition>());
 			positions.get(name).add(position);
+			if(name.equals("5_UTR")) System.out.println(position);
 			sum ++;
 		}
 		

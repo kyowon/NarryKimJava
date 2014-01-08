@@ -58,8 +58,8 @@ public class MergeResults {
 				}
 			}
 			out.close();
-			appendPvalues(outFile,7,8);
-			appendPvalues(outFile,9,10);
+			appendPvalues(outFile,6,7);
+			appendPvalues(outFile,8,9);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -119,17 +119,17 @@ public class MergeResults {
 			if(i<scorers.length-1) ret+=",";
 			else ret+="\t";
 		}
-		for(int i=0;i<scorers.length;i++){
+		/*for(int i=0;i<scorers.length;i++){
 			ret+= "HarrQuantities" + (i+1);
 			if(i<scorers.length-1) ret+=",";
 			else ret+="\t";
-		}
+		}*/
 		for(int i=0;i<scorers.length;i++){
 			ret+= "RPFQuantities" + (i+1);
 			if(i<scorers.length-1) ret+=",";
 			else ret+="\t";
 		}
-		ret += "mostExtremeHarrQuantityRatio\tmostExtremeHarrQuantityRatioPvalue\tmostExtremeRPFQuantityRatio\tmostExtremeRPFQuantityRatioPvalue";
+		ret += "mostExtremeHarrScoreRatio\tmostExtremeHarrScoreRatioPvalue\tmostExtremeRPFQuantityRatio\tmostExtremeRPFQuantityRatioPvalue";
 		ret += "\tIsAnnotated\tContainingGeneName\tContainingGBGeneName\ttxStart\ttxEnd\tcdsStart\tcdsEnd";
 		return ret;
 	}
@@ -137,7 +137,7 @@ public class MergeResults {
 	private void getSinglePositionInformation(ScoredPosition position, PrintStream outFileStream, PrintStream outMFileStream){
 		BedCovFileParser[][] bedCovFileParsers = position.isPlusStrand()? bedCovPlusFileParsers : bedCovMinusFileParsers; 
 		double[] scores = new double[scorers.length];
-		double[][] quantities = new double[scorers.length][2];
+		double[] quantities = new double[scorers.length];
 		
 		for(int i=0;i<scorers.length;i++){
 			double[][] cov = new double[2][];
@@ -158,8 +158,8 @@ public class MergeResults {
 			}*/
 			scores[i] = scorers[i][0].getLRScore(scorers[i][0].getRawScore(cov[0]));
 			//scores[i] = scorers[i][0].getRawScore(cov[0]);
-			quantities[i][0] = scorers[i][0].getQuantity(cov[0]);
-			quantities[i][1] = scorers[i][1].getQuantity(cov[1], true);
+			//quantities[i][0] = scorers[i][0].getQuantity(cov[0]);
+			quantities[i] = scorers[i][1].getQuantity(cov[1], true);
 		}
 		
 		double[] mostExtremeRatios = new double[2];
@@ -167,7 +167,7 @@ public class MergeResults {
 		for(int i=0;i<scorers.length;i++){
 			for(int j=i+1;j<scorers.length;j++){	
 				for(int k=0;k<mostExtremeRatios.length;k++){
-					double v = Math.log10(quantities[i][k]/quantities[j][k]);
+					double v = k==0? Math.log10(scores[i]/scores[j]) : Math.log10(quantities[i]/quantities[j]);
 					if(mostExtremeRatios[k] < Math.abs(v)){
 						mostExtremeRatios[k] = Math.abs(v);
 						if(v<0) signs[k] = -1;
@@ -189,13 +189,13 @@ public class MergeResults {
 		for(int i=0;i<scorers.length;i++){
 			sb.append(scores[i]); if(i<scorers.length-1) sb.append(',');
 		}
+		//sb.append('\t');
+		//for(int i=0;i<scorers.length;i++){
+		//	sb.append(quantities[i][0]); if(i<scorers.length-1) sb.append(',');
+		//}
 		sb.append('\t');
 		for(int i=0;i<scorers.length;i++){
-			sb.append(quantities[i][0]); if(i<scorers.length-1) sb.append(',');
-		}
-		sb.append('\t');
-		for(int i=0;i<scorers.length;i++){
-			sb.append(quantities[i][1]); if(i<scorers.length-1) sb.append(',');
+			sb.append(quantities[i]); if(i<scorers.length-1) sb.append(',');
 		}
 		for(int k=0;k<mostExtremeRatios.length;k++){
 			sb.append('\t'); sb.append(mostExtremeRatios[k]); 
