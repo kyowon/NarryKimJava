@@ -11,136 +11,75 @@ import net.sf.samtools.util.BufferedLineReader;
 
 public class BedCovFileParser {
 	
-	private class BedCoverage implements Comparable<BedCoverage>{ // contigs are not considered for memory usage
-		private int position;
-		private int coverage;
-		private double sqrtCoverage;
-		
-		private BedCoverage(int position, int coverage){
-			this.position = position;
-			this.coverage = coverage;
-			this.sqrtCoverage = coverage == 0? 0.0 : Math.sqrt(coverage);
-		}
-		
-		@Override
-		public boolean equals(Object o){
-			if(o instanceof BedCoverage){
-				BedCoverage other = (BedCoverage)o;
-				return this.position == other.position;
-			}
-			return false;
-		}
-		
-		@Override
-		public int hashCode(){
-			return new Long(this.position).hashCode();			
-		}
-		
-		public double getSqrtCoverage(){
-			return sqrtCoverage;
-		}
-		
-		public int getCoverage(){
-			return coverage;
-		}
-
-		public int getPosition(){
-			return position;
-		}
-		
-		public int compareTo(BedCoverage o) {
-			return new Long(this.position).compareTo(new Long(o.position)); 
-		}
-		
-		@Override
-		public String toString(){
-			return position + " " + coverage;
-		}		
-		
-	}
+	private HashMap<String, HashMap<Integer, Integer>> coverageMap;
+	private AnnotationFileParser annotationParser;
 	
-	private HashMap<String, ArrayList<BedCoverage>> bedCoverageMap;
-	
-	
-	public BedCovFileParser(String bedCovFile){
+	public BedCovFileParser(String bedCovFile, String annotationFile){
 		read(bedCovFile);
+		annotationParser = new AnnotationFileParser(annotationFile);
 	}
 	
 	public ArrayList<String> getContigs(){
-		ArrayList<String> contigs = new ArrayList<String>(bedCoverageMap.keySet());
+		ArrayList<String> contigs = new ArrayList<String>(coverageMap.keySet());
 		Collections.sort(contigs);
 		return contigs;
 	}
 	
 	public Iterator<Integer> getNonZeroCoveragePositionIterator(String contig){
 		ArrayList<Integer> positions = new ArrayList<Integer>();
-		Iterator<BedCoverage> iterator = getBedCoverageIterator(contig, 0, Integer.MAX_VALUE);
-		while(iterator.hasNext()){
-			positions.add(iterator.next().getPosition());
+		HashMap<Integer, Integer> subCoverageMap = coverageMap.get(contig);
+		for(int key : subCoverageMap.keySet()){
+			positions.add(key);
 		}
+		Collections.sort(positions);
 		return positions.iterator();
 	}
 	
-	private Iterator<BedCoverage> getBedCoverageIterator(String contig, int start, int end){// start inclusive, end exclusive
-		ArrayList<BedCoverage> bedCoverages = bedCoverageMap.get(contig);
-		ArrayList<BedCoverage> bedCoveragesToreturn = new ArrayList<BedCoverage>();
+	private Iterator<Integer> getBedCoverageIterator(String contig, int start, int length, boolean isPlusStrand){// start inclusive TODO
+		 HashMap<Integer, Integer> coverages = coverageMap.get(contig);
+		ArrayList<Integer> coveragesToreturn = new ArrayList<Integer>();
 		
-		if(bedCoverages == null) return bedCoveragesToreturn.iterator();
-		int startIndex = Collections.binarySearch(bedCoverages, new BedCoverage(start, 0));
-		startIndex = startIndex < 0? - startIndex - 1 : startIndex;
-		int endIndex = Collections.binarySearch(bedCoverages, new BedCoverage(end, 0));
-		endIndex = endIndex < 0? - endIndex - 1 : endIndex;
-			for(int i=startIndex;i<Math.min(endIndex, bedCoverages.size());i++)
-			bedCoveragesToreturn.add(bedCoverages.get(i));
-	
-		return bedCoveragesToreturn.iterator();
+		if(coverages == null) return coveragesToreturn.iterator();		
+		ArrayList<Integer> positions = annotationParser.getLiftOverPositions(contig, isPlusStrand, start, length);			
+		if(positions == null) return coveragesToreturn.iterator();
+		
+		for(int position : positions){
+			Integer coverage = coverages.get(position);
+			coveragesToreturn.add(coverage == null ? 0 : coverage);
+		}		
+		return coveragesToreturn.iterator();
 	}
 	
 	public double[] getSqrtCoverages(String contig, int position, int leftWindowSize, int rightWindowSize, boolean isPlusStrand){
-		double[] coverages = new double[leftWindowSize + rightWindowSize];
-		int start, end;
-		if(isPlusStrand){
-			start = position - leftWindowSize;
-			end = position + rightWindowSize;
-		}else{
-			end = position + leftWindowSize + 1;
-			start = position - rightWindowSize + 1;
+		double[] cov = getCoverages(contig, position, leftWindowSize, rightWindowSize, isPlusStrand);
+		double[] sqrtCov = new double[cov.length];
+		for(int i=0; i<cov.length; i++){
+			sqrtCov[i] = Math.sqrt(cov[i]);
 		}
-		Iterator<BedCoverage> iterator = getBedCoverageIterator(contig, start, end);
-		
-		while(iterator.hasNext()){
-			BedCoverage bedCoverage = iterator.next();
-			int index = bedCoverage.getPosition() - start;
-			index = isPlusStrand? index : coverages.length - index - 1;
-				coverages[index] = bedCoverage.getSqrtCoverage();
-		}		
-		return coverages;
+		return sqrtCov;
 	}
 	
 	public double[] getCoverages(String contig, int position, int leftWindowSize, int rightWindowSize, boolean isPlusStrand){
 		double[] coverages = new double[leftWindowSize + rightWindowSize];
-		int start, end;
+		int start;
 		if(isPlusStrand){
 			start = position - leftWindowSize;
-			end = position + rightWindowSize;
 		}else{
-			end = position + leftWindowSize + 1;
-			start = position - rightWindowSize + 1;
+			start = position + leftWindowSize;
 		}
-		Iterator<BedCoverage> iterator = getBedCoverageIterator(contig, start, end);
+		Iterator<Integer> iterator = getBedCoverageIterator(contig, start, coverages.length, isPlusStrand);
 		
+		int index = 0;
 		while(iterator.hasNext()){
-			BedCoverage bedCoverage = iterator.next();
-			int index = bedCoverage.getPosition() - start;
-			index = isPlusStrand? index : coverages.length - index - 1;
-				coverages[index] = bedCoverage.getCoverage();
+			int coverage = iterator.next();
+			coverages[index++] = coverage;
 		}		
 		return coverages;
 	}
 	
 	
 	private void read(String bedCovFile){
-		bedCoverageMap = new HashMap<String, ArrayList<BedCoverage>>();
+		coverageMap = new HashMap<String, HashMap<Integer, Integer>>();
 		try {
 			BufferedLineReader in = new BufferedLineReader(new FileInputStream(bedCovFile));
 			String s;
@@ -149,15 +88,10 @@ public class BedCovFileParser {
 				String contig = token[0];
 				int position = Integer.parseInt(token[1]);
 				int coverage = (int)Double.parseDouble(token[2]);
-				if(!bedCoverageMap.containsKey(contig)) bedCoverageMap.put(contig, new ArrayList<BedCoverage>());
-				bedCoverageMap.get(contig).add(new BedCoverage(position, coverage));
+				if(!coverageMap.containsKey(contig)) coverageMap.put(contig, new HashMap<Integer, Integer>());
+				coverageMap.get(contig).put(position, coverage);
 			}
-			in.close();
-			
-			for(String contig : bedCoverageMap.keySet()){
-				Collections.sort(bedCoverageMap.get(contig));
-			}
-			
+			in.close();					
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -165,9 +99,9 @@ public class BedCovFileParser {
 	}
 	
 	public static void main(String[] args){
-		BedCovFileParser test = new BedCovFileParser("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/Thy_Harr10m.sorted.plus.cov");
+		BedCovFileParser test = new BedCovFileParser("/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/Noco_Harr_10mHsum-uncollapsed.plus.cov", "/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt");
 	
-		for(double cov : test.getSqrtCoverages("chr1", 566743, 5,10, true))
+		for(double cov : test.getCoverages("chr1", 566744, 5,10, false))
 			System.out.println(cov);
 	}
 	

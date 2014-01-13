@@ -21,7 +21,7 @@ public class MergeResults {
 	private ScoringOutputParser[] scoringOutputParsers;
 	private Scorer[][] scorers;
 	
-	public MergeResults(String[] scoreOutFiles, String[][] bedCovPlusFiles, String[][] bedCovMinusFiles, String[][] paramFiles){
+	public MergeResults(String[] scoreOutFiles, String[][] bedCovPlusFiles, String[][] bedCovMinusFiles, String[][] paramFiles, String annotationFile){
 		int n = scoreOutFiles.length;
 		scoringOutputParsers = new ScoringOutputParser[n];
 		bedCovPlusFileParsers = new BedCovFileParser[n][2];
@@ -31,9 +31,9 @@ public class MergeResults {
 		for(int i=0; i<n;i++){
 			scoringOutputParsers[i] = new ScoringOutputParser(scoreOutFiles[i]);
 			for(int j=0;j<2;j++){
-				bedCovPlusFileParsers[i][j] = new BedCovFileParser(bedCovPlusFiles[i][j]);
-				bedCovMinusFileParsers[i][j] = new BedCovFileParser(bedCovMinusFiles[i][j]);
-				scorers[i][j] = new Scorer(bedCovPlusFiles[i][j], bedCovMinusFiles[i][j], paramFiles[i][j]);
+				bedCovPlusFileParsers[i][j] = new BedCovFileParser(bedCovPlusFiles[i][j], annotationFile);
+				bedCovMinusFileParsers[i][j] = new BedCovFileParser(bedCovMinusFiles[i][j], annotationFile);
+				scorers[i][j] = new Scorer(bedCovPlusFiles[i][j], bedCovMinusFiles[i][j], paramFiles[i][j], annotationFile);
 			}			
 		}
 	}
@@ -143,7 +143,7 @@ public class MergeResults {
 			double[][] cov = new double[2][];
 			for(int j=0;j<2;j++){
 				cov[j] = bedCovFileParsers[i][j].getSqrtCoverages(position.getContig(), position.getPosition(), scorers[i][j].getLeftWindowSize(), scorers[i][j].getRightWindowSize(), position.isPlusStrand());
-				double[] covForMfile = bedCovFileParsers[i][j].getSqrtCoverages(position.getContig(), position.getPosition(), 30, 50, position.isPlusStrand());
+				double[] covForMfile = bedCovFileParsers[i][j].getCoverages(position.getContig(), position.getPosition(), 30, 100, position.isPlusStrand());
 				for(Double c : covForMfile){
 					outMFileStream.append(c.toString());
 					outMFileStream.append('\t');
@@ -234,7 +234,7 @@ public class MergeResults {
 			"/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/Thy_2_RPF.sorted.param"}
 		};
 				
-		MergeResults test = new MergeResults(scoreOutFiles, bedCovPlusFiles, bedCovMinusFiles, paramFiles);
-		test.merge("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/out.txt", 2);
+		//MergeResults test = new MergeResults(scoreOutFiles, bedCovPlusFiles, bedCovMinusFiles, paramFiles);
+		//test.merge("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/out.txt", 2);
 	}	
 }

@@ -37,8 +37,8 @@ public class MatchedFilterTrainier {
 	private String outParamFile;
 	
 	public MatchedFilterTrainier(String bedCovPlusFile, String bedCovMinusFile, String refFlatFile, String outParamFile){
-		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile);
-		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile);
+		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, refFlatFile);
+		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, refFlatFile);
 		annotationFileParser = new AnnotationFileParser(refFlatFile);	
 		this.outParamFile = outParamFile;
 	}

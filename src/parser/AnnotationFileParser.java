@@ -39,6 +39,7 @@ public class AnnotationFileParser {
 		private int exonCount;		
 		private int[] exonStarts;
 		private int[] exonEnds;
+		private int[][] introns;
 		
 		public AnnotatedGene(String s){
 			String[] token = s.split("\t");
@@ -140,7 +141,16 @@ public class AnnotationFileParser {
 		public int[] getExonEnds() {
 			return exonEnds;
 		}
-		
+		public int[][] getIntrons(){
+			if(introns == null){
+				introns = new int[getExonCount()-1][2];
+				for(int i=1;i<getExonCount();i++){
+					introns[i-1][0] = getExonEnds()[i-1];
+					introns[i-1][1] = getExonStarts()[i]-1;
+				}
+			}
+			return introns;
+		}
 		
 	}
 	
@@ -239,6 +249,52 @@ public class AnnotationFileParser {
 		return name;
 	}
 	
+	public ArrayList<Integer> getLiftOverPositions(String contig, boolean isPlusStrand, int start, int length){ // if start is in intron, return null; length should be short enough to ensure that positions are within a single gene.
+		AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
+		if(gene == null){
+			if(isPlusStrand) gene = getContainingGene(contig, isPlusStrand, start + length - 1);
+			else gene = getContainingGene(contig, isPlusStrand, start - length + 1);			
+		}
+		ArrayList<Integer> ret = new ArrayList<Integer>();
+		int[][] introns = gene==null? new int[0][0] : gene.getIntrons();
+		if(isPlusStrand){
+			int intronIndex = 0;
+			int c = start;
+			for(;intronIndex<introns.length;intronIndex++){
+				if(introns[intronIndex][1] >= c){
+					if(introns[intronIndex][0] <= c) return null;
+					break;
+				}
+			}			
+			while(ret.size() < length){
+				ret.add(c++);
+				if(intronIndex < introns.length && c >= introns[intronIndex][0]){
+					c = introns[intronIndex][1] + 1;
+					intronIndex++;
+				}
+			}						
+		}else{
+			int intronIndex = introns.length-1;
+			int c = start;
+			for(;intronIndex>=0;intronIndex--){
+				if(introns[intronIndex][0] <= c){
+					if(introns[intronIndex][1] >= c) return null;
+					break;
+				}
+			}			
+			while(ret.size() < length && c>=0){
+				ret.add(c--);
+				if(intronIndex >= 0 && c <= introns[intronIndex][1]){
+					c = introns[intronIndex][0] - 1;
+					intronIndex--;
+				}
+			}				
+		}
+		
+		return ret;
+	}
+	
+	
 	
 	public Iterator<AnnotatedGene> getAnnotatedGeneIterator(){
 		ArrayList<AnnotatedGene> allGenes = new ArrayList<AnnotatedGene>();
@@ -254,17 +310,21 @@ public class AnnotationFileParser {
 	
 
 	public static void main(String[] args){
-		AnnotationFileParser test = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/data/refFlatHuman.txt");
-		//ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/data/hg19.fa");
-		Iterator<AnnotatedGene> iterator = test.getAnnotatedGeneIterator("chr1");
-		while(iterator.hasNext()){
-			AnnotatedGene gene = iterator.next();
+		AnnotationFileParser test = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt");
+		//System.out.println();
+		ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/hg19.fa");
+		
+		for(int i: test.getLiftOverPositions("chrX", false, 51811268-1, 3))
+			System.out.println(i + " " + fasta.getSequence("chrX", i, i+1));
+		//Iterator<AnnotatedGene> iterator = test.getAnnotatedGeneIterator("chr1");
+		//while(iterator.hasNext()){
+		//	AnnotatedGene gene = iterator.next();
 			//if(gene.txStart == 235272657)System.out.println(test.annotatedGeneSetMap.get("chr1").indexOf(gene) + " " +  gene.txStart + " " + gene.txEnd + " " + gene.geneName + " " + gene.getGenomeBrowserGeneName());
 			//if(gene.isPlusStrand())
 				//System.out.println(fasta.getSequence(gene.getContig(), gene.getCdsStart(), gene.getCdsStart()+3));
 			//else 
 				//System.out.println(fasta.getSequence(gene.getContig(), gene.getCdsEnd()-3, gene.getCdsEnd()));
-		}
+	//	}
 		//System.out.println(test.getContainingGene("chr5", 36152364).getGeneName());
 	}
 }

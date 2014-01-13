@@ -26,15 +26,15 @@ public class ReadLengthDistribution
     private BedCovFileParser bedCovPlusFileParser, bedCovMinusFileParser;
     private HashMap<String, ArrayList<ScoredPosition>> positionMap = null;
     
-    public ReadLengthDistribution(String bamFileName, String scoringOutputFileName, String fasta, String bedCovPlusFile, String bedCovMinusFile)
+    public ReadLengthDistribution(String bamFileName, String scoringOutputFileName, String fasta, String bedCovPlusFile, String bedCovMinusFile, String annotationFile)
     {
         this.bamFile=new File(bamFileName);
         this.scoringOutputParser = new ScoringOutputParser(scoringOutputFileName);
         this.inputSam=new SAMFileReader(this.bamFile);
         this.fastaParser = new ZeroBasedFastaParser(fasta);
         this.inputSam.setValidationStringency(ValidationStringency.SILENT);
-        bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile);
-		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile);
+        bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFile);
+		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFile);
         getPositionMap();
     }
 
@@ -210,6 +210,7 @@ public class ReadLengthDistribution
     }
 
     
+    /*
     public static void main(String[] args){
     	String key = "ANNO";
     	String sampleKey = "RPF6_Thy_RPF_1-uncollapsed";
@@ -255,5 +256,5 @@ public class ReadLengthDistribution
     	}    
     	
     	test.close();
-    }
+    }*/
 }

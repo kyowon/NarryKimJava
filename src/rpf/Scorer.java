@@ -34,9 +34,9 @@ public class Scorer {
 	private PolynomialFunction likelihoodFunction;
 	private AnnotationFileParser annotationFileParser = null; // if specified, only annotated start positions are considered
 	
-	public Scorer(String bedCovPlusFile, String bedCovMinusFile, String paramFile){
-		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile);
-		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile);		
+	public Scorer(String bedCovPlusFile, String bedCovMinusFile, String paramFile, String annotationFile){
+		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFile);
+		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFile);		
 		read(paramFile);		
 	}
 	

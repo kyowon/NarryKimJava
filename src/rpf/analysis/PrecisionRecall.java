@@ -52,6 +52,7 @@ public class PrecisionRecall {
 		return ret;
 	}
 
+	/*
 	public static void main(String[] args){
 		AnnotationFileParser annotationParser = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/data/refFlatHuman.txt");
 		BedCovFileParser covPlusParser = new BedCovFileParser("/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/Noco_Harr10mNew.sorted.plus.cov"); 
@@ -69,6 +70,6 @@ public class PrecisionRecall {
 			System.out.println(scoreThreshold + "\t" + PrecisionRecall.getPrecisionNRecall(scoringOutputParser, trueSetNumber, scoreThreshold).get(1));
 		}
 		
-	}
+	}*/
 	
 }
