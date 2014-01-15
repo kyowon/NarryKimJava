@@ -52,7 +52,7 @@ public class CodonFrequency {
 	}
 	
 	public static void main(String[] args){
-		String inFile = "/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/Thy_Harr10mNew.sorted.plus.cov.score.tsv";
+		String inFile = "/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/Thy_Harr_10mHsum-uncollapsed.plus.cov.score.tsv";
 		String outFile = inFile + ".freq";
 		PrintStream out;
 		ScoringOutputParser parser = new ScoringOutputParser(inFile);

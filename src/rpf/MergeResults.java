@@ -12,7 +12,10 @@ import java.util.Collections;
 import java.util.HashSet;
 
 import parser.BedCovFileParser;
+import parser.RPFMergedFileParser;
+import parser.RPFMergedFileParser.MergedResult;
 import parser.ScoringOutputParser;
+import parser.AnnotationFileParser.AnnotatedGene;
 import parser.ScoringOutputParser.ScoredPosition;
 
 public class MergeResults {
@@ -42,20 +45,39 @@ public class MergeResults {
 		try {
 			PrintStream out = new PrintStream(outFile);
 			PrintStream mout = new PrintStream(outFile.replace('.', '_')+".m");
+			ArrayList<MergedResult> mergedResults = new ArrayList<MergedResult>();
 			HashSet<String> contigs = new HashSet<String>();
 			for(int i=0;i<scoringOutputParsers.length;i++){
 				contigs.addAll(scoringOutputParsers[i].getContigs());
 			}
-			out.println(getHeader());
 			for(String contig : contigs){
 				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, contig, scoreThreshold)){
-					String vname = position.getGeneName();
-					if(!position.isAnnotated()) vname = contig+"_"+position.getPosition()+"_"+(position.isPlusStrand()? "P" : "M");
-					mout.println(vname + "=[");
-					getSinglePositionInformation(position, out, mout);
-					mout.println("]';");
-					
+					String gname;;
+					if(!position.isAnnotated()) gname = contig+"_"+position.getPosition()+"_"+(position.isPlusStrand()? "P" : "M");
+					else gname = position.getGene().getGeneName();
+					mout.println(gname + "=[");
+					mergedResults.add(getSinglePositionInformation(position, mout));
+					mout.println("]';");					
 				}
+			}
+			
+			ArrayList<Double> values = new ArrayList<Double>();
+			for(MergedResult m : mergedResults){
+				values.add(m.getScoreRatio());
+			}
+			for(MergedResult m : mergedResults){
+				m.setScorePvalue(getPvalue(values, m.getScoreRatio()));
+			}
+			values.clear();
+			for(MergedResult m : mergedResults){
+				values.add(m.getQuantityRatio());
+			}
+			for(MergedResult m : mergedResults){
+				m.setQuantityPvalue(getPvalue(values, m.getQuantityRatio()));
+			}
+			out.println(getHeader());
+			for(MergedResult m : mergedResults){
+				out.println(m);
 			}
 			out.close();
 			appendPvalues(outFile,6,7);
@@ -116,7 +138,7 @@ public class MergeResults {
 		String ret = "#Contig\tPosition\tStrand\tCodon\t";
 		for(int i=0;i<scorers.length;i++){
 			ret+= "Scores" + (i+1); 
-			if(i<scorers.length-1) ret+=",";
+			if(i<scorers.length-1) ret+=";";
 			else ret+="\t";
 		}
 		/*for(int i=0;i<scorers.length;i++){
@@ -126,15 +148,15 @@ public class MergeResults {
 		}*/
 		for(int i=0;i<scorers.length;i++){
 			ret+= "RPFQuantities" + (i+1);
-			if(i<scorers.length-1) ret+=",";
+			if(i<scorers.length-1) ret+=";";
 			else ret+="\t";
 		}
 		ret += "mostExtremeHarrScoreRatio\tmostExtremeHarrScoreRatioPvalue\tmostExtremeRPFQuantityRatio\tmostExtremeRPFQuantityRatioPvalue";
-		ret += "\tIsAnnotated\tContainingGeneName\tContainingGBGeneName\ttxStart\ttxEnd\tcdsStart\tcdsEnd";
+		ret += "\tgenomicRegion\tframeShift\tIsAnnotated\t" + AnnotatedGene.getHeader();
 		return ret;
 	}
 		
-	private void getSinglePositionInformation(ScoredPosition position, PrintStream outFileStream, PrintStream outMFileStream){
+	private MergedResult getSinglePositionInformation(ScoredPosition position, PrintStream outMFileStream){
 		BedCovFileParser[][] bedCovFileParsers = position.isPlusStrand()? bedCovPlusFileParsers : bedCovMinusFileParsers; 
 		double[] scores = new double[scorers.length];
 		double[] quantities = new double[scorers.length];
@@ -148,68 +170,14 @@ public class MergeResults {
 					outMFileStream.append(c.toString());
 					outMFileStream.append('\t');
 				}
-				outMFileStream.append('\n');
-			}
-			
-			/*if(i == 0 && position.getPosition() == 139304633){
-				double[] vo = bedCovFileParsers[i][0].getCoverages(position.getContig(), position.getPosition(), scorers[i][0].getLeftWindowSize(), scorers[i][0].getRightWindowSize(), position.isPlusStrand(), 2);
-				for(double v : vo) System.out.println(v);
-				System.out.println(scorers[i][0].getLRScore(scorers[i][0].getRawScore(vo)));
-			}*/
-			scores[i] = scorers[i][0].getLRScore(scorers[i][0].getRawScore(cov[0]));
-			//scores[i] = scorers[i][0].getRawScore(cov[0]);
-			//quantities[i][0] = scorers[i][0].getQuantity(cov[0]);
+				outMFileStream.append('\n');		
+			}		
+			scores[i] = scorers[i][0].getLRScore(scorers[i][0].getRawScore(cov[0]));		
 			quantities[i] = scorers[i][1].getQuantity(cov[1], true);
 		}
 		
-		double[] mostExtremeRatios = new double[2];
-		int[] signs = new int[2];		
-		for(int i=0;i<scorers.length;i++){
-			for(int j=i+1;j<scorers.length;j++){	
-				for(int k=0;k<mostExtremeRatios.length;k++){
-					double v = k==0? Math.log10(scores[i]/scores[j]) : Math.log10(quantities[i]/quantities[j]);
-					if(mostExtremeRatios[k] < Math.abs(v)){
-						mostExtremeRatios[k] = Math.abs(v);
-						if(v<0) signs[k] = -1;
-						else signs[k] = 1;
-					}					
-				}				
-			}
-		}
-		
-		for(int k=0;k<mostExtremeRatios.length;k++){
-			mostExtremeRatios[k] *= signs[k];
-		}
-		
-		StringBuffer sb = new StringBuffer();
-		sb.append(position.getContig()); sb.append('\t');
-		sb.append(position.getPosition()); sb.append('\t');
-		sb.append((position.isPlusStrand()? '+' : '-')); sb.append('\t');
-		sb.append(position.getCodon()); sb.append('\t');
-		for(int i=0;i<scorers.length;i++){
-			sb.append(scores[i]); if(i<scorers.length-1) sb.append(',');
-		}
-		//sb.append('\t');
-		//for(int i=0;i<scorers.length;i++){
-		//	sb.append(quantities[i][0]); if(i<scorers.length-1) sb.append(',');
-		//}
-		sb.append('\t');
-		for(int i=0;i<scorers.length;i++){
-			sb.append(quantities[i]); if(i<scorers.length-1) sb.append(',');
-		}
-		for(int k=0;k<mostExtremeRatios.length;k++){
-			sb.append('\t'); sb.append(mostExtremeRatios[k]); 
-			sb.append('\t'); sb.append('*');
-		}
-		boolean isContained = position.getGeneName() != null;
-		sb.append('\t'); sb.append(isContained? (position.isAnnotated()?"T":"F") : "_"); 
-		sb.append('\t'); sb.append(isContained? position.getGeneName() : "_"); 
-		sb.append('\t'); sb.append(isContained? position.getGBGeneName() : "_"); 
-		sb.append('\t'); sb.append(isContained? position.getTxStart() : "_"); 
-		sb.append('\t'); sb.append(isContained? position.getTxEnd() : "_"); 
-		sb.append('\t'); sb.append(isContained? position.getCdsStart() : "_");
-		sb.append('\t'); sb.append(isContained? position.getCdsEnd() : "_"); 	
-		outFileStream.println(sb.toString());
+		return new RPFMergedFileParser().new MergedResult(position, scores, quantities);
+				
 	}
 		
 	public static void main(String[] args){ // quantities can be from different files!!!!  param and bedCovPlusFiles should be added for quan.

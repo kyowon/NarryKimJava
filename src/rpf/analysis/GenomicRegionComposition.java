@@ -20,9 +20,9 @@ public class GenomicRegionComposition {
 		int sum = 0;
 		for(ScoredPosition position : scoringOutputParser.getPositions()){
 			if(position.getScore() < scoreThreshold) continue;
-			String name = annotationFileParser.getGenomicRegionName(position.getContig(), position.isPlusStrand(), position.getPosition());
-			if(!positions.containsKey(name)) positions.put(name, new ArrayList<ScoredPosition>());
-			positions.get(name).add(position);
+			ArrayList<String> name = annotationFileParser.getGenomicRegionNameAndFrameShift(position.getContig(), position.isPlusStrand(), position.getPosition());
+			if(!positions.containsKey(name.get(0))) positions.put(name.get(0), new ArrayList<ScoredPosition>());
+			positions.get(name.get(0)).add(position);
 			if(name.equals("5_UTR")) System.out.println(position);
 			sum ++;
 		}

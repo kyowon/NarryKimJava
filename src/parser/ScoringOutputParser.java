@@ -22,12 +22,9 @@ public class ScoringOutputParser {
 		private double quantity;
 		private String codon;
 		private boolean isAnnotated = false;
-		private String geneName;
-		private String gbgeneName;
-		private int txStart = -1;
-		private int txEnd = -1;
-		private int cdsStart = -1;
-		private int cdsEnd = -1;
+		private AnnotatedGene gene = null;
+		private String genomicRegion;
+		private String frameShift;
 		
 		public String getContig() {
 			return contig;
@@ -50,25 +47,17 @@ public class ScoringOutputParser {
 		public boolean isAnnotated(){
 			return isAnnotated;
 		}
-		public String getGeneName(){
-			return geneName;
+		public AnnotatedGene getGene(){
+			return gene;
 		}
-		public String getGBGeneName(){
-			return gbgeneName;
+		
+		public String getGenomicRegion(){
+			return genomicRegion;
 		}
-		public int getTxStart() {
-			return txStart;
+		public String getFrameShift(){
+			return frameShift;
 		}
-		public int getTxEnd() {
-			return txEnd;
-		}
-		public int getCdsStart() {
-			return cdsStart;
-		}
-		public int getCdsEnd() {
-			return cdsEnd;
-		}
-		private ScoredPosition(String s){ // TODO
+		private ScoredPosition(String s){ 
 			String[] token = s.split("\t");
 			contig = token[0];
 			position = Integer.parseInt(token[1]);
@@ -76,33 +65,34 @@ public class ScoringOutputParser {
 			score = Double.parseDouble(token[3]);
 			quantity = Double.parseDouble(token[4]);
 			codon = token[5];
-			if(!token[6].equals("_")){				
-				isAnnotated = token[6].equals("T");
-				geneName = token[7];
-				gbgeneName = token[8];
-				txStart = Integer.parseInt(token[9]);
-				txEnd = Integer.parseInt(token[10]);
-				cdsStart = Integer.parseInt(token[11]);
-				cdsEnd = Integer.parseInt(token[12]);
+			genomicRegion = token[6];
+			frameShift = token[7];
+			if(!token[8].equals("_")){				
+				isAnnotated = token[8].equals("T");
+				StringBuffer gsb = new StringBuffer();
+				for(int i=9;i<token.length;i++){
+					gsb.append(token[i]);
+					gsb.append('\t');
+				}
+				gene = new AnnotatedGene(gsb.toString());
 			}
+			
 		}
 		
-		private ScoredPosition(String contig, int position, boolean isPlusStrand, double score, double quantity, String codon, AnnotatedGene gene, boolean isAnnotated){
+		private ScoredPosition(String contig, int position, boolean isPlusStrand, double score, double quantity, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
 			this.contig = contig;
 			this.position = position;
 			this.isPlusStrand = isPlusStrand;
 			this.score = score;
 			this.quantity = quantity;
 			this.codon = codon;
+			this.genomicRegion = genomicRegion;
+			this.frameShift = frameShift;
 			if(gene != null){
-				this.geneName = gene.getGeneName();
-				this.gbgeneName = gene.getGenomeBrowserGeneName();
-				this.txStart = gene.getTxStart();
-				this.txEnd = gene.getTxEnd();
-				this.cdsStart = gene.getCdsStart();
-				this.cdsEnd = gene.getCdsEnd();
 				this.isAnnotated = isAnnotated;
+				this.gene = gene;			
 			}
+			
 		}
 				
 		public int compareTo(ScoredPosition o) {
@@ -131,17 +121,18 @@ public class ScoringOutputParser {
 			sb.append((isPlusStrand? '+': '-')); sb.append('\t');
 			sb.append(score); sb.append('\t');
 			sb.append(quantity); sb.append('\t');
-			sb.append(codon); 
-			if(geneName !=null){
+			sb.append(codon);sb.append('\t');
+			sb.append(genomicRegion);sb.append('\t');
+			sb.append(frameShift);sb.append('\t');
+			if(gene !=null){	
+				sb.append(isAnnotated()? 'T' : 'F');
 				sb.append('\t');
-				sb.append(isAnnotated? "T" : "F"); sb.append('\t');
-				sb.append(geneName); sb.append('\t');
-				sb.append(gbgeneName); sb.append('\t');
-				sb.append(txStart); sb.append('\t');
-				sb.append(txEnd); sb.append('\t');
-				sb.append(cdsStart); sb.append('\t');
-				sb.append(cdsEnd);
-			}else sb.append("\t_\t_\t_\t_\t_\t_");
+				sb.append(gene);
+			}else{ 
+				sb.append('_');
+				sb.append('\t');
+				sb.append(AnnotatedGene.getEmptyGeneString());
+			}
 			return sb.toString(); 
 		}		
 	}
@@ -202,8 +193,8 @@ public class ScoringOutputParser {
 	}
 	*/
 	
-	public static ScoredPosition getScoredPosition(String contig, int position, boolean isPlusStrand, double score, double quantity, String codon, AnnotatedGene gene, boolean isAnnotated){
-		return  new ScoringOutputParser().new ScoredPosition(contig, position, isPlusStrand, score, quantity, codon, gene, isAnnotated);			
+	public static ScoredPosition getScoredPosition(String contig, int position, boolean isPlusStrand, double score, double quantity, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
+		return  new ScoringOutputParser().new ScoredPosition(contig, position, isPlusStrand, score, quantity, codon, gene, isAnnotated, genomicRegion, frameShift);			
 	}
 	
 	public static ArrayList<ScoredPosition> getUnionPositions(ScoringOutputParser[] parsers, String contig, double scoreThreshold){

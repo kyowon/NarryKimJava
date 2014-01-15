@@ -137,6 +137,7 @@ public class MakeProteinFastaAndAnnotationFile {
 	
 	
 	//
+	/*
 	private void generate(String annotationkey){
 		PrintStream outFasta;
 		PrintStream outAnnotation;
@@ -238,7 +239,7 @@ public class MakeProteinFastaAndAnnotationFile {
 		} catch (FileNotFoundException e) {			
 			e.printStackTrace();
 		}
-	}
+	}*/
 	
 	
 	
@@ -271,6 +272,6 @@ public class MakeProteinFastaAndAnnotationFile {
 				score);
 		
 		//test.getExcludingKeywords("/media/kyowon/Data1/RPF_Project/data/hg19_protein_" + key + "_1.8.blast");
-		test.generate(annotationkey);
+		//test.generate(annotationkey);
 	}
 }

@@ -54,7 +54,7 @@ public class BedCovFileParser {
 		double[] cov = getCoverages(contig, position, leftWindowSize, rightWindowSize, isPlusStrand);
 		double[] sqrtCov = new double[cov.length];
 		for(int i=0; i<cov.length; i++){
-			sqrtCov[i] = Math.sqrt(cov[i]);
+			if(cov[i]>0) sqrtCov[i] = Math.sqrt(cov[i]);
 		}
 		return sqrtCov;
 	}

@@ -27,7 +27,7 @@ public class AnnotationFileParser {
 		}
 	}
 	
-	public class AnnotatedGene{
+	public static class AnnotatedGene{
 		private String genomeBrowserGeneName;		
 		private String geneName;
 		private String contig;
@@ -66,7 +66,7 @@ public class AnnotationFileParser {
 			}
 		}	
 		
-		// construct sudo annotated gene
+		/*// construct sudo annotated gene
 		private AnnotatedGene(ScoredPosition position){ 
 			genomeBrowserGeneName = position.getGBGeneName() != null? position.getGBGeneName() : "Putative";
 			geneName = position.getGeneName() != null? position.getGeneName() : ((Integer)position.getPosition()).toString();
@@ -79,7 +79,7 @@ public class AnnotationFileParser {
 			exonCount = 1;
 			exonStarts = new int[exonCount];
 			exonEnds = new int[exonCount];			
-		}
+		}*/
 		
 		private AnnotatedGene(int txStart, int txEnd){ // constructor for comparison
 			this.txStart = txStart;
@@ -87,8 +87,7 @@ public class AnnotationFileParser {
 		}
 		
 		public String toString(){
-			StringBuffer sb = new StringBuffer();
-			
+			StringBuffer sb = new StringBuffer();			
 			sb.append(genomeBrowserGeneName); sb.append('\t');
 			sb.append(geneName); sb.append('\t');
 			sb.append(contig); sb.append('\t');
@@ -105,6 +104,38 @@ public class AnnotationFileParser {
 			for(int t : exonEnds){
 				sb.append(t);sb.append(',');
 			}
+			return sb.toString();
+		}
+		
+		public static String getEmptyGeneString(){
+			StringBuffer sb = new StringBuffer();			
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); 
+			return sb.toString();
+		}
+		
+		public static String getHeader(){
+			StringBuffer sb = new StringBuffer();
+			sb.append("GenomeBrowserGeneName");sb.append('\t');
+			sb.append("GeneName");sb.append('\t');
+			sb.append("Contig");sb.append('\t');
+			sb.append("Strand");sb.append('\t');
+			sb.append("txStart");sb.append('\t');
+			sb.append("txEnd");sb.append('\t');
+			sb.append("cdsStart");sb.append('\t');
+			sb.append("cdsEnd");sb.append('\t');
+			sb.append("ExonCount");sb.append('\t');
+			sb.append("ExonStarts");sb.append('\t');
+			sb.append("ExonEnds");sb.append('\t');			
 			return sb.toString();
 		}
 		
@@ -157,9 +188,9 @@ public class AnnotationFileParser {
 	private HashMap<String, ArrayList<AnnotatedGene>> annotatedGeneSetMap;
 	private HashMap<String, HashMap<Boolean, HashMap<Integer, AnnotatedGene>>> annotatedGenePositionMap;
 	
-	public static AnnotatedGene getSudoAnnotatedGene(ScoredPosition position){
-		return new AnnotationFileParser().new AnnotatedGene(position);
-	}
+//	public static AnnotatedGene getSudoAnnotatedGene(ScoredPosition position){
+//		return new AnnotationFileParser().new AnnotatedGene(position);
+//	}
 	
 	
 	public AnnotationFileParser(String annotationFile){
@@ -227,26 +258,90 @@ public class AnnotationFileParser {
 		return ret;
 	}
 	
-	public String getGenomicRegionName(String contig, boolean isPlusStrand, int position){
-		String name;
+	public ArrayList<String> getGenomicRegionNameAndFrameShift(String contig, boolean isPlusStrand, int position){
+		ArrayList<String> ret = new ArrayList<String>();
 		AnnotatedGene gene = getAnnotatedGene(contig, isPlusStrand, position);
-		if(gene != null) return "Genic_Start";
+		if(gene != null){
+			//ret.add("NM_Start"); ret.add("0"); TODO
+			//return ret;
+		}
 		else gene = getContainingGene(contig, isPlusStrand, position);								
 		
-		if(gene == null) name = "InterGenic";
-		else{
-			if(gene.getGenomeBrowserGeneName().startsWith("LINC")) name = "Genic_LINC";
-			else if(gene.getGeneName().startsWith("NR")) name = "Genic_NR";
-			else{
-				if(position >= gene.getCdsStart() && position < gene.getCdsEnd()) name = "Genic_ORF";
-				else{
-					if(isPlusStrand && position < gene.getCdsStart()) name = "5_UTR";
-					else if(!isPlusStrand && position > gene.getCdsEnd()) name = "5_UTR";
-					else name = "3_UTR";
+		String name;
+		String frameShift;
+		
+		if(gene == null){
+			name = "InterGenic";
+			frameShift = "_";
+		}else{
+			if(gene.getGenomeBrowserGeneName().startsWith("LINC")) name = "LINC";
+			else if(gene.getGeneName().startsWith("NR")) name = "NR";
+			else name = "NM";
+			
+			if(position >= gene.getCdsStart() && position < gene.getCdsEnd()){
+				name += "_ORF";
+				int[][] introns = gene.getIntrons();
+				for(int i=0;i<introns.length;i++){
+					if(position >=introns[i][0] && position <= introns[i][1]){
+						name += "_Intron";
+						break;
+					}
 				}
-			}				
+				
+			}else{
+				if(isPlusStrand && position < gene.getCdsStart()) name += "_5_UTR";
+				else if(!isPlusStrand && position >= gene.getCdsEnd()) name += "_5_UTR";
+				else name += "_3_UTR";
+			}	
+			Integer j = 0;
+			if(isPlusStrand){
+				int i = 0;
+				for(;i<gene.getExonCount()-1;i++){
+					if(position < gene.getExonEnds()[i]){						
+						break;
+					}
+					j+=gene.getExonEnds()[i] - gene.getExonStarts()[i];
+				}
+				assert(position >= gene.getExonStarts()[i]);
+				j += position - gene.getExonStarts()[i];
+				
+				i = 0;
+				int startPosition = gene.getCdsStart();
+				for(;i<gene.getExonCount()-1;i++){
+					if(startPosition < gene.getExonEnds()[i]){						
+						break;
+					}
+					j-=gene.getExonEnds()[i] - gene.getExonStarts()[i];
+				}
+				assert(startPosition >= gene.getExonStarts()[i]);
+				j -= startPosition - gene.getExonStarts()[i];
+				j = j%3;
+				if(j<0) j+=3;
+			}else{				
+				int i = gene.getExonCount()-1;
+				for(;i>0;i--){
+					if(position >= gene.getExonStarts()[i]) break;
+					j+=gene.getExonEnds()[i] - gene.getExonStarts()[i];
+				}
+				assert(position < gene.getExonEnds()[i]);
+				j += gene.getExonEnds()[i] - position;
+				
+				i = gene.getExonCount()-1;
+				int startPosition = gene.getCdsEnd() - 1;
+				for(;i>0;i--){
+					if(startPosition >= gene.getExonStarts()[i]) break;
+					j-=gene.getExonEnds()[i] - gene.getExonStarts()[i];
+				}
+				assert(startPosition < gene.getExonEnds()[i]);
+				j -= gene.getExonEnds()[i] - startPosition;
+				j = j%3;
+				if(j<0) j+=3;
+			}	
+			frameShift = j.toString();
 		}
-		return name;
+		
+		ret.add(name); ret.add(frameShift);
+		return ret;
 	}
 	
 	public ArrayList<Integer> getLiftOverPositions(String contig, boolean isPlusStrand, int start, int length){ // if start is in intron, return null; length should be short enough to ensure that positions are within a single gene.
@@ -262,7 +357,7 @@ public class AnnotationFileParser {
 			int c = start;
 			for(;intronIndex<introns.length;intronIndex++){
 				if(introns[intronIndex][1] >= c){
-					if(introns[intronIndex][0] <= c) return null;
+					//if(introns[intronIndex][0] <= c) return null;
 					break;
 				}
 			}			
@@ -278,7 +373,7 @@ public class AnnotationFileParser {
 			int c = start;
 			for(;intronIndex>=0;intronIndex--){
 				if(introns[intronIndex][0] <= c){
-					if(introns[intronIndex][1] >= c) return null;
+					//if(introns[intronIndex][1] >= c) return null;
 					break;
 				}
 			}			
@@ -289,8 +384,7 @@ public class AnnotationFileParser {
 					intronIndex--;
 				}
 			}				
-		}
-		
+		}		
 		return ret;
 	}
 	
@@ -310,12 +404,21 @@ public class AnnotationFileParser {
 	
 
 	public static void main(String[] args){
-		AnnotationFileParser test = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt");
+		AnnotationFileParser test = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/refFlatHumantest.txt");
 		//System.out.println();
-		ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/hg19.fa");
+		//ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/hg19.fa");
 		
-		for(int i: test.getLiftOverPositions("chrX", false, 51811268-1, 3))
-			System.out.println(i + " " + fasta.getSequence("chrX", i, i+1));
+		//for(int i=75;i>5;i--)
+		//	System.out.println(i+ " " + test.getGenomicRegionNameAndFrameShift("chr8", false, i));
+		
+	//	System.out.println();
+		
+		//for(int i=5;i<75;i++)
+		//	System.out.println(i+ " " + test.getGenomicRegionNameAndFrameShift("chr9", true, i));
+		
+		test.getLiftOverPositions("chr20", true, 35807792, 100);
+	//	for(int i: test.getLiftOverPositions("chrX", false, 51811268-1, 3))
+	//		System.out.println(i + " " + fasta.getSequence("chrX", i, i+1));
 		//Iterator<AnnotatedGene> iterator = test.getAnnotatedGeneIterator("chr1");
 		//while(iterator.hasNext()){
 		//	AnnotatedGene gene = iterator.next();

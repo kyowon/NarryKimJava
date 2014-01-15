@@ -49,7 +49,7 @@ public class ReadLengthDistribution
     }
   
     private void getPositionMap(){
-    	positionMap = new HashMap<String, ArrayList<ScoredPosition>>();
+    	/*positionMap = new HashMap<String, ArrayList<ScoredPosition>>();
     	String key = "_etc";
     	for(ScoredPosition position : scoringOutputParser.getPositions()){
 	    	boolean isPlusStrand = position.isPlusStrand();
@@ -69,7 +69,7 @@ public class ReadLengthDistribution
 			}
 			if(!positionMap.containsKey(key)) positionMap.put(key, new ArrayList<ScoredPosition>());
 			positionMap.get(key).add(position);
-    	}
+    	}*/
     }
     
     private void normalizeDistribution(double[][] dist){

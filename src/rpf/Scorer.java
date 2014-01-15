@@ -38,12 +38,9 @@ public class Scorer {
 		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFile);
 		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFile);		
 		read(paramFile);		
+		annotationFileParser = new AnnotationFileParser(annotationFile);
 	}
 	
-	public Scorer setAnnotationFileFile(String refFlat){
-		annotationFileParser = new AnnotationFileParser(refFlat);
-		return this;
-	}
 	
 	public void scoreNWrite(double scoreThreshold, String fastaFile, String outFile){
 		if(new File(outFile).exists()){
@@ -92,12 +89,15 @@ public class Scorer {
 						}						
 						
 						boolean isAnnotated = false;
+						ArrayList<String> genomicRegionAndFrameShift = null;
 						if(annotationFileParser != null){
 							gene = annotationFileParser.getAnnotatedGene(contig, isPlusStrand, currentPosition);
 							if(gene != null) isAnnotated = true;
-							else gene = annotationFileParser.getContainingGene(contig, isPlusStrand, currentPosition);								
+							else gene = annotationFileParser.getContainingGene(contig, isPlusStrand, currentPosition);		
+							genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(contig, isPlusStrand, currentPosition);
+							if(genomicRegionAndFrameShift.get(0).endsWith("Intron")) continue;
 						}						
-						ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(contig, currentPosition, isPlusStrand, score, quantity, codon, gene, isAnnotated);
+						ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(contig, currentPosition, isPlusStrand, score, quantity, codon, gene, isAnnotated, genomicRegionAndFrameShift.get(0), genomicRegionAndFrameShift.get(1));
 						out.println(scoredPosition);						
 					}						
 				}	
@@ -254,7 +254,7 @@ public class Scorer {
 	
 	public static int numberOfNonZeroElements(double[] v){
 		int c = 0;
-		for(double e : v) if(e > 0) c++;
+		for(double e : v) if(e != 0) c++;
 		return c;
 	}
 	

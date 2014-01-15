@@ -112,13 +112,12 @@ public class RPFPipeLine {
 			for(int j=0;j<plusCovFiles[i].length;j++){
 				MatchedFilterTrainier trainer = new MatchedFilterTrainier(plusCovFiles[i][j], minusCovFiles[i][j], refFlat, paramFiles[i][j]);
 				System.out.println("Training for " + plusCovFiles[i][j] + " and " + minusCovFiles[i][j]);
-				if(j == 0) trainer.train(30, 50, 3); // harr
-				else trainer.train(30, 200, 7); // rpf
+				if(j == 0) trainer.train(30, 50, 5); // harr
+				else trainer.train(30, 200, 10); // rpf
 				System.out.println("Training done..");
 				if(j==0){
 					System.out.println("Scoring for " + plusCovFiles[i][j] + " and " + minusCovFiles[i][j]);
 					Scorer scorer = new Scorer(plusCovFiles[i][j], minusCovFiles[i][j], paramFiles[i][j], refFlat);
-					scorer.setAnnotationFileFile(refFlat);
 					scorer.scoreNWrite(0, fasta, scoreOutFiles[i]);
 					scorer.writeWindowFilteredOutput(scoreOutFiles[i], scoreOutFiles[i] + ".windowed.tsv", 50);
 					System.out.println("Scoring done..");
