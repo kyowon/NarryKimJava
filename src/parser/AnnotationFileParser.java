@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 
 import parser.ScoringOutputParser.ScoredPosition;
@@ -344,12 +345,53 @@ public class AnnotationFileParser {
 		return ret;
 	}
 	
-	public ArrayList<Integer> getLiftOverPositions(String contig, boolean isPlusStrand, int start, int length){ // if start is in intron, return null; length should be short enough to ensure that positions are within a single gene.
+	
+	public ArrayList<Integer> getLiftOverCDSPositions(AnnotatedGene gene){	
+		return getLiftOverPositions(gene, gene.isPlusStrand(), gene.isPlusStrand()? gene.cdsStart : gene.cdsEnd - 1, Integer.MAX_VALUE, true);
+	}
+	
+	public ArrayList<Integer> getLiftOverPositionsTillNextStopCodon(String contig, boolean isPlusStrand, int start, ZeroBasedFastaParser fastaParser){
 		AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
-		if(gene == null){
-			if(isPlusStrand) gene = getContainingGene(contig, isPlusStrand, start + length - 1);
-			else gene = getContainingGene(contig, isPlusStrand, start - length + 1);			
+		ArrayList<Integer> positions = getLiftOverPositions(gene, isPlusStrand, start, Integer.MAX_VALUE, true);
+		ArrayList<Integer> ret = new ArrayList<Integer>();
+		HashSet<String> stopCodons = new HashSet<String>();
+		stopCodons.add("TAG");
+		stopCodons.add("TAA");
+		stopCodons.add("TGA");
+		
+		HashSet<String> complementaryStopCodons = new HashSet<String>();
+		complementaryStopCodons.add("ATC");
+		complementaryStopCodons.add("ATT");
+		complementaryStopCodons.add("ACT");
+		
+		for(int i=0;i<positions.size()-2;i+=3){
+			ArrayList<Integer> p = new ArrayList<Integer>();
+			p.add(positions.get(i));
+			p.add(positions.get(i+1));
+			p.add(positions.get(i+2));
+			ret.addAll(p);
+			if(isPlusStrand && stopCodons.contains(fastaParser.getSequence(contig, p))){
+				break;
+			}
+			if(!isPlusStrand && complementaryStopCodons.contains(fastaParser.getSequence(contig, p))){
+				break;
+			}
 		}
+		
+		return ret;
+	}
+	
+	
+	public ArrayList<Integer> getLiftOverPositions(String contig, boolean isPlusStrand, int start, int length){
+		AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
+		//if(gene == null){
+		//	if(isPlusStrand) gene = getContainingGene(contig, isPlusStrand, start + length - 1);
+		//	else gene = getContainingGene(contig, isPlusStrand, start - length + 1);			
+		//}
+		return getLiftOverPositions(gene, isPlusStrand, start, length, false);
+	}
+	
+	private ArrayList<Integer> getLiftOverPositions(AnnotatedGene gene, boolean isPlusStrand, int start, int length, boolean stopAtCDSEnd){
 		ArrayList<Integer> ret = new ArrayList<Integer>();
 		int[][] introns = gene==null? new int[0][0] : gene.getIntrons();
 		if(isPlusStrand){
@@ -363,6 +405,7 @@ public class AnnotationFileParser {
 			}			
 			while(ret.size() < length){
 				ret.add(c++);
+				if(stopAtCDSEnd && c >= gene.getCdsEnd()) break;
 				if(intronIndex < introns.length && c >= introns[intronIndex][0]){
 					c = introns[intronIndex][1] + 1;
 					intronIndex++;
@@ -379,6 +422,7 @@ public class AnnotationFileParser {
 			}			
 			while(ret.size() < length && c>=0){
 				ret.add(c--);
+				if(stopAtCDSEnd && c < gene.getCdsStart()) break;
 				if(intronIndex >= 0 && c <= introns[intronIndex][1]){
 					c = introns[intronIndex][0] - 1;
 					intronIndex--;
@@ -387,8 +431,6 @@ public class AnnotationFileParser {
 		}		
 		return ret;
 	}
-	
-	
 	
 	public Iterator<AnnotatedGene> getAnnotatedGeneIterator(){
 		ArrayList<AnnotatedGene> allGenes = new ArrayList<AnnotatedGene>();

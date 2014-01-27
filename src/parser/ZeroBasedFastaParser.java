@@ -2,6 +2,7 @@ package parser;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
 
@@ -33,12 +34,51 @@ public class ZeroBasedFastaParser {
 		byte[] refSeq = refSeqs.get(contig);
 		StringBuffer seq = new StringBuffer();
 		end = getLength(contig) < end? getLength(contig) : end;
-		for(int i=start;i<end;i++){
-			if(i<0 || i>=refSeq.length) continue;
-			seq.append((char)refSeq[i]);
+		
+		int tst=start;
+		int tend=end;
+		
+		if(start>end){
+			tst = end;
+			tend = start;
 		}
-				
+		
+		for(int i=tst;i<tend;i++){
+			if(i<0) continue;
+			if(i>=refSeq.length) break;
+			seq.append((char)refSeq[i]);
+		}		
+		
+		return start>end? getComplementaryCodon(seq.toString()): seq.toString();
+	}
+	
+	public String getSequence(String contig, ArrayList<Integer> positions){
+		if(!refSeqs.containsKey(contig)) return null;
+		byte[] refSeq = refSeqs.get(contig);
+		StringBuffer seq = new StringBuffer();
+		for(int i : positions){
+			if(i<0) continue;
+			if(i>=refSeq.length) break;
+			seq.append((char)refSeq[i]);
+		}				
 		return seq.toString();
+	}
+	
+	public static String getComplementaryCodon(String codon){
+		StringBuffer cc = new StringBuffer();
+		char[] nas = codon.toCharArray();
+		for(int i = nas.length-1;i>=0;i--){
+			char na = nas[i];
+			cc.append(getComplementaryNA(na));
+		}
+		return cc.toString();
+	}
+	
+	private static char getComplementaryNA(char na){
+		if(na == 'A') return 'T';
+		if(na == 'T') return 'A';
+		if(na == 'C') return 'G';
+		return 'C';
 	}
 	
 	public int getLength(String contig){

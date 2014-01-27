@@ -17,27 +17,29 @@ import parser.RPFMergedFileParser.MergedResult;
 import parser.ScoringOutputParser;
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.ScoringOutputParser.ScoredPosition;
+import parser.ZeroBasedFastaParser;
 
 public class MergeResults {
-	private BedCovFileParser[][] bedCovPlusFileParsers; // [][0] : harr [][1] : RPF TODO make "sample number" and replace it with '2'
-	private BedCovFileParser[][] bedCovMinusFileParsers;
 	private ScoringOutputParser[] scoringOutputParsers;
-	private Scorer[][] scorers;
+	private Quantifier[] rpfQuantifiers = null;
+	private Quantifier[] rnaQuantifiers = null;
 	
-	public MergeResults(String[] scoreOutFiles, String[][] bedCovPlusFiles, String[][] bedCovMinusFiles, String[][] paramFiles, String annotationFile){
+	public MergeResults(String[] scoreOutFiles, String[] rpfCovPlusFiles, String[] rpfCovMinusFiles,
+			String[] rnaCovPlusFiles, String[] rnaCovMinusFiles,
+			String annotationFile,
+			String fastaFile){
 		int n = scoreOutFiles.length;
 		scoringOutputParsers = new ScoringOutputParser[n];
-		bedCovPlusFileParsers = new BedCovFileParser[n][2];
-		bedCovMinusFileParsers = new BedCovFileParser[n][2];
-		scorers = new Scorer[n][2];
 		
-		for(int i=0; i<n;i++){
+		if(rpfCovPlusFiles!=null)
+			rpfQuantifiers = new Quantifier[n];
+		if(rnaCovPlusFiles!=null)
+			rnaQuantifiers = new Quantifier[n];
+		
+		for(int i=0;i<n;i++){
 			scoringOutputParsers[i] = new ScoringOutputParser(scoreOutFiles[i]);
-			for(int j=0;j<2;j++){
-				bedCovPlusFileParsers[i][j] = new BedCovFileParser(bedCovPlusFiles[i][j], annotationFile);
-				bedCovMinusFileParsers[i][j] = new BedCovFileParser(bedCovMinusFiles[i][j], annotationFile);
-				scorers[i][j] = new Scorer(bedCovPlusFiles[i][j], bedCovMinusFiles[i][j], paramFiles[i][j], annotationFile);
-			}			
+			if(rpfQuantifiers!=null) rpfQuantifiers[i] = new Quantifier(rpfCovPlusFiles[i], rpfCovMinusFiles[i], annotationFile, fastaFile);
+			if(rnaQuantifiers!=null) rnaQuantifiers[i] = new Quantifier(rnaCovPlusFiles[i], rnaCovMinusFiles[i], annotationFile, fastaFile);
 		}
 	}
 	
@@ -52,7 +54,7 @@ public class MergeResults {
 			}
 			for(String contig : contigs){
 				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, contig, scoreThreshold)){
-					String gname;;
+					String gname;
 					if(!position.isAnnotated()) gname = contig+"_"+position.getPosition()+"_"+(position.isPlusStrand()? "P" : "M");
 					else gname = position.getGene().getGeneName();
 					mout.println(gname + "=[");
@@ -136,9 +138,9 @@ public class MergeResults {
 	
 	private String getHeader(){
 		String ret = "#Contig\tPosition\tStrand\tCodon\t";
-		for(int i=0;i<scorers.length;i++){
+		for(int i=0;i<scoringOutputParsers.length;i++){
 			ret+= "Scores" + (i+1); 
-			if(i<scorers.length-1) ret+=";";
+			if(i<scoringOutputParsers.length-1) ret+=";";
 			else ret+="\t";
 		}
 		/*for(int i=0;i<scorers.length;i++){
@@ -146,9 +148,9 @@ public class MergeResults {
 			if(i<scorers.length-1) ret+=",";
 			else ret+="\t";
 		}*/
-		for(int i=0;i<scorers.length;i++){
+		for(int i=0;i<scoringOutputParsers.length;i++){
 			ret+= "RPFQuantities" + (i+1);
-			if(i<scorers.length-1) ret+=";";
+			if(i<scoringOutputParsers.length-1) ret+=";";
 			else ret+="\t";
 		}
 		ret += "mostExtremeHarrScoreRatio\tmostExtremeHarrScoreRatioPvalue\tmostExtremeRPFQuantityRatio\tmostExtremeRPFQuantityRatioPvalue";
@@ -158,8 +160,8 @@ public class MergeResults {
 		
 	private MergedResult getSinglePositionInformation(ScoredPosition position, PrintStream outMFileStream){
 		BedCovFileParser[][] bedCovFileParsers = position.isPlusStrand()? bedCovPlusFileParsers : bedCovMinusFileParsers; 
-		double[] scores = new double[scorers.length];
-		double[] quantities = new double[scorers.length];
+		//double[] scores = new double[scorers.length];
+		//double[] quantities = new double[scorers.length];
 		
 		for(int i=0;i<scorers.length;i++){
 			double[][] cov = new double[2][];
@@ -173,7 +175,7 @@ public class MergeResults {
 				outMFileStream.append('\n');		
 			}		
 			scores[i] = scorers[i][0].getLRScore(scorers[i][0].getRawScore(cov[0]));		
-			quantities[i] = scorers[i][1].getQuantity(cov[1], true);
+			//quantities[i] = scorers[i][1].getQuantity(cov[1], true);
 		}
 		
 		return new RPFMergedFileParser().new MergedResult(position, scores, quantities);

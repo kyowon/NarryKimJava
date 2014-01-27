@@ -76,7 +76,7 @@ public class Scorer {
 					lastConsidered = currentPosition;
 					if(numberOfNonZeroElements(cov) < numberOfNonZeroElements) continue;
 					double score = getLRScore(getRawScore(cov));
-					double quantity = getQuantity(cov);
+				//	double quantity = getQuantity(cov);
 					
 					if(score > scoreThreshold){
 						String codon;
@@ -97,7 +97,7 @@ public class Scorer {
 							genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(contig, isPlusStrand, currentPosition);
 							if(genomicRegionAndFrameShift.get(0).endsWith("Intron")) continue;
 						}						
-						ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(contig, currentPosition, isPlusStrand, score, quantity, codon, gene, isAnnotated, genomicRegionAndFrameShift.get(0), genomicRegionAndFrameShift.get(1));
+						ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(contig, currentPosition, isPlusStrand, score, codon, gene, isAnnotated, genomicRegionAndFrameShift.get(0), genomicRegionAndFrameShift.get(1));
 						out.println(scoredPosition);						
 					}						
 				}	
@@ -233,7 +233,7 @@ public class Scorer {
 	//public int getCoverageThreshold(){
 	//	return coverageThreshold;
 	//}
-	
+	/*
 	public double getQuantity(double[] cov){
 		return getQuantity(cov, false);
 	}
@@ -250,6 +250,8 @@ public class Scorer {
 		//double[] sqrtCov = getSqrtVector(cov);
 		return getInnerProduct(signalFilter, cov);
 	}
+	*/
+	
 	
 	
 	public static int numberOfNonZeroElements(double[] v){

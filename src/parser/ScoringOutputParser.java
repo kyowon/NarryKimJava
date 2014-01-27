@@ -19,7 +19,6 @@ public class ScoringOutputParser {
 		private boolean isPlusStrand;
 		private int position;
 		private double score;
-		private double quantity;
 		private String codon;
 		private boolean isAnnotated = false;
 		private AnnotatedGene gene = null;
@@ -37,9 +36,6 @@ public class ScoringOutputParser {
 		}
 		public double getScore() {
 			return score;
-		}
-		public double getQuantity() {
-			return quantity;
 		}
 		public String getCodon() {
 			return codon;
@@ -63,14 +59,13 @@ public class ScoringOutputParser {
 			position = Integer.parseInt(token[1]);
 			isPlusStrand = token[2].equals("+");
 			score = Double.parseDouble(token[3]);
-			quantity = Double.parseDouble(token[4]);
-			codon = token[5];
-			genomicRegion = token[6];
-			frameShift = token[7];
+			codon = token[4];
+			genomicRegion = token[5];
+			frameShift = token[6];
 			if(!token[8].equals("_")){				
-				isAnnotated = token[8].equals("T");
+				isAnnotated = token[7].equals("T");
 				StringBuffer gsb = new StringBuffer();
-				for(int i=9;i<token.length;i++){
+				for(int i=8;i<token.length;i++){
 					gsb.append(token[i]);
 					gsb.append('\t');
 				}
@@ -79,12 +74,11 @@ public class ScoringOutputParser {
 			
 		}
 		
-		private ScoredPosition(String contig, int position, boolean isPlusStrand, double score, double quantity, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
+		private ScoredPosition(String contig, int position, boolean isPlusStrand, double score, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
 			this.contig = contig;
 			this.position = position;
 			this.isPlusStrand = isPlusStrand;
 			this.score = score;
-			this.quantity = quantity;
 			this.codon = codon;
 			this.genomicRegion = genomicRegion;
 			this.frameShift = frameShift;
@@ -120,7 +114,6 @@ public class ScoringOutputParser {
 			sb.append(position); sb.append('\t');
 			sb.append((isPlusStrand? '+': '-')); sb.append('\t');
 			sb.append(score); sb.append('\t');
-			sb.append(quantity); sb.append('\t');
 			sb.append(codon);sb.append('\t');
 			sb.append(genomicRegion);sb.append('\t');
 			sb.append(frameShift);sb.append('\t');
@@ -193,8 +186,8 @@ public class ScoringOutputParser {
 	}
 	*/
 	
-	public static ScoredPosition getScoredPosition(String contig, int position, boolean isPlusStrand, double score, double quantity, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
-		return  new ScoringOutputParser().new ScoredPosition(contig, position, isPlusStrand, score, quantity, codon, gene, isAnnotated, genomicRegion, frameShift);			
+	public static ScoredPosition getScoredPosition(String contig, int position, boolean isPlusStrand, double score, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
+		return  new ScoringOutputParser().new ScoredPosition(contig, position, isPlusStrand, score, codon, gene, isAnnotated, genomicRegion, frameShift);			
 	}
 	
 	public static ArrayList<ScoredPosition> getUnionPositions(ScoringOutputParser[] parsers, String contig, double scoreThreshold){

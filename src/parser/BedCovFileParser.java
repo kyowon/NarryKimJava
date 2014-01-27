@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 
+import parser.AnnotationFileParser.AnnotatedGene;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class BedCovFileParser {
@@ -36,7 +37,7 @@ public class BedCovFileParser {
 	}
 	
 	private Iterator<Integer> getBedCoverageIterator(String contig, int start, int length, boolean isPlusStrand){// start inclusive TODO
-		 HashMap<Integer, Integer> coverages = coverageMap.get(contig);
+		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
 		ArrayList<Integer> coveragesToreturn = new ArrayList<Integer>();
 		
 		if(coverages == null) return coveragesToreturn.iterator();		
@@ -77,6 +78,45 @@ public class BedCovFileParser {
 		return coverages;
 	}
 	
+	public double getTotalCDSCoverage(AnnotatedGene gene){
+		HashMap<Integer, Integer> coverages = coverageMap.get(gene.getContig());
+		double totalCoverages = 0;
+		ArrayList<Integer> positions = annotationParser.getLiftOverCDSPositions(gene);
+		//System.out.println(fastaParser.getSequence(contig, positions));
+		//System.out.println(positions.get(positions.size()-1));
+	
+		for(int position : positions){
+			Integer coverage = coverages.get(position);
+			if(coverage == null) continue;
+			totalCoverages += coverage;
+		}	
+		return totalCoverages;
+	}
+	
+	public double getTotalCoverageTillnextStopCodon(String contig, boolean isPlusStrand, int position, ZeroBasedFastaParser fastaParser){
+		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
+		double totalCoverages = 0;
+		ArrayList<Integer> positions = annotationParser.getLiftOverPositionsTillNextStopCodon(contig, isPlusStrand, position, fastaParser);
+		//System.out.println(positions.size());
+		for(int p : positions){
+			Integer coverage = coverages.get(p);
+			if(coverage == null) continue;
+			totalCoverages += coverage;
+		}	
+		return totalCoverages;
+	}
+	
+	public double getTotalCoverage(String contig, boolean isPlusStrand, int position, int length){
+		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
+		double totalCoverages = 0;
+		ArrayList<Integer> positions = annotationParser.getLiftOverPositions(contig, isPlusStrand, position, length);
+		for(int p : positions){
+			Integer coverage = coverages.get(p);
+			if(coverage == null) continue;
+			totalCoverages += coverage;
+		}	
+		return totalCoverages;
+	}
 	
 	private void read(String bedCovFile){
 		coverageMap = new HashMap<String, HashMap<Integer, Integer>>();

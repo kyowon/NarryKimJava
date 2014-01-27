@@ -18,6 +18,8 @@ public class MSGFPlusParser {
 		private int charge;
 		private String peptide;
 		private String protein;
+		private char preAA;
+		private char postAA;
 		private int deNovoScore;
 		private int msgfScore;
 		private float specEvalue;
@@ -88,8 +90,12 @@ public class MSGFPlusParser {
 		public float getPepQvalue() {
 			return pepQvalue;
 		}
-
-		
+		public char getPreAA(){
+			return preAA;
+		}
+		public char getPostAA(){
+			return postAA;
+		}
 		public MSGFPlusPSM(String s){
 			String[] token = s.split("\t");
 			specFile = token[0];
@@ -110,6 +116,8 @@ public class MSGFPlusParser {
 				qvalue = Float.parseFloat(token[14]);
 				pepQvalue = Float.parseFloat(token[15]);
 			}
+			preAA = protein.charAt(protein.lastIndexOf("(pre=")+5);
+			postAA = protein.charAt(protein.lastIndexOf("post=")+5);
 		}
 		
 		public String toString(){
