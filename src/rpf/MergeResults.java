@@ -28,18 +28,25 @@ public class MergeResults {
 			String[] rnaCovPlusFiles, String[] rnaCovMinusFiles,
 			String annotationFile,
 			String fastaFile){
-		int n = scoreOutFiles.length;
-		scoringOutputParsers = new ScoringOutputParser[n];
+		scoringOutputParsers = new ScoringOutputParser[scoreOutFiles.length];
 		
 		if(rpfCovPlusFiles!=null)
-			rpfQuantifiers = new Quantifier[n];
+			rpfQuantifiers = new Quantifier[rpfCovPlusFiles.length];
 		if(rnaCovPlusFiles!=null)
-			rnaQuantifiers = new Quantifier[n];
+			rnaQuantifiers = new Quantifier[rnaCovPlusFiles.length];
 		
-		for(int i=0;i<n;i++){
+		for(int i=0;i<scoringOutputParsers.length;i++){
 			scoringOutputParsers[i] = new ScoringOutputParser(scoreOutFiles[i]);
-			if(rpfQuantifiers!=null) rpfQuantifiers[i] = new Quantifier(rpfCovPlusFiles[i], rpfCovMinusFiles[i], annotationFile, fastaFile);
-			if(rnaQuantifiers!=null) rnaQuantifiers[i] = new Quantifier(rnaCovPlusFiles[i], rnaCovMinusFiles[i], annotationFile, fastaFile);
+		}
+		if(rpfQuantifiers!=null){
+			for(int i=0;i<rpfQuantifiers.length;i++){
+				rpfQuantifiers[i] = new Quantifier(rpfCovPlusFiles[i], rpfCovMinusFiles[i], annotationFile, fastaFile);
+			}
+		}
+		if(rnaQuantifiers!=null){
+			for(int i=0;i<rnaQuantifiers.length;i++){
+				rnaQuantifiers[i] = new Quantifier(rnaCovPlusFiles[i], rnaCovMinusFiles[i], annotationFile, fastaFile);
+			}
 		}
 	}
 	
@@ -89,52 +96,7 @@ public class MergeResults {
 		}
 	}
 		
-	private void appendPvalues(String outFile, int valueColumn, int pvalueColumn){
-		ArrayList<Double> values = new ArrayList<Double>();
-		try {
-            BufferedReader br = new BufferedReader(new FileReader(outFile));
-            String s;
-            while ((s = br.readLine()) != null) {
-            	if(s.startsWith("#")) continue;
-            	values.add(Double.parseDouble(s.split("\t")[valueColumn]));
-            }
-            br.close();            
-            Collections.sort(values);
-            br = new BufferedReader(new FileReader(outFile));
-            ArrayList<String> lines = new ArrayList<String>();
-            while ((s = br.readLine()) != null) {
-            	if(s.startsWith("#")){
-            		lines.add(s + "\n");
-            		continue;
-            	}
-            	String[] token = s.split("\t");
-            	double value = Double.parseDouble(token[valueColumn]);
-            	Double pval = getPvalue(values, value);
-            	token[pvalueColumn] = pval.toString();
-            	StringBuffer line = new StringBuffer();
-            	for(int i=0;i<token.length-1;i++){
-            		line.append(token[i]);line.append("\t");
-            	}
-            	line.append(token[token.length-1]);line.append("\n");
-            	lines.add(line.toString());
-            }
-            br.close();
-            BufferedWriter bw = new BufferedWriter(new FileWriter(outFile));
-            for(String line : lines){
-            	bw.write(line);
-            }
-            bw.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
 	
-	private double getPvalue(ArrayList<Double> values, double value){
-		int index = Collections.binarySearch(values, value);
-		if(index < 0) index = - index - 1;
-		double pval = (double) index / values.size();
-		return pval;//Math.min(pval, 1-pval);
-	}
 	
 	private String getHeader(){
 		String ret = "#Contig\tPosition\tStrand\tCodon\t";
@@ -143,21 +105,27 @@ public class MergeResults {
 			if(i<scoringOutputParsers.length-1) ret+=";";
 			else ret+="\t";
 		}
-		/*for(int i=0;i<scorers.length;i++){
-			ret+= "HarrQuantities" + (i+1);
-			if(i<scorers.length-1) ret+=",";
-			else ret+="\t";
-		}*/
-		for(int i=0;i<scoringOutputParsers.length;i++){
-			ret+= "RPFQuantities" + (i+1);
-			if(i<scoringOutputParsers.length-1) ret+=";";
-			else ret+="\t";
+		ret += "NonuniformityOfScores\t";
+		if(rpfQuantifiers != null && rpfQuantifiers.length > 0){
+			for(int i=0;i<rpfQuantifiers.length;i++){
+				ret+= "RPFQuantities" + (i+1);
+				if(i<rpfQuantifiers.length-1) ret+=";";
+			}
 		}
-		ret += "mostExtremeHarrScoreRatio\tmostExtremeHarrScoreRatioPvalue\tmostExtremeRPFQuantityRatio\tmostExtremeRPFQuantityRatioPvalue";
+		ret += "NonuniformityOfRPFQuantities\t";
+		if(rnaQuantifiers != null && rnaQuantifiers.length > 0){
+			for(int i=0;i<rnaQuantifiers.length;i++){
+				ret+= "RNAQuantities" + (i+1);
+				if(i<rnaQuantifiers.length-1) ret+=";";
+			}
+		}	
+		ret += "NonuniformityOfRNAQuantities\t";
 		ret += "\tgenomicRegion\tframeShift\tIsAnnotated\t" + AnnotatedGene.getHeader();
 		return ret;
 	}
 		
+	
+	
 	private MergedResult getSinglePositionInformation(ScoredPosition position, PrintStream outMFileStream){
 		BedCovFileParser[][] bedCovFileParsers = position.isPlusStrand()? bedCovPlusFileParsers : bedCovMinusFileParsers; 
 		//double[] scores = new double[scorers.length];

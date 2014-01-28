@@ -21,17 +21,17 @@ public class Quantifier {
 		fastaFileParser = new ZeroBasedFastaParser(fastaFile);
 	}
 	
-	public double getORFQuantity(AnnotatedGene gene){
+	public double getCDSQuantity(AnnotatedGene gene){
 		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
 		return bedCovFileParser.getTotalCDSCoverage(gene);
 	}
 	
-	public double getuORFQuantity(String contig, int position, boolean isPlusStrand){
+	public double getPositionQuantity(String contig, int position, boolean isPlusStrand){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
 		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, fastaFileParser);
 	}
 	
-	public double getQuantatyChangeRatio(String contig, int position, boolean isPlusStrand, int length){
+	public double getPositionQuantatyChangeRatio(String contig, int position, boolean isPlusStrand, int length){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
 		int prevPosition = isPlusStrand? position - length : position + length;
 		double qb = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, prevPosition, length) + 1;
@@ -47,11 +47,11 @@ public class Quantifier {
 				"/media/kyowon/Data1/RPF_Project/genomes/hg19.fa");
 		
 		AnnotatedGene gene = new AnnotatedGene("SRXN1	NM_080725	chr20	-	627267	634014	629357	633829	2	627267,633619,	629561,634014,");
-		System.out.println(test.getuORFQuantity("chr20", 306568, true));
+		System.out.println(test.getPositionQuantity("chr20", 306568, true));
 		
-		System.out.println(test.getuORFQuantity("chr20", 633829 - 1 , false));
+		System.out.println(test.getPositionQuantity("chr20", 633829 - 1 , false));
 		
-		System.out.println(test.getORFQuantity(gene));
+		System.out.println(test.getCDSQuantity(gene));
 		
 	}
 

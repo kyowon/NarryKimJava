@@ -4,41 +4,42 @@ import java.util.ArrayList;
 
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.ScoringOutputParser.ScoredPosition;
+import rpf.Quantifier;
 
 public class RPFMergedFileParser {
 	public class MergedResult{
 		//	IsAnnotated	ContainingGeneName	ContainingGBGeneName	txStart	txEnd	cdsStart	cdsEnd	genomicRegion	frameShift
-
+		private int quantityChangeLength = 300;
+		
 		private String contig;
 		private int position;
 		private boolean isPlusStrand;
 		private String codon;
 		private double[] scores;
-		private double[] rpfORFQuantities;
-		private double[] rpfORFQuantitiesNormalized;
+		private double scoreNonuniformity;//
 		
-		private double[] rpfQuantityChanges;
-		private double[] rpfuORFQuantities;
-		private double[] rpfuORFQuantitiesNormalized;
+		private double[] rpfCDSQuantities;//
+		private double[] rpfCDSQuantitiesNormalized;//
+		private double rpfCDSNonuniformity;	//
 		
-		private double[] rnaORFQuantities;
-		//private double[] rnaQuantityChanges;
-		//private double[] rnauORFQuantities;
+		private double[] rpfPositionQuantities;//
+		private double[] rpfPositionQuantitiesNormalized;//	
+		private double rpfPositionNonuniformity;	//
+		private double[] rpfPositionQuantityChanges;//
 		
-		private double scoreRatio;
-		private double scorePvalue = -1;		
-		private double rpfORFQuantitiesNormalizedRatio;
-		private double rpfORFQuantitiesNormalizedPvalue = -1;
+		private double[] rnaCDSQuantities;//
+		private double rnaCDSNonuniformity;//
 		
-		private double rpfuORFQuantitiesNormalizedRatio;
-		private double rpfuORFQuantitiesNormalizedPvalue = -1;
+		private double[] rnaPositionQuantities;//
+		private double rnaPositionNonuniformity;//
+		private double[] rnaPositionQuantityChanges;//
 		
 		private String genomicRegion;
 		private String frameShift;
 		private boolean isAnnotated;
 		private AnnotatedGene gene;
 		
-		public MergedResult(ArrayList<ScoredPosition> positions){
+		public MergedResult(ArrayList<ScoredPosition> positions, Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers){
 			this.contig = positions.get(0).getContig();
 			this.position = positions.get(0).getPosition();
 			this.isPlusStrand = positions.get(0).isPlusStrand();
@@ -49,28 +50,61 @@ public class RPFMergedFileParser {
 			this.gene = positions.get(0).getGene();
 			
 			this.scores = new double[positions.size()];
+			for(int i=0;i<this.scores.length;i++){
+				this.scores[i] = positions.get(i).getScore();
+			}
+			scoreNonuniformity = getNonuniformity(scores);
 			
-			
-			double[] mostExtremeRatios = new double[2];
-			int[] signs = new int[2];		
-			for(int i=0;i<scores.length;i++){
-				for(int j=i+1;j<scores.length;j++){	
-					for(int k=0;k<mostExtremeRatios.length;k++){
-						double v = k==0? Math.log10(scores[i]/scores[j]) : Math.log10(rpfQuantities[i]/rpfQuantities[j]);
-						if(mostExtremeRatios[k] < Math.abs(v)){
-							mostExtremeRatios[k] = Math.abs(v);
-							if(v<0) signs[k] = -1;
-							else signs[k] = 1;
-						}					
-					}				
+			if(rpfQuantifiers!=null){
+				if(gene != null){				
+					rpfCDSQuantities = new double[rpfQuantifiers.length];
+					for(int i=0; i<rpfQuantifiers.length;i++){
+						rpfCDSQuantities[i] = rpfQuantifiers[i].getCDSQuantity(gene);
+					}
+				}
+				rpfPositionQuantities = new double[rpfQuantifiers.length];
+				rpfPositionQuantityChanges = new double[rpfQuantifiers.length];
+				for(int i=0; i<rpfPositionQuantities.length;i++){
+					rpfPositionQuantities[i] = rpfQuantifiers[i].getPositionQuantity(contig, position, isPlusStrand);
+					rpfPositionQuantityChanges[i] = rpfQuantifiers[i].getPositionQuantatyChangeRatio(contig, position, isPlusStrand, quantityChangeLength);
 				}
 			}
 			
-			for(int k=0;k<mostExtremeRatios.length;k++){
-				mostExtremeRatios[k] *= signs[k];
+			if(rnaQuantifiers!=null){
+				if(gene != null){				
+					rnaCDSQuantities = new double[rnaQuantifiers.length];
+					for(int i=0; i<rnaQuantifiers.length;i++){
+						rnaCDSQuantities[i] = rnaQuantifiers[i].getCDSQuantity(gene);
+					}
+					rnaCDSNonuniformity = getNonuniformity(rnaCDSQuantities);
+				}
+				rnaPositionQuantities = new double[rnaQuantifiers.length];
+				rnaPositionQuantityChanges = new double[rnaQuantifiers.length];
+				for(int i=0; i<rnaPositionQuantities.length;i++){
+					rnaPositionQuantities[i] = rnaQuantifiers[i].getPositionQuantity(contig, position, isPlusStrand);
+					rnaPositionQuantityChanges[i] = rnaQuantifiers[i].getPositionQuantatyChangeRatio(contig, position, isPlusStrand, quantityChangeLength);
+				}
+				rnaPositionNonuniformity = getNonuniformity(rnaPositionQuantities);
 			}
-			scoreRatio = mostExtremeRatios[0];
-			quantityRatio = mostExtremeRatios[1];
+			if(rpfQuantifiers!=null && rnaQuantifiers!=null){
+				if(gene != null){
+					rpfCDSQuantitiesNormalized = new double[rpfQuantifiers.length];
+					for(int i=0; i<rpfCDSQuantitiesNormalized.length;i++){
+						rpfCDSQuantitiesNormalized[i] = rpfCDSQuantities[i] == 0? rpfCDSQuantities[i] : rpfCDSQuantities[i] / rnaCDSQuantities[i];
+					}
+					rpfCDSNonuniformity = getNonuniformity(rpfCDSQuantitiesNormalized);
+				}
+				rpfPositionQuantitiesNormalized = new double[rpfQuantifiers.length];
+				for(int i=0; i<rpfPositionQuantitiesNormalized.length;i++){
+					rpfPositionQuantitiesNormalized[i] = rpfPositionQuantitiesNormalized[i] == 0? rpfPositionQuantitiesNormalized[i] : rpfPositionQuantitiesNormalized[i] / rnaPositionQuantities[i];
+				}	
+				rpfPositionNonuniformity = getNonuniformity(rpfPositionQuantitiesNormalized);
+			}else{
+				if(gene != null){
+					rpfCDSNonuniformity = getNonuniformity(rpfCDSQuantities);
+				}
+				rpfPositionNonuniformity = getNonuniformity(rpfPositionQuantities);
+			}
 		}
 		
 		public MergedResult(String s){
@@ -130,22 +164,19 @@ public class RPFMergedFileParser {
 			return sb.toString();
 		}
 		
-		public void setScorePvalue(double scorePvalue) {
-			this.scorePvalue = scorePvalue;
+		private double getNonuniformity(double[] dist){
+			double sum = 0;
+			for(double v : dist){
+				sum += v;
+			}
+			if(sum == 0) return 0;
+			double kl = 0;
+			for(double v : dist){
+				double vn = v/sum;
+				if(vn > 0) kl += vn * Math.log(vn*dist.length);
+			}
+			return kl;		
 		}
-
-		public void setQuantityPvalue(double quantityPvalue) {
-			this.quantityPvalue = quantityPvalue;
-		}
-
-		public double getScoreRatio() {
-			return scoreRatio;
-		}
-
-		public double getQuantityRatio() {
-			return quantityRatio;
-		}
-
 		
 	}
 }
