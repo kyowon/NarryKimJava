@@ -210,8 +210,17 @@ public class Scorer {
 	}
 	
 	
-	public double getRawScore(double[] cov){
+	private double getRawScore(double[] cov){
 		return getRawScore(filter, cov, numberOfNonZeroElements, filterNorm);
+	}
+	
+	public double getScore(String contig, int position, boolean isPlusStrand, boolean considerNumberOfNonZeorElements){
+		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;	
+		double[] cov = bedCovFileParser.getSqrtCoverages(contig, position, leftWindowSize, rightWindowSize, isPlusStrand);
+		double score = -1;
+		if(!considerNumberOfNonZeorElements || numberOfNonZeroElements(cov) >= numberOfNonZeroElements) 
+			score = getLRScore(getRawScore(cov));
+		return score;
 	}
 	
 	private static double getRawScore(double[] filter, double[] cov, int numberOfNonZeroElements, double filterNorm){

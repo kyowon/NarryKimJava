@@ -136,7 +136,7 @@ public class AnnotationFileParser {
 			sb.append("cdsEnd");sb.append('\t');
 			sb.append("ExonCount");sb.append('\t');
 			sb.append("ExonStarts");sb.append('\t');
-			sb.append("ExonEnds");sb.append('\t');			
+			sb.append("ExonEnds");		
 			return sb.toString();
 		}
 		
@@ -358,22 +358,13 @@ public class AnnotationFileParser {
 		stopCodons.add("TAG");
 		stopCodons.add("TAA");
 		stopCodons.add("TGA");
-		
-		HashSet<String> complementaryStopCodons = new HashSet<String>();
-		complementaryStopCodons.add("ATC");
-		complementaryStopCodons.add("ATT");
-		complementaryStopCodons.add("ACT");
-		
 		for(int i=0;i<positions.size()-2;i+=3){
 			ArrayList<Integer> p = new ArrayList<Integer>();
 			p.add(positions.get(i));
 			p.add(positions.get(i+1));
 			p.add(positions.get(i+2));
 			ret.addAll(p);
-			if(isPlusStrand && stopCodons.contains(fastaParser.getSequence(contig, p))){
-				break;
-			}
-			if(!isPlusStrand && complementaryStopCodons.contains(fastaParser.getSequence(contig, p))){
+			if(stopCodons.contains(fastaParser.getSequence(contig, p))){
 				break;
 			}
 		}

@@ -59,6 +59,8 @@ public class MergeResults {
 			for(int i=0;i<scoringOutputParsers.length;i++){
 				contigs.addAll(scoringOutputParsers[i].getContigs());
 			}
+			
+			
 			for(String contig : contigs){
 				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, contig, scoreThreshold)){
 					String gname;
@@ -68,29 +70,13 @@ public class MergeResults {
 					mergedResults.add(getSinglePositionInformation(position, mout));
 					mout.println("]';");					
 				}
-			}
+			}		
 			
-			ArrayList<Double> values = new ArrayList<Double>();
-			for(MergedResult m : mergedResults){
-				values.add(m.getScoreRatio());
-			}
-			for(MergedResult m : mergedResults){
-				m.setScorePvalue(getPvalue(values, m.getScoreRatio()));
-			}
-			values.clear();
-			for(MergedResult m : mergedResults){
-				values.add(m.getQuantityRatio());
-			}
-			for(MergedResult m : mergedResults){
-				m.setQuantityPvalue(getPvalue(values, m.getQuantityRatio()));
-			}
-			out.println(getHeader());
+			out.println(mergedResults.get(0).getHeader());
 			for(MergedResult m : mergedResults){
 				out.println(m);
 			}
 			out.close();
-			appendPvalues(outFile,6,7);
-			appendPvalues(outFile,8,9);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -98,38 +84,9 @@ public class MergeResults {
 		
 	
 	
-	private String getHeader(){
-		String ret = "#Contig\tPosition\tStrand\tCodon\t";
-		for(int i=0;i<scoringOutputParsers.length;i++){
-			ret+= "Scores" + (i+1); 
-			if(i<scoringOutputParsers.length-1) ret+=";";
-			else ret+="\t";
-		}
-		ret += "NonuniformityOfScores\t";
-		if(rpfQuantifiers != null && rpfQuantifiers.length > 0){
-			for(int i=0;i<rpfQuantifiers.length;i++){
-				ret+= "RPFQuantities" + (i+1);
-				if(i<rpfQuantifiers.length-1) ret+=";";
-			}
-		}
-		ret += "NonuniformityOfRPFQuantities\t";
-		if(rnaQuantifiers != null && rnaQuantifiers.length > 0){
-			for(int i=0;i<rnaQuantifiers.length;i++){
-				ret+= "RNAQuantities" + (i+1);
-				if(i<rnaQuantifiers.length-1) ret+=";";
-			}
-		}	
-		ret += "NonuniformityOfRNAQuantities\t";
-		ret += "\tgenomicRegion\tframeShift\tIsAnnotated\t" + AnnotatedGene.getHeader();
-		return ret;
-	}
-		
-	
-	
 	private MergedResult getSinglePositionInformation(ScoredPosition position, PrintStream outMFileStream){
+		
 		BedCovFileParser[][] bedCovFileParsers = position.isPlusStrand()? bedCovPlusFileParsers : bedCovMinusFileParsers; 
-		//double[] scores = new double[scorers.length];
-		//double[] quantities = new double[scorers.length];
 		
 		for(int i=0;i<scorers.length;i++){
 			double[][] cov = new double[2][];
