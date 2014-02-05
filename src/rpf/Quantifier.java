@@ -39,6 +39,14 @@ public class Quantifier {
 		return qa/qb;
 	}
 	
+	public BedCovFileParser getBedCovPlusFileParser() {
+		return bedCovPlusFileParser;
+	}
+
+
+	public BedCovFileParser getBedCovMinusFileParser() {
+		return bedCovMinusFileParser;
+	}
 	
 	public static void main(String[] args) {
 		Quantifier test = new Quantifier("/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/RPF6_Thy_RPF_1-uncollapsed.plus.cov"

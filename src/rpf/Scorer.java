@@ -26,7 +26,7 @@ public class Scorer {
 	private int numberOfNonZeroElements = 5;
 	//private int coverageThreshold = 1;
 	
-	private BedCovFileParser bedCovPlusFileParser;
+	private BedCovFileParser bedCovPlusFileParser;	
 	private BedCovFileParser bedCovMinusFileParser;
 	private double[] filter;
 	private double[] signal; // used for quantification
@@ -261,7 +261,15 @@ public class Scorer {
 	}
 	*/
 	
-	
+	public BedCovFileParser getBedCovPlusFileParser() {
+		return bedCovPlusFileParser;
+	}
+
+
+	public BedCovFileParser getBedCovMinusFileParser() {
+		return bedCovMinusFileParser;
+	}
+
 	
 	public static int numberOfNonZeroElements(double[] v){
 		int c = 0;

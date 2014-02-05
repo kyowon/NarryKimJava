@@ -21,15 +21,19 @@ import parser.ZeroBasedFastaParser;
 
 public class MergeResults {
 	private ScoringOutputParser[] scoringOutputParsers;
+	private Scorer[] scorers = null; 
 	private Quantifier[] rpfQuantifiers = null;
 	private Quantifier[] rnaQuantifiers = null;
 	
-	public MergeResults(String[] scoreOutFiles, String[] rpfCovPlusFiles, String[] rpfCovMinusFiles,
+	public MergeResults(String[] scoreOutFiles, 
+			String[] harrCovPlusFiles, String[] harrCovMinusFiles, 
+			String[] rpfCovPlusFiles, String[] rpfCovMinusFiles,
 			String[] rnaCovPlusFiles, String[] rnaCovMinusFiles,
+			String[] paramFiles,
 			String annotationFile,
 			String fastaFile){
 		scoringOutputParsers = new ScoringOutputParser[scoreOutFiles.length];
-		
+		scorers = new Scorer[scoreOutFiles.length];
 		if(rpfCovPlusFiles!=null)
 			rpfQuantifiers = new Quantifier[rpfCovPlusFiles.length];
 		if(rnaCovPlusFiles!=null)
@@ -37,6 +41,7 @@ public class MergeResults {
 		
 		for(int i=0;i<scoringOutputParsers.length;i++){
 			scoringOutputParsers[i] = new ScoringOutputParser(scoreOutFiles[i]);
+			scorers[i] = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], paramFiles[i], annotationFile);
 		}
 		if(rpfQuantifiers!=null){
 			for(int i=0;i<rpfQuantifiers.length;i++){
@@ -59,52 +64,53 @@ public class MergeResults {
 			for(int i=0;i<scoringOutputParsers.length;i++){
 				contigs.addAll(scoringOutputParsers[i].getContigs());
 			}
-			
-			
 			for(String contig : contigs){
 				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, contig, scoreThreshold)){
-					String gname;
-					if(!position.isAnnotated()) gname = contig+"_"+position.getPosition()+"_"+(position.isPlusStrand()? "P" : "M");
-					else gname = position.getGene().getGeneName();
-					mout.println(gname + "=[");
-					mergedResults.add(getSinglePositionInformation(position, mout));
-					mout.println("]';");					
+					mergedResults.add(new RPFMergedFileParser().new MergedResult(position, scorers, rpfQuantifiers, rnaQuantifiers));	
+					writeMfile(mout, position);	
 				}
 			}		
-			
 			out.println(mergedResults.get(0).getHeader());
 			for(MergedResult m : mergedResults){
 				out.println(m);
 			}
 			out.close();
+			mout.close();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
-	}
-		
+	}	
 	
-	
-	private MergedResult getSinglePositionInformation(ScoredPosition position, PrintStream outMFileStream){
-		
-		BedCovFileParser[][] bedCovFileParsers = position.isPlusStrand()? bedCovPlusFileParsers : bedCovMinusFileParsers; 
-		
+	private void writeMfile(PrintStream mout, ScoredPosition position){
+		String gname;
+		if(!position.isAnnotated()) gname = position.getContig() +"_"+position.getPosition()+"_"+(position.isPlusStrand()? "P" : "M");
+		else gname = position.getGene().getGeneName();
+		mout.print(gname);
+		//a{3}=[ 4 5 ; 7 8 ]'
 		for(int i=0;i<scorers.length;i++){
-			double[][] cov = new double[2][];
-			for(int j=0;j<2;j++){
-				cov[j] = bedCovFileParsers[i][j].getSqrtCoverages(position.getContig(), position.getPosition(), scorers[i][j].getLeftWindowSize(), scorers[i][j].getRightWindowSize(), position.isPlusStrand());
-				double[] covForMfile = bedCovFileParsers[i][j].getCoverages(position.getContig(), position.getPosition(), 30, 100, position.isPlusStrand());
-				for(Double c : covForMfile){
-					outMFileStream.append(c.toString());
-					outMFileStream.append('\t');
-				}
-				outMFileStream.append('\n');		
-			}		
-			scores[i] = scorers[i][0].getLRScore(scorers[i][0].getRawScore(cov[0]));		
-			//quantities[i] = scorers[i][1].getQuantity(cov[1], true);
+			mout.println("{"+(i+1)+"}=[");
+			BedCovFileParser sbp =  position.isPlusStrand()? scorers[i].getBedCovPlusFileParser() : scorers[i].getBedCovMinusFileParser();
+			subWriteMfile(mout, position, sbp);
+			if(rpfQuantifiers != null && rpfQuantifiers[i] != null){
+				BedCovFileParser rpfbp =  position.isPlusStrand()? rpfQuantifiers[i].getBedCovPlusFileParser() : rpfQuantifiers[i].getBedCovMinusFileParser();
+				subWriteMfile(mout, position, rpfbp);
+			}
+			if(rnaQuantifiers != null && rnaQuantifiers[i] != null){
+				BedCovFileParser rnabp =  position.isPlusStrand()? rnaQuantifiers[i].getBedCovPlusFileParser() : rnaQuantifiers[i].getBedCovMinusFileParser();
+				subWriteMfile(mout, position, rnabp);
+			}
+			mout.println("]';");	
+		}				
+					
+	}
+	
+	private void subWriteMfile(PrintStream mout, ScoredPosition position, BedCovFileParser bp){
+		double[] cov = bp.getCoverages(position.getContig(), position.getPosition(), 30, 100, position.isPlusStrand());
+		for(Double c : cov){
+			mout.append(c.toString());
+			mout.append('\t');
 		}
-		
-		return new RPFMergedFileParser().new MergedResult(position, scores, quantities);
-				
+		mout.append('\n');
 	}
 		
 	public static void main(String[] args){ // quantities can be from different files!!!!  param and bedCovPlusFiles should be added for quan.

@@ -94,33 +94,41 @@ public class RPFMergedFileParser {
 		}
 		
 		public MergedResult(String s){
+			int i = 0;
 			String[] token = s.split("\t");
-			contig = token[0];
-			position = Integer.parseInt(token[1]);
-			isPlusStrand = token[2].equals("+");
-			codon = token[3];
-			String[] st = token[4].split(";");
-			String[] qt = token[5].split(";");
-			scores = new double[st.length-1];
-			rpfORFQuantities = new double[st.length-1];
-			for(int i=0;i<st.length-1;i++){
-				scores[i] = Double.parseDouble(st[i]);
-				rpfORFQuantities[i] = Double.parseDouble(qt[i]);
-			}
-			scoreRatio = Double.parseDouble(token[6]);
-			if(!token[7].equals("*")) scorePvalue = Double.parseDouble(token[7]);
-			quantityRatio = Double.parseDouble(token[8]);
-			if(!token[9].equals("*")) quantityPvalue = Double.parseDouble(token[9]);
-			genomicRegion = token[10];
-			frameShift = token[11];
-			if(!token[12].equals("_")){
-				isAnnotated = token[12].equals("T");
+			contig = token[i++];
+			position = Integer.parseInt(token[i++]);
+			isPlusStrand = token[i++].equals("+");
+			codon = token[i++];
+			scores = subParse(token[i++]);
+			rpfPositionQuantities = subParse(token[i++]);
+			rnaPositionQuantities = subParse(token[i++]);
+			rpfPositionQuantitiesNormalized = subParse(token[i++]);
+			rpfPositionQuantityChanges = subParse(token[i++]);
+			rnaPositionQuantityChanges = subParse(token[i++]);
+			rpfCDSQuantities = subParse(token[i++]);
+			rnaCDSQuantities = subParse(token[i++]);
+			rpfCDSQuantitiesNormalized = subParse(token[i++]);
+			
+			genomicRegion = token[i++];
+			frameShift = token[i++];
+			if(!token[i].equals("_")){
+				isAnnotated = token[i++].equals("T");
 				StringBuffer gs = new StringBuffer();
-				for(int i=13;i<token.length;i++){
+				for(;i<token.length;i++){
 					gs.append(token[i]); gs.append('\t');
 				}
 				gene = new AnnotatedGene(gs.toString());
 			}
+		}
+		
+		private double[] subParse(String s){
+			String[] token = s.split(";");
+			double[] ret = new double[token.length];
+			for(int i=0;i<ret.length;i++){
+				ret[i] = Double.parseDouble(token[i]);
+			}
+			return ret;
 		}
 		
 		public String getHeader(){
@@ -137,7 +145,7 @@ public class RPFMergedFileParser {
 			header += subGetHeader("RNA_CDSQuantities", rnaCDSQuantities) + "\t";
 			header += subGetHeader("RPF/RNA_CDSQuantities", rpfCDSQuantitiesNormalized) + "\t";
 			
-			header += "GenomicRegion\tFrameShift\t" + AnnotatedGene.getHeader();
+			header += "GenomicRegion\tFrameShift\tisAnnotated\t" + AnnotatedGene.getHeader();
 			
 			return header;
 		}
