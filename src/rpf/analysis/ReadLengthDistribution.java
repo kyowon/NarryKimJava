@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import parser.AnnotationFileParser;
 import parser.BedCovFileParser;
 import parser.ScoringOutputParser;
 import parser.ScoringOutputParser.ScoredPosition;
@@ -26,7 +27,7 @@ public class ReadLengthDistribution
     private BedCovFileParser bedCovPlusFileParser, bedCovMinusFileParser;
     private HashMap<String, ArrayList<ScoredPosition>> positionMap = null;
     
-    public ReadLengthDistribution(String bamFileName, String scoringOutputFileName, String fasta, String bedCovPlusFile, String bedCovMinusFile, String annotationFile)
+    public ReadLengthDistribution(String bamFileName, String scoringOutputFileName, String fasta, String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFile)
     {
         this.bamFile=new File(bamFileName);
         this.scoringOutputParser = new ScoringOutputParser(scoringOutputFileName);

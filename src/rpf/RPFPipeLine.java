@@ -1,5 +1,8 @@
 package rpf;
 
+import parser.AnnotationFileParser;
+import parser.ZeroBasedFastaParser;
+
 public class RPFPipeLine {
 	private static String[] scoreOutFiles;
 	private static String[] harrCovPlusFiles; 
@@ -9,8 +12,8 @@ public class RPFPipeLine {
 	private static String[] rnaCovPlusFiles; 
 	private static String[] rnaCovMinusFiles;
 	private static String[] paramFiles;
-	private static String fasta = null;
-	private static String refFlat = null;
+	private static ZeroBasedFastaParser fasta = null;
+	private static AnnotationFileParser refFlat = null;
 	private static double scoreThreshold = 2;
 	private static String outFile = null;
 		
@@ -49,9 +52,9 @@ public class RPFPipeLine {
 				rnaCovMinusFiles[i] = token[i];
 			}
 		}else if(mode == 7){
-			fasta = s;
+			fasta = new ZeroBasedFastaParser(s);
 		}else if(mode == 8){
-			refFlat = s;
+			refFlat = new AnnotationFileParser(s);
 		}else if(mode == 9){
 			scoreThreshold = Double.parseDouble(s);
 		}else if(mode == 10){
@@ -126,13 +129,13 @@ public class RPFPipeLine {
 			
 			System.out.println("Scoring for " + harrCovPlusFiles[i] + " and " + harrCovMinusFiles[i]);
 			Scorer scorer = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], paramFiles[i], refFlat);
-			scorer.scoreNWrite(0, fasta, scoreOutFiles[i]);
+			scorer.scoreNWrite(scoreThreshold, fasta, scoreOutFiles[i]);
 			//scorer.writeWindowFilteredOutput(scoreOutFiles[i], scoreOutFiles[i] + ".windowed.tsv", 50);
 			System.out.println("Scoring done..");
 			
 		}
-		System.out.println("Merging results");
 		MergeResults merge = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, refFlat, fasta);
+		System.out.println("Merging results");
 		merge.merge(outFile, scoreThreshold);
 		System.out.println("Merging done..");
 	}

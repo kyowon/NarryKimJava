@@ -15,9 +15,9 @@ public class BedCovFileParser {
 	private HashMap<String, HashMap<Integer, Integer>> coverageMap;
 	private AnnotationFileParser annotationParser;
 	
-	public BedCovFileParser(String bedCovFile, String annotationFile){
+	public BedCovFileParser(String bedCovFile, AnnotationFileParser annotationParser){
 		read(bedCovFile);
-		annotationParser = new AnnotationFileParser(annotationFile);
+		this.annotationParser = annotationParser;
 	}
 	
 	public ArrayList<String> getContigs(){
@@ -138,11 +138,11 @@ public class BedCovFileParser {
 		}
 	}
 	
-	public static void main(String[] args){
+	/*public static void main(String[] args){
 		BedCovFileParser test = new BedCovFileParser("/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/Noco_Harr_10mHsum-uncollapsed.plus.cov", "/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt");
 	
 		for(double cov : test.getCoverages("chr1", 566744, 5,10, false))
 			System.out.println(cov);
-	}
+	}*/
 	
 }

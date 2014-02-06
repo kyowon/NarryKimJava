@@ -36,10 +36,10 @@ public class MatchedFilterTrainier {
 	private double[] likelihoodFunctionCoefficients;
 	private String outParamFile;
 	
-	public MatchedFilterTrainier(String bedCovPlusFile, String bedCovMinusFile, String refFlatFile, String outParamFile){
-		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, refFlatFile);
-		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, refFlatFile);
-		annotationFileParser = new AnnotationFileParser(refFlatFile);	
+	public MatchedFilterTrainier(String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFileParser, String outParamFile){
+		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFileParser);
+		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFileParser);
+		this.annotationFileParser = annotationFileParser;	
 		this.outParamFile = outParamFile;
 	}
 		
@@ -178,7 +178,7 @@ public class MatchedFilterTrainier {
 	}
 	
 	private static double[] calculateLikelihoodFunctionCoefficients(double[] filter, ArrayList<double[]> signal, ArrayList<double[]> noise, int numberOfNonZeroElements){
-		double[] likelihoodFunctionCoefficients = new double[5];
+		double[] likelihoodFunctionCoefficients = new double[4];
 		ArrayList<Double> signalScores = new ArrayList<Double>();
 		ArrayList<Double> noiseScores = new ArrayList<Double>();
 		CurveFitter<Parametric> fitter = new CurveFitter<Parametric>(new LevenbergMarquardtOptimizer());
@@ -220,7 +220,7 @@ public class MatchedFilterTrainier {
 		return likelihoodFunctionCoefficients;
 	}
 	
-	public static void main(String[] args){
+	/*public static void main(String[] args){
 		String keyword =  "RPF6_NS_RPF_1";
 		String annotationkey = "uORF";
 		String covFileprefix = "/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/" + keyword + "-uncollapsed";
@@ -232,6 +232,6 @@ public class MatchedFilterTrainier {
 		
 		MatchedFilterTrainier test = new MatchedFilterTrainier(covFilePlus, covFileMinus, annotationFile, annotationFile+ keyword + ".param");
 		test.train(30, 50, 7);
-	}
+	}*/
 	
 }

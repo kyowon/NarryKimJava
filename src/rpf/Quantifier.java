@@ -15,10 +15,10 @@ public class Quantifier {
 	//private double uorfQuantity;
 	
 	
-	public Quantifier(String bedCovPlusFile, String bedCovMinusFile, String annotationFile, String fastaFile){
-		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFile);
-		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFile);	
-		fastaFileParser = new ZeroBasedFastaParser(fastaFile);
+	public Quantifier(String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFileParser, ZeroBasedFastaParser fastaFileParser){
+		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFileParser);
+		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFileParser);	
+		this.fastaFileParser = fastaFileParser;
 	}
 	
 	public double getCDSQuantity(AnnotatedGene gene){
@@ -48,7 +48,7 @@ public class Quantifier {
 		return bedCovMinusFileParser;
 	}
 	
-	public static void main(String[] args) {
+	/*public static void main(String[] args) {
 		Quantifier test = new Quantifier("/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/RPF6_Thy_RPF_1-uncollapsed.plus.cov"
 				,"/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/RPF6_Thy_RPF_1-uncollapsed.minus.cov"
 				, "/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt",
@@ -61,6 +61,6 @@ public class Quantifier {
 		
 		System.out.println(test.getCDSQuantity(gene));
 		
-	}
+	}*/
 
 }

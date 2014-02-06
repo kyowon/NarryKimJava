@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 
+import parser.AnnotationFileParser;
 import parser.BedCovFileParser;
 import parser.RPFMergedFileParser;
 import parser.RPFMergedFileParser.MergedResult;
@@ -30,8 +31,8 @@ public class MergeResults {
 			String[] rpfCovPlusFiles, String[] rpfCovMinusFiles,
 			String[] rnaCovPlusFiles, String[] rnaCovMinusFiles,
 			String[] paramFiles,
-			String annotationFile,
-			String fastaFile){
+			AnnotationFileParser annotationFileParser,
+			ZeroBasedFastaParser fastaFileParser){
 		scoringOutputParsers = new ScoringOutputParser[scoreOutFiles.length];
 		scorers = new Scorer[scoreOutFiles.length];
 		if(rpfCovPlusFiles!=null)
@@ -41,16 +42,16 @@ public class MergeResults {
 		
 		for(int i=0;i<scoringOutputParsers.length;i++){
 			scoringOutputParsers[i] = new ScoringOutputParser(scoreOutFiles[i]);
-			scorers[i] = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], paramFiles[i], annotationFile);
+			scorers[i] = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], paramFiles[i], annotationFileParser);
 		}
 		if(rpfQuantifiers!=null){
 			for(int i=0;i<rpfQuantifiers.length;i++){
-				rpfQuantifiers[i] = new Quantifier(rpfCovPlusFiles[i], rpfCovMinusFiles[i], annotationFile, fastaFile);
+				rpfQuantifiers[i] = new Quantifier(rpfCovPlusFiles[i], rpfCovMinusFiles[i], annotationFileParser, fastaFileParser);
 			}
 		}
 		if(rnaQuantifiers!=null){
 			for(int i=0;i<rnaQuantifiers.length;i++){
-				rnaQuantifiers[i] = new Quantifier(rnaCovPlusFiles[i], rnaCovMinusFiles[i], annotationFile, fastaFile);
+				rnaQuantifiers[i] = new Quantifier(rnaCovPlusFiles[i], rnaCovMinusFiles[i], annotationFileParser, fastaFileParser);
 			}
 		}
 	}
@@ -59,20 +60,22 @@ public class MergeResults {
 		try {
 			PrintStream out = new PrintStream(outFile);
 			PrintStream mout = new PrintStream(outFile.replace('.', '_')+".m");
-			ArrayList<MergedResult> mergedResults = new ArrayList<MergedResult>();
+			//ArrayList<MergedResult> mergedResults = new ArrayList<MergedResult>();
 			HashSet<String> contigs = new HashSet<String>();
 			for(int i=0;i<scoringOutputParsers.length;i++){
 				contigs.addAll(scoringOutputParsers[i].getContigs());
 			}
+			boolean start = true;
 			for(String contig : contigs){
 				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, contig, scoreThreshold)){
-					mergedResults.add(new RPFMergedFileParser().new MergedResult(position, scorers, rpfQuantifiers, rnaQuantifiers));	
+					MergedResult mr = new RPFMergedFileParser().new MergedResult(position, scorers, rpfQuantifiers, rnaQuantifiers);
+					if(start){
+						out.println(mr.getHeader());
+						start = false;
+					}
+					out.println(mr);	
 					writeMfile(mout, position);	
 				}
-			}		
-			out.println(mergedResults.get(0).getHeader());
-			for(MergedResult m : mergedResults){
-				out.println(m);
 			}
 			out.close();
 			mout.close();

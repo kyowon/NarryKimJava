@@ -34,31 +34,31 @@ public class Scorer {
 	private PolynomialFunction likelihoodFunction;
 	private AnnotationFileParser annotationFileParser = null; // if specified, only annotated start positions are considered
 	
-	public Scorer(String bedCovPlusFile, String bedCovMinusFile, String paramFile, String annotationFile){
-		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFile);
-		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFile);		
+	public Scorer(String bedCovPlusFile, String bedCovMinusFile, String paramFile, AnnotationFileParser annotationFileParser){
+		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFileParser);
+		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFileParser);		
 		read(paramFile);		
-		annotationFileParser = new AnnotationFileParser(annotationFile);
+		this.annotationFileParser = annotationFileParser;
 	}
 	
 	
-	public void scoreNWrite(double scoreThreshold, String fastaFile, String outFile){
+	public void scoreNWrite(double scoreThreshold, ZeroBasedFastaParser fastaParser, String outFile){
 		if(new File(outFile).exists()){
 			System.out.println(outFile + " exists. Scoring is skipped.");
 			return;
 		}
 		try {
 			PrintStream out = new PrintStream(outFile);
-			scoreNWrite(scoreThreshold, true, fastaFile, out);
-			scoreNWrite(scoreThreshold, false, fastaFile, out);
+			scoreNWrite(scoreThreshold, true, fastaParser, out);
+			scoreNWrite(scoreThreshold, false, fastaParser, out);
 			out.close();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
 	}
 	
-	private void scoreNWrite(double scoreThreshold, boolean isPlusStrand, String fastaFile, PrintStream out){
-		ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser(fastaFile);
+	private void scoreNWrite(double scoreThreshold, boolean isPlusStrand, ZeroBasedFastaParser fastaParser, PrintStream out){
+		//ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser(fastaFile);
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;	
 		for(String contig : bedCovFileParser.getContigs()){
 			Iterator<Integer> iterator;
