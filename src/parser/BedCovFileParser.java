@@ -47,7 +47,9 @@ public class BedCovFileParser {
 		for(int position : positions){
 			Integer coverage = coverages.get(position);
 			coveragesToreturn.add(coverage == null ? 0 : coverage);
-		}		
+			//System.out.println(position + " " + coverage);
+		}	
+		//System.out.println(positions);
 		return coveragesToreturn.iterator();
 	}
 	
@@ -138,11 +140,14 @@ public class BedCovFileParser {
 		}
 	}
 	
-	/*public static void main(String[] args){
-		BedCovFileParser test = new BedCovFileParser("/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/Noco_Harr_10mHsum-uncollapsed.plus.cov", "/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt");
-	
-		for(double cov : test.getCoverages("chr1", 566744, 5,10, false))
-			System.out.println(cov);
-	}*/
+	public static void main(String[] args){
+		BedCovFileParser test = new BedCovFileParser("/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/Harr_C-uncollapsed.plus.cov", 
+				new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
+	//chr10	127852386
+
+		int i=0;
+		for(double cov : test.getCoverages("chr10", 127852386, 30,10, true))
+			System.out.println(i++ + " " + cov);
+	}
 	
 }

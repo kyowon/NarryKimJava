@@ -47,12 +47,12 @@ public class ZeroBasedFastaParser {
 			if(i<0) continue;
 			if(i>=refSeq.length) break;
 			seq.append((char)refSeq[i]);
-		}		
-		
-		return start>end? getComplementaryCodon(seq.toString()): seq.toString();
+		}	
+		String ret = start>end? getComplementaryCodon(seq.toString()): seq.toString();		
+		return ret.toUpperCase();
 	}
 	
-	public String getSequence(String contig, ArrayList<Integer> positions){
+	public String getSequence(String contig, ArrayList<Integer> positions){ // positions should be sorted in ascending order
 		if(!refSeqs.containsKey(contig)) return null;
 		byte[] refSeq = refSeqs.get(contig);
 		StringBuffer seq = new StringBuffer();
@@ -61,7 +61,7 @@ public class ZeroBasedFastaParser {
 			if(i>=refSeq.length) break;
 			seq.append((char)refSeq[i]);
 		}				
-		return seq.toString();
+		return seq.toString().toUpperCase();
 	}
 	
 	public static String getComplementaryCodon(String codon){

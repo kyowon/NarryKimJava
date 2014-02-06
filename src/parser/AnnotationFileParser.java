@@ -221,11 +221,6 @@ public class AnnotationFileParser {
 		}		
 	}
 	
-	
-	private AnnotationFileParser() {
-	}
-
-
 	public AnnotatedGene getAnnotatedGene(String contig, boolean isPlusStrand, int position){
 		HashMap<Boolean, HashMap<Integer, AnnotatedGene>> sub = annotatedGenePositionMap.get(contig);
 		if(sub == null) return null;
@@ -393,14 +388,16 @@ public class AnnotationFileParser {
 					//if(introns[intronIndex][0] <= c) return null;
 					break;
 				}
-			}			
+			}		
+			boolean startLift = false;
 			while(ret.size() < length){
 				ret.add(c++);
-				if(stopAtCDSEnd && c >= gene.getCdsEnd()) break;
-				if(intronIndex < introns.length && c >= introns[intronIndex][0]){
+				if(stopAtCDSEnd && gene!=null && c >= gene.getCdsEnd()) break;
+				if(intronIndex >= 0 && intronIndex < introns.length && c >= introns[intronIndex][0]){ // if c is within intron
+					if(!startLift) continue;
 					c = introns[intronIndex][1] + 1;
 					intronIndex++;
-				}
+				}else startLift = true;
 			}						
 		}else{
 			int intronIndex = introns.length-1;
@@ -410,14 +407,16 @@ public class AnnotationFileParser {
 					//if(introns[intronIndex][1] >= c) return null;
 					break;
 				}
-			}			
+			}		
+			boolean startLift = false;
 			while(ret.size() < length && c>=0){
 				ret.add(c--);
-				if(stopAtCDSEnd && c < gene.getCdsStart()) break;
-				if(intronIndex >= 0 && c <= introns[intronIndex][1]){
+				if(stopAtCDSEnd && gene!=null && c < gene.getCdsStart()) break;
+				if(intronIndex >= 0 && intronIndex < introns.length && c <= introns[intronIndex][1]){
+					if(!startLift) continue;
 					c = introns[intronIndex][0] - 1;
 					intronIndex--;
-				}
+				}else startLift = true;
 			}				
 		}		
 		return ret;
