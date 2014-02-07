@@ -342,12 +342,12 @@ public class AnnotationFileParser {
 	
 	
 	public ArrayList<Integer> getLiftOverCDSPositions(AnnotatedGene gene){	
-		return getLiftOverPositions(gene, gene.isPlusStrand(), gene.isPlusStrand()? gene.cdsStart : gene.cdsEnd - 1, Integer.MAX_VALUE, true);
+		return getLiftOverPositions(gene, gene.isPlusStrand(), gene.isPlusStrand()? gene.cdsStart : gene.cdsEnd - 1, gene == null? 0 : Integer.MAX_VALUE, true);
 	}
 	
-	public ArrayList<Integer> getLiftOverPositionsTillNextStopCodon(String contig, boolean isPlusStrand, int start, ZeroBasedFastaParser fastaParser){
+	public ArrayList<Integer> getLiftOverPositionsTillNextStopCodon(String contig, boolean isPlusStrand, int start, int maxLength, ZeroBasedFastaParser fastaParser){
 		AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
-		ArrayList<Integer> positions = getLiftOverPositions(gene, isPlusStrand, start, Integer.MAX_VALUE, true);
+		ArrayList<Integer> positions = getLiftOverPositions(gene, isPlusStrand, start, maxLength, true);
 		ArrayList<Integer> ret = new ArrayList<Integer>();
 		HashSet<String> stopCodons = new HashSet<String>();
 		stopCodons.add("TAG");

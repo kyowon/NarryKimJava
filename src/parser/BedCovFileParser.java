@@ -14,11 +14,14 @@ public class BedCovFileParser {
 	
 	private HashMap<String, HashMap<Integer, Integer>> coverageMap;
 	private AnnotationFileParser annotationParser;
+	private int totalReadCount = 0;
 	
 	public BedCovFileParser(String bedCovFile, AnnotationFileParser annotationParser){
 		read(bedCovFile);
 		this.annotationParser = annotationParser;
 	}
+	
+	public int getTotalReadCount() { return totalReadCount; }
 	
 	public ArrayList<String> getContigs(){
 		ArrayList<String> contigs = new ArrayList<String>(coverageMap.keySet());
@@ -80,36 +83,39 @@ public class BedCovFileParser {
 		return coverages;
 	}
 	
-	public double getTotalCDSCoverage(AnnotatedGene gene){
+	public double getTotalCDSCoverage(AnnotatedGene gene, boolean normalizeByLength){
 		HashMap<Integer, Integer> coverages = coverageMap.get(gene.getContig());
+		if(coverages == null) return 0;
 		double totalCoverages = 0;
 		ArrayList<Integer> positions = annotationParser.getLiftOverCDSPositions(gene);
-		//System.out.println(fastaParser.getSequence(contig, positions));
-		//System.out.println(positions.get(positions.size()-1));
 	
 		for(int position : positions){
 			Integer coverage = coverages.get(position);
 			if(coverage == null) continue;
 			totalCoverages += coverage;
 		}	
+		if(normalizeByLength) totalCoverages/=positions.size();
 		return totalCoverages;
 	}
 	
-	public double getTotalCoverageTillnextStopCodon(String contig, boolean isPlusStrand, int position, ZeroBasedFastaParser fastaParser){
+	public double getTotalCoverageTillnextStopCodon(String contig, boolean isPlusStrand, int position, int maxLength, ZeroBasedFastaParser fastaParser, boolean normalizeByLength){
 		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
+		if(coverages == null) return 0;
 		double totalCoverages = 0;
-		ArrayList<Integer> positions = annotationParser.getLiftOverPositionsTillNextStopCodon(contig, isPlusStrand, position, fastaParser);
+		ArrayList<Integer> positions = annotationParser.getLiftOverPositionsTillNextStopCodon(contig, isPlusStrand, position, maxLength, fastaParser);
 		//System.out.println(positions.size());
 		for(int p : positions){
 			Integer coverage = coverages.get(p);
 			if(coverage == null) continue;
 			totalCoverages += coverage;
 		}	
+		if(normalizeByLength) totalCoverages/=positions.size();
 		return totalCoverages;
 	}
 	
-	public double getTotalCoverage(String contig, boolean isPlusStrand, int position, int length){
+	public double getTotalCoverage(String contig, boolean isPlusStrand, int position, int length, boolean normalizeByLength){
 		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
+		if(coverages == null) return 0;
 		double totalCoverages = 0;
 		ArrayList<Integer> positions = annotationParser.getLiftOverPositions(contig, isPlusStrand, position, length);
 		for(int p : positions){
@@ -117,11 +123,13 @@ public class BedCovFileParser {
 			if(coverage == null) continue;
 			totalCoverages += coverage;
 		}	
+		if(normalizeByLength) totalCoverages/=positions.size();
 		return totalCoverages;
 	}
 	
 	private void read(String bedCovFile){
 		coverageMap = new HashMap<String, HashMap<Integer, Integer>>();
+		totalReadCount = 0;
 		try {
 			BufferedLineReader in = new BufferedLineReader(new FileInputStream(bedCovFile));
 			String s;
@@ -132,6 +140,7 @@ public class BedCovFileParser {
 				int coverage = (int)Double.parseDouble(token[2]);
 				if(!coverageMap.containsKey(contig)) coverageMap.put(contig, new HashMap<Integer, Integer>());
 				coverageMap.get(contig).put(position, coverage);
+				totalReadCount += coverage;
 			}
 			in.close();					
 		} catch (FileNotFoundException e) {

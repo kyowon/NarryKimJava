@@ -21,23 +21,35 @@ public class Quantifier {
 		this.fastaFileParser = fastaFileParser;
 	}
 	
-	public double getCDSQuantity(AnnotatedGene gene){
+	public double getCDSRPKM(AnnotatedGene gene){
 		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
-		return bedCovFileParser.getTotalCDSCoverage(gene);
+		return bedCovFileParser.getTotalCDSCoverage(gene, true) * 1e9 / bedCovFileParser.getTotalReadCount();
 	}
 	
-	public double getPositionQuantity(String contig, int position, boolean isPlusStrand){
+	public double getPositionRPKM(String contig, int position, boolean isPlusStrand, int maxLength){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, fastaFileParser);
+		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, true) * 1e9 / bedCovFileParser.getTotalReadCount();
 	}
-	
+	///([length of transcript]/1000)/([total reads]/10^6)
 	public double getPositionQuantatyChangeRatio(String contig, int position, boolean isPlusStrand, int length){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
 		int prevPosition = isPlusStrand? position - length : position + length;
-		double qb = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, prevPosition, length) + 1;
-		double qa = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, position, length) + 1; 
+		double qb = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, prevPosition, length, false) + 1;
+		double qa = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, position, length, false) + 1; 
 		return qa/qb;
 	}
+	
+	public double getCDSQuantity(AnnotatedGene gene){
+		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
+		return bedCovFileParser.getTotalCDSCoverage(gene, false);
+	}
+	
+	public double getPositionQuantity(String contig, int position, boolean isPlusStrand, int maxLength){
+		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
+		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, false);
+	}
+	
+
 	
 	public BedCovFileParser getBedCovPlusFileParser() {
 		return bedCovPlusFileParser;
