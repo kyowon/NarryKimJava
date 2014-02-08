@@ -1,9 +1,13 @@
 package rpf;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,22 +46,19 @@ public class Scorer {
 	}
 	
 	
-	public void scoreNWrite(double scoreThreshold, ZeroBasedFastaParser fastaParser, String outFile){
-		if(new File(outFile).exists()){
-			System.out.println(outFile + " exists. Scoring is skipped.");
-			return;
-		}
+	public void scoreNWrite(double scoreThreshold, ZeroBasedFastaParser fastaParser, String outFile, boolean append){
 		try {
-			PrintStream out = new PrintStream(outFile);
+			// out = new PrintWriter(new BufferedWriter(new FileWriter("writePath", true)));
+			PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(outFile, append)));
 			scoreNWrite(scoreThreshold, true, fastaParser, out);
 			scoreNWrite(scoreThreshold, false, fastaParser, out);
 			out.close();
-		} catch (FileNotFoundException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 	
-	private void scoreNWrite(double scoreThreshold, boolean isPlusStrand, ZeroBasedFastaParser fastaParser, PrintStream out){
+	private void scoreNWrite(double scoreThreshold, boolean isPlusStrand, ZeroBasedFastaParser fastaParser, PrintWriter out){
 		//ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser(fastaFile);
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;	
 		for(String contig : bedCovFileParser.getContigs()){
@@ -77,8 +78,8 @@ public class Scorer {
 					if(numberOfNonZeroElements(cov) < numberOfNonZeroElements) continue;
 					double score = getLRScore(getRawScore(cov));
 				//	double quantity = getQuantity(cov);
-					
-					if(score > scoreThreshold){
+					//System.out.println(score);
+					if(scoreThreshold > 0 && score > scoreThreshold || scoreThreshold < 0 && score < -scoreThreshold){
 						String codon;
 						if(!fastaParser.containsContig(contig)){
 							codon = "N/A";

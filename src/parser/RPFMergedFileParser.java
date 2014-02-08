@@ -10,8 +10,8 @@ import rpf.Scorer;
 public class RPFMergedFileParser {
 	public class MergedResult{
 		//	IsAnnotated	ContainingGeneName	ContainingGBGeneName	txStart	txEnd	cdsStart	cdsEnd	genomicRegion	frameShift
-		private int positionQuantityChangeLength = 300;
-		private int positionQuantityMaxLength = 500000;
+		private int positionQuantityChangeLength = 600;
+		private int positionQuantityMaxLength = 30000;
 		
 		private String contig;
 		private int position;
@@ -215,7 +215,7 @@ public class RPFMergedFileParser {
 			return sb.toString();
 		}
 		
-		private void subToString(double[] quantities, StringBuffer sb){
+		private void subToString(double[] quantities, StringBuffer sb){ // TODO if null, number of ';' should be specified
 			if(quantities!=null && quantities.length>0){
 				for(int i=0; i<quantities.length-1; i++){
 					sb.append(quantities[i]); sb.append(';');
@@ -229,7 +229,6 @@ public class RPFMergedFileParser {
 				sb.append("N/A\tN/A");
 			}
 		}
-		
 		
 		private double getNonuniformity(double[] dist){
 			double sum = 0;

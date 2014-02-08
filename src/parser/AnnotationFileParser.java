@@ -390,9 +390,17 @@ public class AnnotationFileParser {
 				}
 			}		
 			boolean startLift = false;
-			while(ret.size() < length){
+			while(true){
 				ret.add(c++);
-				if(stopAtCDSEnd && gene!=null && c >= gene.getCdsEnd()) break;
+				if(gene == null){
+					if(ret.size() >= length) break;
+				}else{
+					if(stopAtCDSEnd){
+						if(c >= gene.getCdsEnd()) break;
+					}else{
+						if(ret.size() >= length) break;
+					}
+				}				
 				if(intronIndex >= 0 && intronIndex < introns.length && c >= introns[intronIndex][0]){ // if c is within intron
 					if(!startLift) continue;
 					c = introns[intronIndex][1] + 1;
@@ -409,9 +417,19 @@ public class AnnotationFileParser {
 				}
 			}		
 			boolean startLift = false;
-			while(ret.size() < length && c>=0){
+			while(true){
 				ret.add(c--);
-				if(stopAtCDSEnd && gene!=null && c < gene.getCdsStart()) break;
+				if(gene == null){
+					if(ret.size() >= length || c < 0) break;
+				}else{
+					if(stopAtCDSEnd){
+						if(c < gene.getCdsEnd()) break;
+					}else{
+						if(ret.size() >= length || c < 0) break;
+					}
+				}
+				
+				//if(stopAtCDSEnd && gene!=null && c < gene.getCdsStart()) break;
 				if(intronIndex >= 0 && intronIndex < introns.length && c <= introns[intronIndex][1]){
 					if(!startLift) continue;
 					c = introns[intronIndex][0] - 1;

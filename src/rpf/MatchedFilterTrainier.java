@@ -44,10 +44,6 @@ public class MatchedFilterTrainier {
 	}
 		
 	public void train(int leftWindowSize, int rightWindowSize, int numberOfNonZeroElements){
-		if(new File(outParamFile).exists()){
-			System.out.println(outParamFile + " exists. Training is skipped.");
-			return;
-		}
 		this.leftWindowSize = leftWindowSize;
 		this.rightWindowSize = rightWindowSize;
 		this.numberOfNonZeroElements = numberOfNonZeroElements;

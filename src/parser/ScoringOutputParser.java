@@ -197,7 +197,8 @@ public class ScoringOutputParser {
 		}	
 		ArrayList<ScoredPosition> positionList = new ArrayList<ScoredPosition>();
 		for(ScoredPosition p : positions){
-			if(p.getScore() > scoreThreshold) positionList.add(p);
+			if(scoreThreshold > 0 && p.getScore() > scoreThreshold) positionList.add(p);
+			else if(scoreThreshold <= 0 && p.getScore() < -scoreThreshold) positionList.add(p);
 		}		
 		Collections.sort(positionList);
 		return positionList;
