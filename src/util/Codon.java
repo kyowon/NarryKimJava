@@ -145,8 +145,9 @@ public class Codon extends ArrayList<Nucleotide>{
 	}
 	
 	public static void main(String[] args){
-		for(Codon codon : Codon.getStandardCodon("AAA").getMutatedStandardCodons(2)){
-			System.out.println(codon.getNucleotideSeq());
+		System.out.println(Codon.getStandardCodon("GGG").getCodingAA());
+		for(Codon codon : Codon.getStandardCodon("GGG").getMutatedStandardCodons(2)){
+			System.out.println(codon.getNucleotideSeq() + " " + codon.getCodingAA());
 		}
 	}
 	
