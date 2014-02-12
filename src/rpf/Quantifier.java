@@ -23,12 +23,12 @@ public class Quantifier {
 	
 	public double getCDSRPKM(AnnotatedGene gene){
 		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
-		return bedCovFileParser.getTotalCDSCoverage(gene, true) * 1e9 / bedCovFileParser.getTotalReadCount();
+		return (bedCovFileParser.getTotalCDSCoverage(gene, true)+1) * 1e9 / (bedCovFileParser.getTotalReadCount()+1);
 	}
 	
 	public double getPositionRPKM(String contig, int position, boolean isPlusStrand, int maxLength){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, true) * 1e9 / bedCovFileParser.getTotalReadCount();
+		return (bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, true)+1) * 1e9 / (bedCovFileParser.getTotalReadCount()+1);
 	}
 	///([length of transcript]/1000)/([total reads]/10^6)
 	public double getPositionQuantatyChangeRatio(String contig, int position, boolean isPlusStrand, int length){

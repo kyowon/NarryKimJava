@@ -52,8 +52,7 @@ public class ZeroBasedFastaParser {
 		return ret.toUpperCase();
 	}
 	
-	public String getSequence(String contig, ArrayList<Integer> positions){ // positions should be sorted in ascending order
-		if(!refSeqs.containsKey(contig)) return null;
+	public String getSequence(String contig, ArrayList<Integer> positions){ 
 		byte[] refSeq = refSeqs.get(contig);
 		StringBuffer seq = new StringBuffer();
 		for(int i : positions){
@@ -103,12 +102,8 @@ public class ZeroBasedFastaParser {
 
 	
 	public static void main(String[] args){
-		ZeroBasedFastaParser test = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/data/hg19.fa");
-		//System.out.println(test.getContigs());
-//		System.out.println(test.getLength("1"));
-		System.out.println(test.getSequence("chr20", 62151688, 62151688+150));
-		//chr20_62151688_+
-		//chr18_72057531
-		
+		ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.fa");
+		//
+		System.out.println(fasta.getSequence("chr13_random", 54, 54+167));
 	}
 }

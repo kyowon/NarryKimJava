@@ -1,7 +1,5 @@
 package parser;
 
-import java.util.ArrayList;
-
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.ScoringOutputParser.ScoredPosition;
 import rpf.Quantifier;
@@ -101,6 +99,11 @@ public class RPFMergedFileParser {
 			position = Integer.parseInt(token[i++]);
 			isPlusStrand = token[i++].equals("+");
 			codon = token[i++];
+			genomicRegion = token[i++];
+			frameShift = token[i++];
+			if(!token[i].equals("_"))
+				isAnnotated = token[i].equals("T");
+			i++;
 			scores = subParse(token[i++]);
 			rpfPositionQuantities = subParse(token[i++]);
 			rnaPositionQuantities = subParse(token[i++]);
@@ -110,11 +113,9 @@ public class RPFMergedFileParser {
 			rpfCDSQuantities = subParse(token[i++]);
 			rnaCDSQuantities = subParse(token[i++]);
 			rpfCDSQuantitiesNormalized = subParse(token[i++]);
-			i++;
-			genomicRegion = token[i++];
-			frameShift = token[i++];
+			//i++;
+			
 			if(!token[i].equals("_")){
-				isAnnotated = token[i++].equals("T");
 				StringBuffer gs = new StringBuffer();
 				for(;i<token.length;i++){
 					gs.append(token[i]); gs.append('\t');
@@ -133,7 +134,7 @@ public class RPFMergedFileParser {
 		}
 		
 		public String getHeader(){
-			String header =  "Contig\tPosition\tStrand\tCodon\t";
+			String header =  "Contig\tPosition\tStrand\tCodon\tGenomicRegion\tFrameShift\tisAnnotated\t";
 			header += subGetHeader("Score", scores) + "\t";
 			header += subGetHeader("RPF_Pos_RPKMs", rpfPositionQuantities) + "\t";
 			header += subGetHeader("RNA_Pos_RPKMs", rnaPositionQuantities) + "\t";
@@ -148,7 +149,7 @@ public class RPFMergedFileParser {
 			
 			header += "DistBetweenPos&CDS(RPF/RNA)\t";
 			
-			header += "GenomicRegion\tFrameShift\tisAnnotated\t" + AnnotatedGene.getHeader();
+			header += AnnotatedGene.getHeader();
 			
 			return header;
 		}
@@ -176,6 +177,10 @@ public class RPFMergedFileParser {
 			sb.append(isPlusStrand? '+' : '-');sb.append('\t');
 			sb.append(codon);sb.append('\t');
 			
+			sb.append(genomicRegion);sb.append('\t');
+			sb.append(frameShift);sb.append('\t');
+			sb.append(gene == null ? '_' : (isAnnotated? 'T' : 'F'));sb.append('\t');
+			
 			subToString(scores, sb);
 			sb.append('\t');
 			
@@ -194,38 +199,43 @@ public class RPFMergedFileParser {
 			subToString(rnaPositionQuantityChanges, sb);
 			sb.append('\t');
 			
-			subToString(rpfCDSQuantities, sb);
+			subToString(rpfCDSQuantities, sb, rpfPositionQuantities == null? 0 : rpfPositionQuantities.length);
 			sb.append('\t');
 			
-			subToString(rnaCDSQuantities, sb);
+			subToString(rnaCDSQuantities, sb, rnaPositionQuantities == null? 0 : rnaPositionQuantities.length);
 			sb.append('\t');
 			
-			subToString(rpfCDSQuantitiesNormalized, sb);
+			subToString(rpfCDSQuantitiesNormalized, sb, rpfPositionQuantitiesNormalized == null? 0 : rpfPositionQuantitiesNormalized.length);
 			sb.append('\t');
 			
 			if(rpfCDSQuantitiesNormalized != null && rpfPositionQuantitiesNormalized != null)
-				sb.append(getKL(rpfCDSQuantitiesNormalized, rpfPositionQuantitiesNormalized));
+				sb.append(String.format("%.3e", getKL(rpfPositionQuantitiesNormalized, rpfCDSQuantitiesNormalized)));
 			else sb.append("N/A");
 			sb.append('\t');
 			
-			sb.append(genomicRegion);sb.append('\t');
-			sb.append(frameShift);sb.append('\t');
-			sb.append(gene == null ? '_' : (isAnnotated? 'T' : 'F'));sb.append('\t');
 			sb.append(gene == null ? AnnotatedGene.getEmptyGeneString() : gene.toString());
 			return sb.toString();
 		}
 		
-		private void subToString(double[] quantities, StringBuffer sb){ // TODO if null, number of ';' should be specified
+		private void subToString(double[] quantities, StringBuffer sb){
+			subToString(quantities, sb, quantities == null? 0 : quantities.length);
+		}
+		
+		private void subToString(double[] quantities, StringBuffer sb, int numSample){ 
 			if(quantities!=null && quantities.length>0){
 				for(int i=0; i<quantities.length-1; i++){
-					sb.append(quantities[i]); sb.append(';');
+					sb.append(String.format("%.3e", quantities[i])); sb.append(';');
 				}
-				sb.append(quantities[quantities.length-1]); 
+				sb.append(String.format("%.3e", quantities[quantities.length-1])); 
 				sb.append('\t');
 				if(quantities.length > 1){
-					sb.append(getNonuniformity(quantities));
+					sb.append(String.format("%.3e", getNonuniformity(quantities)));
 				}
 			}else{
+				//sb.append("N/A");
+				for(int i=0; i<numSample-1; i++){
+					sb.append("N/A;");
+				}
 				sb.append("N/A\tN/A");
 			}
 		}
@@ -233,7 +243,7 @@ public class RPFMergedFileParser {
 		private double getNonuniformity(double[] dist){
 			double sum = 0;
 			for(double v : dist){
-				sum += v + 10;
+				sum += v + 1;
 			}
 			if(sum == 0) return 0;
 			double kl = 0;
@@ -244,7 +254,7 @@ public class RPFMergedFileParser {
 			return kl;		
 		}
 		
-		private double getKL(double[] dist1, double[] dist2){
+		private double getKL(double[] dist1, double[] dist2){// s
 			double sum = 0;
 			for(double v : dist1){
 				sum += v;
@@ -253,16 +263,23 @@ public class RPFMergedFileParser {
 				dist1[i] /= sum;
 			}
 			sum = 0;
-			for(double v : dist2){
-				sum += v;
+			double min = 1;
+			for(int i=0;i<dist2.length;i++){
+				if(dist2[i] == 0) continue;
+				min = min > dist2[i]? dist2[i] : min; 
 			}
+			for(int i=0;i<dist2.length;i++){
+				if(dist2[i] == 0) sum += min *.1;
+				else sum += dist2[i];
+			}
+		
 			for(int i=0;i<dist2.length;i++){
 				dist2[i] /= sum;
 			}
 			double kl = 0;
 			for(int i=0;i<dist1.length;i++){
 				double v= dist1[i];
-				if(v > 0 && dist2[i] > 0) kl += v * Math.log(v/dist2[i]);
+				if(v > 0) kl += v * Math.log(v/(dist2[i] == 0? min * .1 : dist2[i]));
 			}
 			return kl;					
 		}

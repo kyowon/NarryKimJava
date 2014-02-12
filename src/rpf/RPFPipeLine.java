@@ -137,7 +137,7 @@ public class RPFPipeLine {
 				System.out.println("Scoring for " + harrCovPlusFiles[i] + " and " + harrCovMinusFiles[i]);
 				Scorer scorer = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], paramFiles[i], annotationFileParser);
 				scorer.scoreNWrite(scoreThreshold, fastaParser, scoreOutFiles[i], false);
-				scorer.scoreNWrite(-0.3, fastaParser, scoreOutFiles[i], true);
+				scorer.scoreNWrite(-0.1, fastaParser, scoreOutFiles[i], true);
 				System.out.println("Scoring done..");
 			}
 		}
@@ -147,7 +147,7 @@ public class RPFPipeLine {
 		merge = null;
 		MergeResults mergeControl = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, annotationFileParser, fastaParser);
 		System.out.println("Merging results - control");
-		mergeControl.merge(outControlFile, -0.3);
+		mergeControl.merge(outControlFile, -0.1);
 		
 		System.out.println("Merging done..");
 	}
