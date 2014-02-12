@@ -114,8 +114,8 @@ public class DsDnCalculator {
 	
 	static public double getNonSynSiteSum(String sequence){
 		double ret = 0;
-		for(int i=0;i<sequence.length();i+=3){
-			for(double v : nonSynSiteMap.get(sequence.substring(i, i+3))){
+		for(int i=0;i<sequence.length()/3;i++){
+			for(double v : nonSynSiteMap.get(sequence.substring(i*3, i*3+3))){
 				ret += v;
 			}
 		}
@@ -124,10 +124,10 @@ public class DsDnCalculator {
 	
 	static public double getNonSynSubSum(String sequence1, String sequence2){
 		double ret = 0;
-		for(int i=0;i<sequence1.length();i+=3){
+		for(int i=0;i<sequence1.length()/3;i++){
 			ArrayList<String> key = new ArrayList<String>();
-			key.add(sequence1.substring(i, i+3));
-			key.add(sequence2.substring(i, i+3));
+			key.add(sequence1.substring(i*3, i*3+3));
+			key.add(sequence2.substring(i*3, i*3+3));
 			ret += nonSynSubMap.get(key);
 		}
 		return ret;
@@ -156,8 +156,9 @@ public class DsDnCalculator {
 	}
 	
 	public static void main(String[] args){		
-		String[] s = {"ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA", 
-				"ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA",
+		String[] s = {
+				"ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA", 
+				//"ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA",
 				"ACGCCGATCGGCGCGATAGGGTTCAAGCTCGTACGA",
 				//"------------------------------------",
 				//"------------------------------------",
