@@ -104,6 +104,6 @@ public class ZeroBasedFastaParser {
 	public static void main(String[] args){
 		ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.fa");
 		//
-		System.out.println(fasta.getSequence("chr13_random", 54, 54+167));
+		System.out.println(fasta.getSequence("chr13_random", 3, 3+60));
 	}
 }

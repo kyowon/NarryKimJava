@@ -42,6 +42,22 @@ public class Nucleotide {
 		return ((Nucleotide)obj).getName().equals(this.getName());
 	}
 	
+	public static String getComplementarySeq(String seq){
+		StringBuffer cc = new StringBuffer();
+		char[] nas = seq.toCharArray();
+		for(int i = nas.length-1;i>=0;i--){
+			char na = nas[i];
+			cc.append(getComplementaryNA(na));
+		}
+		return cc.toString();
+	}
 	
+	private static char getComplementaryNA(char na){
+		if(na == '-') return '-';
+		if(na == 'A') return 'T';
+		if(na == 'T') return 'A';
+		if(na == 'C') return 'G';
+		return 'C';
+	}
 	
 }

@@ -128,6 +128,7 @@ public class DsDnCalculator {
 			ArrayList<String> key = new ArrayList<String>();
 			key.add(sequence1.substring(i*3, i*3+3));
 			key.add(sequence2.substring(i*3, i*3+3));
+			//System.out.println(key);
 			ret += nonSynSubMap.get(key);
 		}
 		return ret;
@@ -138,6 +139,26 @@ public class DsDnCalculator {
 		double nNSSites = 0;
 		int n1=0, n2=0;
 		for(int i=0; i<sequences.length; i++){
+			sequences[i] = sequences[i].toUpperCase();
+			//if(!isPlusStrand) sequences[i] = Nucleotide.getComplementarySeq(sequences[i]);
+			//System.out.println(sequences[i]);
+		}
+		
+		/*String[] seqs = new String[sequences.length];
+		for(int i=0; i<seqs.length; i++){
+			seqs[i] = "";
+		}
+		for(int i=0;i<sequences[0].length();i++){
+			if(sequences[0].charAt(i) != '-'){
+				for(int k=0; k<sequences.length; k++){
+					seqs[k] += sequences[k].charAt(i);
+				}
+			}
+		}
+		sequences = seqs;
+		*/
+		for(int i=0; i<sequences.length; i++){
+			//sequences[i] = sequences[i].toUpperCase();
 			n1++;
 			nNSSites += getNonSynSiteSum(sequences[i]);
 			for(int j=0;j<sequences.length; j++){
@@ -146,21 +167,29 @@ public class DsDnCalculator {
 				nNSSubs += getNonSynSubSum(sequences[i], sequences[j]);
 			}
 		}
-		nNSSites /= n1;
-		nNSSubs /= n2;
+		if(n1>0) nNSSites /= n1;
+		if(n2>0) nNSSubs /= n2;
 		
 		double nSSites = sequences[0].length() - nNSSites;
 		double nSSubs = sequences[0].length()/3 - nNSSubs;
-		
-		return nNSSubs * nSSites / (nNSSites * nSSubs);
+	//	System.out.println(nNSSites + " " + n1);
+		return (nNSSubs * nSSites) / (nNSSites * nSSubs);
 	}
 	
 	public static void main(String[] args){		
 		String[] s = {
-				"ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA", 
+			//	"ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA", 
+				"----CAGACCATAACTAAAA-----ACAATAA------ATAACT-----------------GATGCACAA-TCTGAAC---TGTGCAGTGCTTATACAAACTTA--ATA",
+				"----CAGACGGTACCTAAAA-----ACAGGAA------ATGACT-----------------GACGCACAA-TCCGGAC---TGTGC-CTGCTTGTGTGAAGTTA--ATA",
+		//		"----TCTACTGTAACTAAAA-----TAGATAACCCCTCATGACC-----------------TAGTCACTT-TCTGAA--------------------------------",
+		//		"----CC-----TGACTAAA-----------------------------------------------ATAAGTCCAGAA---TGTATAATACTTGTGCAAATTTA--ATA",
+		//		"----tctactgtaattaaaatagctatagtagactgtagacacc-----------------aatgcataaatccagaa---gatataatgcttgtgcgaattgg--ata",
+		//		"AAAAGCCACTGAAAC--AA------AAAGTGT------AACGCTGCTGCAGAAAGTAGTGCAATGCTTCAATCCAGAA---GACACATTGGCTGTGGGGG-TCA--GTA",
+			//	"------------------------------------",
 				//"ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA",
-				"ACGCCGATCGGCGCGATAGGGTTCAAGCTCGTACGA",
 				//"------------------------------------",
+			//	"------------------------------------",
+				
 				//"------------------------------------",
 				//"------------------------------------",
 				//"------------------------------------",
