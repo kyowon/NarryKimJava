@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
 import util.Nucleotide;
@@ -12,17 +13,20 @@ import net.sf.samtools.util.BufferedLineReader;
 
 public class MafParser {
 	private HashMap<String, HashMap<Integer, ArrayList<String>>> map;
-	private HashMap<String, ArrayList<Integer>> positionMap;
+	private HashMap<String, ArrayList<Integer>> sPositionMap;
+	private HashMap<String, ArrayList<Integer>> ePositionMap;
 	
 	public MafParser(String name){
 		map = new HashMap<String, HashMap<Integer, ArrayList<String>>>();
-		positionMap = new HashMap<String, ArrayList<Integer>>();
+		sPositionMap = new HashMap<String, ArrayList<Integer>>();
+		ePositionMap = new HashMap<String, ArrayList<Integer>>();
 		
 		try {
 			BufferedLineReader in = new BufferedLineReader(new GZIPInputStream(new FileInputStream(name)));
 			String s;
 			ArrayList<String> seqs = new ArrayList<String>();
-			int position = 0;
+			int sposition = 0;
+			int eposition = 0;
 			String contig = null;
 			
 			while((s=in.readLine())!=null){
@@ -35,9 +39,9 @@ public class MafParser {
 						i++;
 						for(;i<token.length;i++) if(!token[i].isEmpty()) break;
 						
-						position = Integer.parseInt(token[i++]);
+						sposition = Integer.parseInt(token[i++]);
 						for(;i<token.length;i++) if(!token[i].isEmpty()) break;
-						i++;
+						eposition = sposition + Integer.parseInt(token[i++]);
 						for(;i<token.length;i++) if(!token[i].isEmpty()) break;
 						
 						if(!token[i].equals("+")){
@@ -50,10 +54,12 @@ public class MafParser {
 				if(s.isEmpty()){
 					if(!map.containsKey(contig)){
 						map.put(contig, new HashMap<Integer, ArrayList<String>>());
-						positionMap.put(contig, new ArrayList<Integer>());
+						sPositionMap.put(contig, new ArrayList<Integer>());
+						ePositionMap.put(contig, new ArrayList<Integer>());
 					}
-					map.get(contig).put(position, seqs);
-					positionMap.get(contig).add(position);
+					map.get(contig).put(sposition, seqs);
+					sPositionMap.get(contig).add(sposition);
+					ePositionMap.get(contig).add(eposition);
 					seqs = new ArrayList<String>();
 				}				
 			}
@@ -61,13 +67,16 @@ public class MafParser {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		for(String contig : positionMap.keySet())
-			Collections.sort(positionMap.get(contig));
+		for(String contig : sPositionMap.keySet()){
+			Collections.sort(sPositionMap.get(contig));
+			Collections.sort(ePositionMap.get(contig));
+		}
+		
 	}
 	
 	private void getSeqs(String contig, int position, int length, int prevIndex, ArrayList<StringBuffer> ret){
 		if(length <= 0) return;
-		ArrayList<Integer> positions = positionMap.get(contig);
+		ArrayList<Integer> positions = sPositionMap.get(contig);
 		if(positions == null) return;
 		int index = Collections.binarySearch(positions, position);
 		//
@@ -103,7 +112,7 @@ public class MafParser {
 			if(bposition < cposition){
 				length -= cposition - position;
 				int append = cposition - position;
-				System.out.println(append + " " + length);
+			//	System.out.println(append + " " + length);
 				for(int j=0;j< ret.size();j++){
 					for(int i=0;i<(length > 0 ? append : append + length);i++)
 						ret.get(j).append('-');
@@ -129,6 +138,18 @@ public class MafParser {
 		return seqs;
 	}
 	
+	public Set<String> getContigs(){
+		return sPositionMap.keySet();
+	}
+	
+	public ArrayList<Integer> getStartPositions(String contig){
+		return sPositionMap.get(contig);
+	}
+	
+	public ArrayList<Integer> getEndPositions(String contig){
+		return ePositionMap.get(contig);
+	}
+	
 	
 	static public void main(String[] args){
 		String maf = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/chr13_random.maf.gz";
@@ -138,7 +159,7 @@ public class MafParser {
 		//589 -586
 		//2 1
 		//test.getSeqs("chr13_random", 1578, 4, 0, ret);
-		for(String seq : test.getSeqs("chr13_random", 6, false, 3)){
+		for(String seq : test.getSeqs("chr13_random", 1, false, 3)){
 			System.out.println(seq.toString());
 			//System.out.println(seq.length());
 		}

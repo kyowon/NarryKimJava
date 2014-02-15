@@ -1,7 +1,12 @@
 package util;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+
+import parser.MafParser;
 
 
 public class DsDnCalculator {
@@ -176,6 +181,42 @@ public class DsDnCalculator {
 		return (nNSSubs * nSSites) / (nNSSites * nSSubs);
 	}
 	
+	public static void out(String mafFileDir, String outFile){		
+		try {
+			PrintStream out = new PrintStream(outFile);
+			
+			for(File mafFile : new File(mafFileDir).listFiles()){
+				if(!mafFile.getName().endsWith("maf.gz"))continue;
+				MafParser mp = new MafParser(mafFile.getAbsolutePath());
+				
+				for(String contig : mp.getContigs()){
+					out.println("CONTIG\t"+contig);
+					ArrayList<Integer> sPositions = mp.getStartPositions(contig);
+					ArrayList<Integer> ePositions = mp.getEndPositions(contig);
+					for(int i=0; i<sPositions.size();i++){
+						int sp = sPositions.get(i);
+						int ep = ePositions.get(i);
+						for(int cp = sp-2;cp<ep+3;cp++){
+							double dsdnp = getDsDnRatio(mp.getSeqs(contig, cp, true, 3));
+							double dsdnm = getDsDnRatio(mp.getSeqs(contig, cp, true, 3));
+							out.println(cp + "\t" + dsdnp + "\t" + dsdnm);
+						}
+						
+					}
+					
+				}
+			}
+			
+			
+			out.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
+	
 	public static void main(String[] args){		
 		String[] s = {
 			//	"ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA", 
@@ -202,9 +243,9 @@ public class DsDnCalculator {
 		
 		//System.out.println(nonSynSubMap.get(new Tuple<String, String>("ACT", "ACG")));
 		
-		System.out.println(getDsDnRatio(s));
+		//System.out.println(getDsDnRatio(s));
 		
-		
+		out("/media/kyowon/Data1/RPF_Project/genomes/mm9/maf", "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/out.txt");
 		//System.out.println(nonSynSiteMap.get("TTA"));
 		//System.out.println(nonSynSiteMap.get("ATA"));
 		//System.out.println(getNonSynSiteRatioSum("ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA"));
