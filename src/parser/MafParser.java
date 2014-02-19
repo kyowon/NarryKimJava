@@ -1,5 +1,6 @@
 package parser;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,7 +29,7 @@ public class MafParser {
 			int sposition = 0;
 			int eposition = 0;
 			String contig = null;
-			
+			boolean isPlusStrand = true;
 			while((s=in.readLine())!=null){
 				if(s.startsWith("#")) continue;
 				if(s.startsWith("s")){
@@ -45,21 +46,26 @@ public class MafParser {
 						for(;i<token.length;i++) if(!token[i].isEmpty()) break;
 						
 						if(!token[i].equals("+")){
-							System.out.println("Damn, -");
-							System.out.println(token[i]);
-						}
+							//System.out.println("Damn, -" + name);
+							//System.out.println(contig + " " + s);
+							//System.out.println(token[i]);
+							//System.exit(1);
+							isPlusStrand = false;
+						}else isPlusStrand = true;
 					}
 					seqs.add(token[token.length-1]);
 				}				
-				if(s.isEmpty()){
-					if(!map.containsKey(contig)){
-						map.put(contig, new HashMap<Integer, ArrayList<String>>());
-						sPositionMap.put(contig, new ArrayList<Integer>());
-						ePositionMap.put(contig, new ArrayList<Integer>());
+				if(s.isEmpty() && isPlusStrand){
+					if(seqs.size() >= 10){
+						if(!map.containsKey(contig)){
+							map.put(contig, new HashMap<Integer, ArrayList<String>>());
+							sPositionMap.put(contig, new ArrayList<Integer>());
+							ePositionMap.put(contig, new ArrayList<Integer>());
+						}
+						map.get(contig).put(sposition, seqs);
+						sPositionMap.get(contig).add(sposition);
+						ePositionMap.get(contig).add(eposition);
 					}
-					map.get(contig).put(sposition, seqs);
-					sPositionMap.get(contig).add(sposition);
-					ePositionMap.get(contig).add(eposition);
 					seqs = new ArrayList<String>();
 				}				
 			}
@@ -75,6 +81,7 @@ public class MafParser {
 	}
 	
 	private void getSeqs(String contig, int position, int length, int prevIndex, ArrayList<StringBuffer> ret){
+	//	System.out.println(position);
 		if(length <= 0) return;
 		ArrayList<Integer> positions = sPositionMap.get(contig);
 		if(positions == null) return;
@@ -84,7 +91,7 @@ public class MafParser {
 		//
 		index = Math.max(prevIndex, index);
 		int cposition = 0;
-		ArrayList<String> seqs = map.get(contig).get(positions.get(0));
+		ArrayList<String> seqs = map.get(contig).get(positions.get(index < 0? 0 : index));
 		if(ret.isEmpty()) for(int i=0;i<seqs.size();i++) ret.add(new StringBuffer());
 		
 		if(index >= 0){
@@ -104,8 +111,7 @@ public class MafParser {
 				if(--length<=0) break;
 			}	
 	    }
-		if(length>0){		
-			
+		if(length>0 && positions.size() > index + 1){		
 			int bposition = cposition;
 			cposition = positions.get(index + 1);
 			//System.out.println(cposition + " " + position + " " + length);
@@ -152,17 +158,13 @@ public class MafParser {
 	
 	
 	static public void main(String[] args){
-		String maf = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/chr13_random.maf.gz";
-		MafParser test = new MafParser(maf);
-		
-	//	ArrayList<StringBuffer> ret = new ArrayList<StringBuffer>();
-		//589 -586
-		//2 1
-		//test.getSeqs("chr13_random", 1578, 4, 0, ret);
-		for(String seq : test.getSeqs("chr13_random", 1, false, 3)){
-			System.out.println(seq.toString());
-			//System.out.println(seq.length());
-		}
+		String mafFileDir = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf";
+		for(File mafFile : new File(mafFileDir).listFiles()){
+			if(!mafFile.getName().endsWith("18.maf.gz"))continue;
+			MafParser mp = new MafParser(mafFile.getAbsolutePath());
+			System.out.println(mp.getSeqs("chr18", 3115284+1, true, 30)[0]);
+			System.out.println(mafFile.getName());
+		}		
 	}
-	
+	//3115282
 }

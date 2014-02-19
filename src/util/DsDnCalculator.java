@@ -120,9 +120,11 @@ public class DsDnCalculator {
 	static public double getNonSynSiteSum(String sequence){
 		double ret = 0;
 		for(int i=0;i<sequence.length()/3;i++){
-			for(double v : nonSynSiteMap.get(sequence.substring(i*3, i*3+3))){
-				ret += v;
-			}
+			String key = sequence.substring(i*3, i*3+3);
+			if(nonSynSiteMap.containsKey(key))
+				for(double v : nonSynSiteMap.get(key)){
+					ret += v;
+				}
 		}
 		return ret;
 	}
@@ -134,12 +136,13 @@ public class DsDnCalculator {
 			key.add(sequence1.substring(i*3, i*3+3));
 			key.add(sequence2.substring(i*3, i*3+3));
 			//System.out.println(key);
-			ret += nonSynSubMap.get(key);
+			if(nonSynSubMap.containsKey(key))
+				ret += nonSynSubMap.get(key);
 		}
 		return ret;
 	}
 	
-	static public double getDsDnRatio(String[] sequences){
+	static public double[] getNonSynSubNSites(String[] sequences){
 		double nNSSubs = 0;
 		double nNSSites = 0;
 		int n1=0, n2=0;
@@ -174,54 +177,68 @@ public class DsDnCalculator {
 		}
 		if(n1>0) nNSSites /= n1;
 		if(n2>0) nNSSubs /= n2;
-		
-		double nSSites = sequences[0].length() - nNSSites;
-		double nSSubs = sequences[0].length()/3 - nNSSubs;
-	//	System.out.println(nNSSites + " " + n1);
-		return (nNSSubs * nSSites) / (nNSSites * nSSubs);
+		double[] ret = new double[]{nNSSubs, nNSSites};
+		return ret;
+		//double nSSites = sequences[0].length() - nNSSites;
+		//double nSSubs = sequences[0].length()/3 - nNSSubs;
+		//System.out.println(nSSites + " " + nNSSites + " " + nSSubs + " " + nNSSubs);
+		//return (nNSSubs * nSSites) / (nNSSites * nSSubs);
 	}
 	
 	public static void out(String mafFileDir, String outFile){		
 		try {
-			PrintStream out = new PrintStream(outFile);
-			
+			PrintStream out = new PrintStream(outFile);			
 			for(File mafFile : new File(mafFileDir).listFiles()){
 				if(!mafFile.getName().endsWith("maf.gz"))continue;
 				MafParser mp = new MafParser(mafFile.getAbsolutePath());
-				
+				System.out.println("Processing " + mafFile.getName());
 				for(String contig : mp.getContigs()){
-					out.println("CONTIG\t"+contig);
+					out.println("CONTIG\t"+contig);					
 					ArrayList<Integer> sPositions = mp.getStartPositions(contig);
 					ArrayList<Integer> ePositions = mp.getEndPositions(contig);
 					for(int i=0; i<sPositions.size();i++){
 						int sp = sPositions.get(i);
 						int ep = ePositions.get(i);
-						for(int cp = sp-2;cp<ep+3;cp++){
-							double dsdnp = getDsDnRatio(mp.getSeqs(contig, cp, true, 3));
-							double dsdnm = getDsDnRatio(mp.getSeqs(contig, cp, true, 3));
-							out.println(cp + "\t" + dsdnp + "\t" + dsdnm);
+						String[] pc = mp.getSeqs(contig, sp-2, true, ep+2-sp+2);
+						out.println("PLUS\t" + (sp-2) + "\t" + (ep-1));
+						for(int k=0;k<pc[0].length() - 2;k++){
+							String[] codons = new String[pc.length];
+							for(int j=0;j<pc.length;j++){
+								codons[j] = pc[j].substring(k, k+3);
+							}
+							double[] nSSubNSitesPlus = getNonSynSubNSites(codons);
+							out.println(nSSubNSitesPlus[0] + "\t" + nSSubNSitesPlus[1] + "\t" + codons[0]);
 						}
 						
-					}
-					
+						String[] mc = mp.getSeqs(contig, ep+2, false, ep+2-sp+2);
+						//System.out.println(mc[0]);
+						//System.exit(0);
+						out.println("MINUS\t" + (sp-2) + "\t" + (ep+2));
+						for(int k=0;k<mc[0].length() - 2;k++){
+							String[] codons = new String[mc.length];
+							for(int j=0;j<mc.length;j++){
+								codons[j] = mc[j].substring(k, k+3);
+							}
+							double[] nSSubNSitesMinus = getNonSynSubNSites(codons);
+							out.println(nSSubNSitesMinus[0] + "\t" + nSSubNSitesMinus[1] + "\t" + codons[0]);
+						}								
+					}					
 				}
-			}
-			
-			
+				mp = null;
+			}			
 			out.close();
 		} catch (FileNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
-		
+		}		
 	}
 	
 	
 	public static void main(String[] args){		
 		String[] s = {
 			//	"ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA", 
-				"----CAGACCATAACTAAAA-----ACAATAA------ATAACT-----------------GATGCACAA-TCTGAAC---TGTGCAGTGCTTATACAAACTTA--ATA",
-				"----CAGACGGTACCTAAAA-----ACAGGAA------ATGACT-----------------GACGCACAA-TCCGGAC---TGTGC-CTGCTTGTGTGAAGTTA--ATA",
+				//"----CAGACCATAACTAAAA-----ACAATAA------ATAACT-----------------GATGCACAA-TCTGAAC---TGTGCAGTGCTTATACAAACTTA--ATA",
+				//"----CAGACGGTACCTAAAA-----ACAGGAA------ATGACT-----------------GACGCACAA-TCCGGAC---TGTGC-CTGCTTGTGTGAAGTTA--ATA",
 		//		"----TCTACTGTAACTAAAA-----TAGATAACCCCTCATGACC-----------------TAGTCACTT-TCTGAA--------------------------------",
 		//		"----CC-----TGACTAAA-----------------------------------------------ATAAGTCCAGAA---TGTATAATACTTGTGCAAATTTA--ATA",
 		//		"----tctactgtaattaaaatagctatagtagactgtagacacc-----------------aatgcataaatccagaa---gatataatgcttgtgcgaattgg--ata",
@@ -238,14 +255,16 @@ public class DsDnCalculator {
 				//"------------------------------------",
 				//"------------------------------------",
 				//"------------------------------------",
+				"---","---","---","---","---","---","---",
+				"---"
 			};
 		
 		
 		//System.out.println(nonSynSubMap.get(new Tuple<String, String>("ACT", "ACG")));
 		
-		//System.out.println(getDsDnRatio(s));
+		System.out.println(getNonSynSubNSites(s)[0] + " " + getNonSynSubNSites(s)[1]);
 		
-		out("/media/kyowon/Data1/RPF_Project/genomes/mm9/maf", "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/out.txt");
+		out("/media/kyowon/Data1/RPF_Project/genomes/mm9/maf", "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/dsdnOutTest.txt");
 		//System.out.println(nonSynSiteMap.get("TTA"));
 		//System.out.println(nonSynSiteMap.get("ATA"));
 		//System.out.println(getNonSynSiteRatioSum("ACTCCGAACGGGGCGTTAGAGTTGAAACCCGTTAGA"));
