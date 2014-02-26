@@ -176,6 +176,7 @@ public class MergedFileParser {
 			return header;
 		}
 		
+		@Override
 		public String toString(){			
 			StringBuffer sb = new StringBuffer();
 			sb.append(contig);sb.append('\t');
@@ -255,7 +256,7 @@ public class MergedFileParser {
 			if(sum == 0) return 0;
 			double kl = 0;
 			for(double v : dist){
-				double vn = (v + 10)/sum;
+				double vn = (v + 1)/sum;
 				if(vn > 0) kl += vn * Math.log(vn*dist.length);
 			}
 			return kl;		

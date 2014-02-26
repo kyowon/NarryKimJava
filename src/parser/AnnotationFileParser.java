@@ -9,7 +9,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 
-import parser.ScoringOutputParser.ScoredPosition;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class AnnotationFileParser {
@@ -87,6 +86,7 @@ public class AnnotationFileParser {
 			this.txEnd = txEnd;
 		}
 		
+		@Override
 		public String toString(){
 			StringBuffer sb = new StringBuffer();			
 			sb.append(genomeBrowserGeneName); sb.append('\t');

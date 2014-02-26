@@ -120,6 +120,7 @@ public class MSGFPlusParser {
 			postAA = protein.charAt(protein.lastIndexOf("post=")+5);
 		}
 		
+		@Override
 		public String toString(){
 			StringBuffer ret = new StringBuffer();
 			ret.append(specFile);ret.append('\t');

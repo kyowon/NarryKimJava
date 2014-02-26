@@ -21,7 +21,6 @@ import parser.BedCovFileParser;
 import parser.ScoringOutputParser;
 import parser.ScoringOutputParser.ScoredPosition;
 import parser.ZeroBasedFastaParser;
-import rpf.analysis.CodonFrequency;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class Scorer {

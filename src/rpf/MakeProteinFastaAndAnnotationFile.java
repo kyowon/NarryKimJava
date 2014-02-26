@@ -2,14 +2,11 @@ package rpf;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.HashSet;
 
 import net.sf.samtools.util.BufferedLineReader;
-import parser.AnnotationFileParser;
 import parser.ScoringOutputParser;
-import parser.ScoringOutputParser.ScoredPosition;
 import parser.ZeroBasedFastaParser;
 
 public class MakeProteinFastaAndAnnotationFile {

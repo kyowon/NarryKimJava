@@ -1,7 +1,6 @@
 package rpf.analysis;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
 
 import parser.MSGFPlusParser;
