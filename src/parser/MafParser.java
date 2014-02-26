@@ -140,7 +140,8 @@ public class MafParser {
 				if(--length<=0) break;
 			}	
 	    }
-	//	System.out.println(ret);
+			
+		//System.out.println(ret.get(0).length() + " " + length + " " +sps.size() + " " + (index + 1));
 		if(length>0 && sps.size() > index + 1){			
 			int bposition = cposition;
 			cposition = sps.get(index + 1);
@@ -153,7 +154,6 @@ public class MafParser {
 						ret.get(j).append('-');
 				}	
 			}
-		
 			getSubSeqs(cposition, length, index + 1, ret);
 		}
 		return;
@@ -161,6 +161,7 @@ public class MafParser {
 		
 	private ArrayList<StringBuffer> getSubSeqs(String contig, int position, boolean isPlusStrand, int length){
 		ArrayList<StringBuffer> ret = new ArrayList<StringBuffer>();
+		//System.out.println(position + " " + length);
 		if(!isPlusStrand) position -= length-1;
 		if(!indexSPositions.containsKey(contig)) return ret; 
 		int index = Collections.binarySearch(indexSPositions.get(contig), position);
@@ -189,9 +190,9 @@ public class MafParser {
 		ArrayList<ArrayList<StringBuffer>> subSeqs = new ArrayList<ArrayList<StringBuffer>>();
 		int maxNum = 0;
 		for(ArrayList<Integer> subPositions : parser.getLiftOverPositions(contig, isPlusStrand, position, length)){
-			//System.out.println(subPositions);//102410577 102410428
+			//System.out.println(subPositions.size());//102410577 102410428
 			ArrayList<StringBuffer> subSeq = getSubSeqs(contig, subPositions.get(0), isPlusStrand, subPositions.size());
-			//System.out.println(subSeq);
+			//System.out.println(subSeq.size());
 			subSeqs.add(subSeq);
 			maxNum = Math.max(maxNum, subSeq.size());
 		}
@@ -263,7 +264,7 @@ public class MafParser {
 					seqs = new ArrayList<String>();
 				}	
 				
-				if(s.isEmpty() && (eposition > lastPosition || accessFile.getFilePointer() - spointer > 200000)) break;
+				if(s.isEmpty() && (eposition > lastPosition || accessFile.getFilePointer() - spointer > 3000000)) break;
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -283,16 +284,17 @@ public class MafParser {
 		}
 		*/
 		
-		String file = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/";
+		String file = "/media/kyowon/Data1/RPF_Project/genomes/hg19/maf/";
 		
-		MafParser test = new MafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
-		//test.generateIndexFile();
+		MafParser test = new MafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/hg19.refFlat.txt"));
+		test.generateIndexFile();
 		test.readIndexFile();
-		String[] seqs =  test.getSeqs("chr3", 40277, false, 150);
+		String[] seqs =  test.getSeqs("chr17", 45727472, true, 150); // why not 150???? TODO
 		for(String seq : seqs){
 			System.out.println(seq + " " + seq.length());
 		}
-		//GATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAA
+		//chr17	45727472
+//GATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAA
 		System.out.println(DsDnCalculator.calculate(seqs));
 		//ATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAAG
 		
