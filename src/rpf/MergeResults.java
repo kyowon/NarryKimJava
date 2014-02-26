@@ -8,7 +8,7 @@ import parser.AnnotationFileParser;
 import parser.BedCovFileParser;
 import parser.MergedFileParser;
 import parser.MergedFileParser.MergedResult;
-import parser.NewMafParser;
+import parser.MafParser;
 import parser.ScoringOutputParser;
 import parser.ScoringOutputParser.ScoredPosition;
 import parser.ZeroBasedFastaParser;
@@ -18,7 +18,7 @@ public class MergeResults {
 	private Scorer[] scorers = null; 
 	private Quantifier[] rpfQuantifiers = null;
 	private Quantifier[] rnaQuantifiers = null;
-	private NewMafParser mafParser = null;
+	private MafParser mafParser = null;
 	
 	public MergeResults(String[] scoreOutFiles, 
 			String[] harrCovPlusFiles, String[] harrCovMinusFiles, 
@@ -27,7 +27,7 @@ public class MergeResults {
 			String[] paramFiles,
 			AnnotationFileParser annotationFileParser,
 			ZeroBasedFastaParser fastaFileParser,
-			NewMafParser mafParser){
+			MafParser mafParser){
 		scoringOutputParsers = new ScoringOutputParser[scoreOutFiles.length];
 		scorers = new Scorer[scoreOutFiles.length];
 		if(rpfCovPlusFiles!=null)

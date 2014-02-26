@@ -3,7 +3,7 @@ package rpf;
 import java.io.File;
 
 import parser.AnnotationFileParser;
-import parser.NewMafParser;
+import parser.MafParser;
 import parser.ZeroBasedFastaParser;
 
 public class RPFPipeLine {
@@ -147,7 +147,7 @@ public class RPFPipeLine {
 				System.out.println("Scoring done..");
 			}
 		}
-		NewMafParser mafParser = new NewMafParser(mafFolder, annotationFileParser);
+		MafParser mafParser = new MafParser(mafFolder, annotationFileParser);
 		mafParser.generateIndexFile();
 		mafParser.readIndexFile();
 		//DsDnOutParser dsdnParser = new DsDnOutParser(dsdnFile, annotationFileParser);

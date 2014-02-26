@@ -13,7 +13,7 @@ import util.DsDnCalculator;
 import util.Nucleotide;
 import net.sf.samtools.util.BufferedLineReader;
 
-public class NewMafParser {
+public class MafParser {
 	private String folderName;
 	private String indexFilename;
 	private HashMap<String, HashMap<Integer, Long>> indexMap;
@@ -23,9 +23,9 @@ public class NewMafParser {
 	private HashMap<String, ArrayList<Integer>> indexSPositions;
 	private HashMap<String, String> fileNameMap;
 	private AnnotationFileParser parser;
-	public static int minNumSpecies = 2;
+	public static int minNumSpecies = 0;
 	
-	public NewMafParser(String folderName, AnnotationFileParser parser){
+	public MafParser(String folderName, AnnotationFileParser parser){
 		this.folderName = folderName;
 		this.indexFilename = folderName + "mafIndex.txt";		
 		this.parser = parser;
@@ -116,7 +116,6 @@ public class NewMafParser {
 	
 	private void getSubSeqs(int position, int length, int prevIndex, ArrayList<StringBuffer> ret){
 		if(length <= 0) return;
-		
 		int index = Collections.binarySearch(sps, position);
 		//
 		if(index < 0) index = - index - 2;
@@ -124,11 +123,11 @@ public class NewMafParser {
 		index = Math.max(prevIndex, index);
 		int cposition = 0;
 		ArrayList<String> seqs = map.get(sps.get(index < 0? 0 : index));
+		//System.out.println(seqs);
 		if(ret.isEmpty()) for(int i=0;i<seqs.size();i++) ret.add(new StringBuffer());
 		
 		if(index >= 0){
-			cposition = sps.get(index);
-			
+			cposition = sps.get(index);			
 			for(int i=0;i<seqs.get(0).length();i++){
 				if(seqs.get(0).charAt(i) == '-'){
 					continue;
@@ -141,10 +140,12 @@ public class NewMafParser {
 				if(--length<=0) break;
 			}	
 	    }
-		if(length>0 && sps.size() > index + 1){		
+	//	System.out.println(ret);
+		if(length>0 && sps.size() > index + 1){			
 			int bposition = cposition;
 			cposition = sps.get(index + 1);
 			if(bposition < cposition){
+				
 				length -= cposition - position;
 				int append = cposition - position;
 				for(int j=0;j< ret.size();j++){
@@ -190,7 +191,7 @@ public class NewMafParser {
 		for(ArrayList<Integer> subPositions : parser.getLiftOverPositions(contig, isPlusStrand, position, length)){
 			//System.out.println(subPositions);//102410577 102410428
 			ArrayList<StringBuffer> subSeq = getSubSeqs(contig, subPositions.get(0), isPlusStrand, subPositions.size());
-			//System.out.println(subSeq.size());
+			//System.out.println(subSeq);
 			subSeqs.add(subSeq);
 			maxNum = Math.max(maxNum, subSeq.size());
 		}
@@ -284,10 +285,10 @@ public class NewMafParser {
 		
 		String file = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/";
 		
-		NewMafParser test = new NewMafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
+		MafParser test = new MafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
 		//test.generateIndexFile();
 		test.readIndexFile();
-		String[] seqs =  test.getSeqs("chr3", 102410577, false, 1500);
+		String[] seqs =  test.getSeqs("chr3", 40277, false, 150);
 		for(String seq : seqs){
 			System.out.println(seq + " " + seq.length());
 		}

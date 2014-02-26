@@ -36,7 +36,7 @@ public class MergedFileParser {
 		private boolean isAnnotated;
 		private AnnotatedGene gene;
 		
-		public MergedResult(ScoredPosition scoredPosition, Scorer[] scorers, Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers, NewMafParser mafParser){
+		public MergedResult(ScoredPosition scoredPosition, Scorer[] scorers, Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers, MafParser mafParser){
 			this.contig = scoredPosition.getContig();
 			this.position = scoredPosition.getPosition();
 			this.isPlusStrand = scoredPosition.isPlusStrand();
