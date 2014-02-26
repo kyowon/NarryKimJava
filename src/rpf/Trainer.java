@@ -19,7 +19,7 @@ import parser.AnnotationFileParser.AnnotatedGene;
 import parser.BedCovFileParser;
 import util.MC;
 
-public class MatchedFilterTrainier {
+public class Trainer {
 
 	private int leftWindowSize = 30;
 	private int rightWindowSize = 200;
@@ -36,7 +36,7 @@ public class MatchedFilterTrainier {
 	private double[] likelihoodFunctionCoefficients;
 	private String outParamFile;
 	
-	public MatchedFilterTrainier(String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFileParser, String outParamFile){
+	public Trainer(String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFileParser, String outParamFile){
 		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFileParser);
 		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFileParser);
 		this.annotationFileParser = annotationFileParser;	
@@ -51,6 +51,7 @@ public class MatchedFilterTrainier {
 		signal = new ArrayList<double[]>();
 		noise = new ArrayList<double[]>();
 		getSignalNNoise(true);
+		//System.out.println(signal.size());
 		getSignalNNoise(false);
 		avgedSignal = getAvg(signal);
 		filter = getFilter(avgedSignal, noise);

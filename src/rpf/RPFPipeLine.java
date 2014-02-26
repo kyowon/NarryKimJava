@@ -3,6 +3,7 @@ package rpf;
 import java.io.File;
 
 import parser.AnnotationFileParser;
+import parser.NewMafParser;
 import parser.ZeroBasedFastaParser;
 
 public class RPFPipeLine {
@@ -14,6 +15,7 @@ public class RPFPipeLine {
 	private static String[] rnaCovPlusFiles; 
 	private static String[] rnaCovMinusFiles;
 	private static String[] paramFiles;
+	private static String mafFolder;
 	private static ZeroBasedFastaParser fastaParser = null;
 	private static AnnotationFileParser annotationFileParser = null;
 	private static double scoreThreshold = 2;
@@ -63,6 +65,8 @@ public class RPFPipeLine {
 			outFile = s;
 		}else if(mode == 11){
 			outControlFile = s;
+		}else if(mode == 12){
+			mafFolder = s;
 		}else ret = false;
 		
 		return ret;
@@ -101,6 +105,8 @@ public class RPFPipeLine {
 				mode = 10;
 			}else if(args[i].equals("-outputControlFile")){				
 				mode = 11;
+			}else if(args[i].equals("-maf")){				
+				mode = 12;
 			}else{
 				s += args[i] + " ";
 			}
@@ -128,7 +134,7 @@ public class RPFPipeLine {
 				
 		for(int i=0;i<harrCovPlusFiles.length;i++){
 			if(!new File(paramFiles[i]).exists()){
-				MatchedFilterTrainier trainer = new MatchedFilterTrainier(harrCovPlusFiles[i], harrCovMinusFiles[i], annotationFileParser, paramFiles[i]);
+				Trainer trainer = new Trainer(harrCovPlusFiles[i], harrCovMinusFiles[i], annotationFileParser, paramFiles[i]);
 				System.out.println("Training for " + harrCovPlusFiles[i] + " and " + harrCovMinusFiles[i]);
 				trainer.train(30, 50, 5); // harr
 				System.out.println("Training done..");
@@ -141,11 +147,15 @@ public class RPFPipeLine {
 				System.out.println("Scoring done..");
 			}
 		}
-		MergeResults merge = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, annotationFileParser, fastaParser);
+		NewMafParser mafParser = new NewMafParser(mafFolder, annotationFileParser);
+		mafParser.generateIndexFile();
+		mafParser.readIndexFile();
+		//DsDnOutParser dsdnParser = new DsDnOutParser(dsdnFile, annotationFileParser);
+		MergeResults merge = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, annotationFileParser, fastaParser, mafParser);
 		System.out.println("Merging results");
 		merge.merge(outFile, scoreThreshold);
 		merge = null;
-		MergeResults mergeControl = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, annotationFileParser, fastaParser);
+		MergeResults mergeControl = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, annotationFileParser, fastaParser, mafParser);
 		System.out.println("Merging results - control");
 		mergeControl.merge(outControlFile, -0.1);
 		
@@ -161,6 +171,7 @@ public class RPFPipeLine {
 				+ "\n-rpfM [rpf coverage files(minus strand), seperated by space]"
 				+ "\n-rnaP [rna coverage files (plus strand), seperated by space]"
 				+ "\n-rnaM [rna coverage files(minus strand), seperated by space]"
+				+ "\n-maf [maf file folder]"
 				+ "\n-fasta [fasta file]"
 				+ "\n-ref [refFlat file]"
 				+ "\n-scoreThreshold [scoreThreshold - default 2]"

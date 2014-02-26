@@ -4,12 +4,13 @@ import parser.AnnotationFileParser.AnnotatedGene;
 import parser.ScoringOutputParser.ScoredPosition;
 import rpf.Quantifier;
 import rpf.Scorer;
+import util.DsDnCalculator;
 
-public class RPFMergedFileParser {
+public class MergedFileParser {
 	public class MergedResult{
 		//	IsAnnotated	ContainingGeneName	ContainingGBGeneName	txStart	txEnd	cdsStart	cdsEnd	genomicRegion	frameShift
 		private int positionQuantityChangeLength = 600;
-		private int positionQuantityMaxLength = 30000;
+		private int positionQuantityMaxLength = 12000;
 		
 		private String contig;
 		private int position;
@@ -31,10 +32,11 @@ public class RPFMergedFileParser {
 		
 		private String genomicRegion;
 		private String frameShift;
+		private double dsdnRatio = -1;
 		private boolean isAnnotated;
 		private AnnotatedGene gene;
 		
-		public MergedResult(ScoredPosition scoredPosition, Scorer[] scorers, Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers){
+		public MergedResult(ScoredPosition scoredPosition, Scorer[] scorers, Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers, NewMafParser mafParser){
 			this.contig = scoredPosition.getContig();
 			this.position = scoredPosition.getPosition();
 			this.isPlusStrand = scoredPosition.isPlusStrand();
@@ -43,6 +45,8 @@ public class RPFMergedFileParser {
 			this.frameShift = scoredPosition.getFrameShift();
 			this.isAnnotated = scoredPosition.isAnnotated();
 			this.gene = scoredPosition.getGene();
+			
+			if(mafParser!=null) this.dsdnRatio = DsDnCalculator.calculate(mafParser.getSeqs(contig, position, isPlusStrand, 150));
 			
 			this.scores = new double[scorers.length];
 			for(int i=0;i<this.scores.length;i++){
@@ -101,6 +105,8 @@ public class RPFMergedFileParser {
 			codon = token[i++];
 			genomicRegion = token[i++];
 			frameShift = token[i++];
+			dsdnRatio = token[i].equals('_') ? -1 : Double.parseDouble(token[i]);
+			i++;
 			if(!token[i].equals("_"))
 				isAnnotated = token[i].equals("T");
 			i++;
@@ -134,7 +140,7 @@ public class RPFMergedFileParser {
 		}
 		
 		public String getHeader(){
-			String header =  "Contig\tPosition\tStrand\tCodon\tGenomicRegion\tFrameShift\tisAnnotated\t";
+			String header =  "Contig\tPosition\tStrand\tCodon\tGenomicRegion\tFrameShift\tDsDnratio\tisAnnotated\t";
 			header += subGetHeader("Score", scores) + "\t";
 			header += subGetHeader("RPF_Pos_RPKMs", rpfPositionQuantities) + "\t";
 			header += subGetHeader("RNA_Pos_RPKMs", rnaPositionQuantities) + "\t";
@@ -179,6 +185,7 @@ public class RPFMergedFileParser {
 			
 			sb.append(genomicRegion);sb.append('\t');
 			sb.append(frameShift);sb.append('\t');
+			sb.append(dsdnRatio>0?dsdnRatio : '_');sb.append('\t');
 			sb.append(gene == null ? '_' : (isAnnotated? 'T' : 'F'));sb.append('\t');
 			
 			subToString(scores, sb);

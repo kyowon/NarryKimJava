@@ -13,8 +13,9 @@ import java.util.HashSet;
 
 import parser.AnnotationFileParser;
 import parser.BedCovFileParser;
-import parser.RPFMergedFileParser;
-import parser.RPFMergedFileParser.MergedResult;
+import parser.MergedFileParser;
+import parser.MergedFileParser.MergedResult;
+import parser.NewMafParser;
 import parser.ScoringOutputParser;
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.ScoringOutputParser.ScoredPosition;
@@ -25,6 +26,7 @@ public class MergeResults {
 	private Scorer[] scorers = null; 
 	private Quantifier[] rpfQuantifiers = null;
 	private Quantifier[] rnaQuantifiers = null;
+	private NewMafParser mafParser = null;
 	
 	public MergeResults(String[] scoreOutFiles, 
 			String[] harrCovPlusFiles, String[] harrCovMinusFiles, 
@@ -32,7 +34,8 @@ public class MergeResults {
 			String[] rnaCovPlusFiles, String[] rnaCovMinusFiles,
 			String[] paramFiles,
 			AnnotationFileParser annotationFileParser,
-			ZeroBasedFastaParser fastaFileParser){
+			ZeroBasedFastaParser fastaFileParser,
+			NewMafParser mafParser){
 		scoringOutputParsers = new ScoringOutputParser[scoreOutFiles.length];
 		scorers = new Scorer[scoreOutFiles.length];
 		if(rpfCovPlusFiles!=null)
@@ -54,6 +57,7 @@ public class MergeResults {
 				rnaQuantifiers[i] = new Quantifier(rnaCovPlusFiles[i], rnaCovMinusFiles[i], annotationFileParser, fastaFileParser);
 			}
 		}
+		this.mafParser = mafParser;
 	}
 	
 	void merge(String outFile, double scoreThreshold){
@@ -67,8 +71,9 @@ public class MergeResults {
 			}
 			boolean start = true;
 			for(String contig : contigs){
+				System.out.println("Merging " + contig);
 				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, contig, scoreThreshold)){
-					MergedResult mr = new RPFMergedFileParser().new MergedResult(position, scorers, rpfQuantifiers, rnaQuantifiers);
+					MergedResult mr = new MergedFileParser().new MergedResult(position, scorers, rpfQuantifiers, rnaQuantifiers, mafParser);
 					if(start){
 						out.println(mr.getHeader());
 						start = false;

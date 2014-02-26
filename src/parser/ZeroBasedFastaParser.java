@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Set;
 
 import net.sf.picard.reference.IndexedFastaSequenceFile;
@@ -29,48 +30,68 @@ public class ZeroBasedFastaParser {
 		return getSequence(contig, 0, getLength(contig));
 	}
 	
+	
+	/**
+    * Get the sequence
+    * @param contig the contig
+    * @param start the zero-based start position, inclusive. Should be smaller than end
+    * @param end the zero-based end position, exclusive.
+    * @return the sequence as it is read from the file.
+    */
 	public String getSequence(String contig, int start, int end){
-		if(!refSeqs.containsKey(contig)) return null;
+		if(!refSeqs.containsKey(contig)) return new String();
 		byte[] refSeq = refSeqs.get(contig);
 		StringBuffer seq = new StringBuffer();
 		end = getLength(contig) < end? getLength(contig) : end;
 		
-		int tst=start;
-		int tend=end;
-		
-		if(start>end){
-			tst = end;
-			tend = start;
-		}
-		//System.out.println(tst + " " + tend);
-		
-		for(int i=tst;i<tend;i++){
+		for(int i=start;i<end;i++){
 			if(i<0) continue;
 			if(i>=refSeq.length) break;
 			seq.append((char)refSeq[i]);
 		}	
-		//System.out.println(seq.toString());
-		String ret = start>end? getComplementaryCodon(seq.toString()): seq.toString();		
-		return ret.toUpperCase();
+		////System.out.println(seq.toString());
+		//String ret = start>end? getComplementaryCodon(seq.toString()): seq.toString();		
+		return seq.toString();
 	}
 	
-	public String getSequence(String contig, ArrayList<Integer> positions){ 
+
+	/**
+	    * Get the sequence
+	    * @param contig the contig
+	    * @param positions the zero-based positions. All inclusive, does not need to be sorted
+	    * @return the sequence as it is read from the file.
+	    */
+	public String getSequence(String contig, List<Integer> positions){ 
 		byte[] refSeq = refSeqs.get(contig);
 		StringBuffer seq = new StringBuffer();
 		for(int i : positions){
 			if(i<0) continue;
 			if(i>=refSeq.length) break;
 			seq.append((char)refSeq[i]);
-		}				
-		return seq.toString().toUpperCase();
+		}		
+		
+		return seq.toString();
 	}
 	
-	public static String getComplementaryCodon(String codon){
+	/**
+	    * Get the complementary sequence (order reversed)
+	    * @param seq the sequence to be complemented
+	    * @param reverseOrder reverse order
+	    * @return the complementary sequence
+	    */
+	public static String getComplementarySequence(String seq, boolean reverseOrder){
 		StringBuffer cc = new StringBuffer();
-		char[] nas = codon.toCharArray();
-		for(int i = nas.length-1;i>=0;i--){
-			char na = nas[i];
-			cc.append(getComplementaryNA(na));
+		char[] nas = seq.toCharArray();
+		if(reverseOrder){
+			for(int i = nas.length-1;i>=0;i--){
+				char na = nas[i];
+				cc.append(getComplementaryNA(na));
+			}
+		}else{
+			for(int i = 0;i<nas.length;i++){
+				char na = nas[i];
+				cc.append(getComplementaryNA(na));
+			}
 		}
 		return cc.toString();
 	}
@@ -113,7 +134,7 @@ public class ZeroBasedFastaParser {
 		//chr5	4086564
 
 		int off = 0;
-		System.out.println(fasta.getSequence("chr5", 4086564+1, 4086564-12));
+		System.out.println(fasta.getSequence("chr5", 108863380-3, 108863380));
 	//	System.out.println(fasta.getSequence("chr10", 53411805+5000+1, 53411805+1));
 	///	System.out.println(fasta.getSequence("chr10", 53411805+5000-1, 53411805-1));
 	}

@@ -57,7 +57,13 @@ public class Nucleotide {
 		if(na == 'A') return 'T';
 		if(na == 'T') return 'A';
 		if(na == 'C') return 'G';
-		return 'C';
+		if(na == 'G') return 'C';
+
+		if(na == 'a') return 't';
+		if(na == 't') return 'a';
+		if(na == 'c') return 'g';
+		
+		return 'c';
 	}
 	
 }
