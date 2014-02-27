@@ -119,6 +119,48 @@ public class BedCovFileParser {
 		return totalCoverages;
 	}
 	
+	public ArrayList<Double> getCoverageBeforeNAfternextStopCodon(String contig, boolean isPlusStrand, int position, int length, int maxLength, ZeroBasedFastaParser fastaParser, boolean normalizeByLength){
+		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
+		ArrayList<Double> ret = new ArrayList<Double>();
+		if(coverages == null){
+			ret.add(.0); ret.add(.0); return ret;
+		}
+		ArrayList<ArrayList<Integer>> positions = annotationParser.getLiftOverPositionsTillNextStopCodon(contig, isPlusStrand, position, maxLength, fastaParser);
+		double before = 0;
+		int n = 0;
+		int stopPosition = -1;
+		for(int i=positions.size()-1;i>=0;i--){
+			ArrayList<Integer> subPositions = positions.get(i);
+			for(int j = subPositions.size()-1;j>=0;j--){
+				if(stopPosition < 0) stopPosition = subPositions.get(j);
+				Integer coverage = coverages.get(subPositions.get(j));
+				if(n++>=length) break;
+				if(coverage == null) continue;
+				before += coverage;
+			}
+			if(n>=length) break;
+		}
+		if(normalizeByLength) before /= length;
+		ret.add(before);
+		double after = 0;
+		
+		positions = annotationParser.getLiftOverPositions(contig, isPlusStrand, stopPosition + (isPlusStrand? 1 : -1), length);
+		n = 0;
+		for(ArrayList<Integer> subPositions : positions){
+			for(int p : subPositions){
+				Integer coverage = coverages.get(p);
+				if(n++>=length) break;
+				if(coverage == null) continue;
+				after += coverage;
+			}
+			if(n>=length) break;
+		}
+		if(normalizeByLength) after /= length;
+		ret.add(after);
+		return ret;
+	}
+	
+	
 	public double getTotalCoverage(String contig, boolean isPlusStrand, int position, int length, boolean normalizeByLength){
 		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
 		if(coverages == null) return 0;

@@ -1,5 +1,7 @@
 package rpf;
 
+import java.util.ArrayList;
+
 import parser.AnnotationFileParser;
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.BedCovFileParser;
@@ -30,8 +32,15 @@ public class Quantifier {
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
 		return (bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, true)+1) * 1e9 / (bedCovFileParser.getTotalReadCount()+1);
 	}
-	///([length of transcript]/1000)/([total reads]/10^6)
-	public double getPositionQuantatyChangeRatio(String contig, int position, boolean isPlusStrand, int length){
+	
+	public double getNextStopCodonQuantityChangeRatio(String contig, int position, boolean isPlusStrand, int length, int maxLength){
+		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
+		ArrayList<Double>covs = bedCovFileParser.getCoverageBeforeNAfternextStopCodon(contig, isPlusStrand, position, length, maxLength, fastaFileParser, false);
+		return (covs.get(0)+1)/(covs.get(1)+1);
+	}
+	
+	//  /([length of transcript]/1000)/([total reads]/10^6)
+	public double getPositionQuantityChangeRatio(String contig, int position, boolean isPlusStrand, int length){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
 		int prevPosition = isPlusStrand? position - length : position + length;
 		double qb = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, prevPosition, length, false) + 1;
@@ -49,12 +58,9 @@ public class Quantifier {
 		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, false);
 	}
 	
-
-	
 	public BedCovFileParser getBedCovPlusFileParser() {
 		return bedCovPlusFileParser;
 	}
-
 
 	public BedCovFileParser getBedCovMinusFileParser() {
 		return bedCovMinusFileParser;

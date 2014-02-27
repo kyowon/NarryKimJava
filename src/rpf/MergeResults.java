@@ -2,6 +2,7 @@ package rpf;
 
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.HashSet;
 
 import parser.AnnotationFileParser;
@@ -52,7 +53,7 @@ public class MergeResults {
 		this.mafParser = mafParser;
 	}
 	
-	void merge(String outFile, double scoreThreshold){
+	public void merge(String outFile, double scoreThreshold){
 		try {
 			PrintStream out = new PrintStream(outFile);
 			PrintStream mout = new PrintStream(outFile.replace('.', '_')+".m");
@@ -62,6 +63,7 @@ public class MergeResults {
 				contigs.addAll(scoringOutputParsers[i].getContigs());
 			}
 			boolean start = true;
+			
 			for(String contig : contigs){
 				System.out.println("Merging " + contig);
 				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, contig, scoreThreshold)){
@@ -75,11 +77,12 @@ public class MergeResults {
 				}
 			}
 			out.close();
-			mout.close();
+			mout.close();		
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
 	}	
+	
 	
 	private void writeMfile(PrintStream mout, ScoredPosition position){
 		String gname;

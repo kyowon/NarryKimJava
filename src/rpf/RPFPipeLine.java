@@ -157,7 +157,7 @@ public class RPFPipeLine {
 		merge = null;
 		MergeResults mergeControl = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, annotationFileParser, fastaParser, mafParser);
 		System.out.println("Merging results - control");
-		mergeControl.merge(outControlFile, -0.1);
+		mergeControl.merge(outControlFile, -0.05);
 		
 		System.out.println("Merging done..");
 	}

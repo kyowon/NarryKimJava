@@ -377,13 +377,8 @@ public class AnnotationFileParser {
 	public ArrayList<ArrayList<Integer>> getLiftOverPositionsTillNextStopCodon(String contig, boolean isPlusStrand, int start, int maxLength, ZeroBasedFastaParser fastaParser){
 		AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
 		//AnnotatedGene tgene = getAnnotatedGene(contig, isPlusStrand, start);
-		
 		ArrayList<ArrayList<Integer>> positions = getLiftOverPositions(gene, isPlusStrand, start, maxLength, true);
 		ArrayList<ArrayList<Integer>> ret = new ArrayList<ArrayList<Integer>>();
-		HashSet<String> stopCodons = new HashSet<String>();
-		stopCodons.add("TAG");
-		stopCodons.add("TAA");
-		stopCodons.add("TGA");
 		boolean stop = false;
 		ArrayList<Integer> tp = new ArrayList<Integer>();
 		for(int j=0;j<positions.size();j++){
@@ -395,7 +390,8 @@ public class AnnotationFileParser {
 				if(tp.size()%3 ==0 && tp.size()>=3){
 					String tc = fastaParser.getSequence(contig, tp.subList(tp.size()-3, tp.size()));
 					if(!isPlusStrand) tc = ZeroBasedFastaParser.getComplementarySequence(tc, false);
-					if(stopCodons.contains(tc.toUpperCase())){ 					
+					tc = tc.toUpperCase();
+					if(tc.equals("TAG") || tc.equals("TAA") || tc.equals("TGA")){ 					
 						ret.add(subRet);
 						stop = true;
 						break;

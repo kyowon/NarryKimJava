@@ -24,6 +24,7 @@ public class MergedFileParser {
 		private double[] rpfPositionQuantities;//
 		private double[] rpfPositionQuantitiesNormalized;//	
 		private double[] rpfPositionQuantityChanges;//
+		private double[] rpfAroundStopCodonQuantityChanges;//
 		
 		private double[] rnaCDSQuantities;//
 		
@@ -62,10 +63,14 @@ public class MergedFileParser {
 				}
 				rpfPositionQuantities = new double[rpfQuantifiers.length];
 				rpfPositionQuantityChanges = new double[rpfQuantifiers.length];
+				rpfAroundStopCodonQuantityChanges = new double[rpfQuantifiers.length];
 				for(int i=0; i<rpfPositionQuantities.length;i++){
 					rpfPositionQuantities[i] = rpfQuantifiers[i].getPositionRPKM(contig, this.position, isPlusStrand, positionQuantityMaxLength);
-					rpfPositionQuantityChanges[i] = rpfQuantifiers[i].getPositionQuantatyChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength);
+					rpfPositionQuantityChanges[i] = rpfQuantifiers[i].getPositionQuantityChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength);
+					rpfAroundStopCodonQuantityChanges[i] = rpfQuantifiers[i].getNextStopCodonQuantityChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength, positionQuantityMaxLength);
 				}
+				
+				//rpfAroundStopCodonQuantityChanges
 			}
 			
 			if(rnaQuantifiers!=null){
@@ -79,7 +84,7 @@ public class MergedFileParser {
 				rnaPositionQuantityChanges = new double[rnaQuantifiers.length];
 				for(int i=0; i<rnaPositionQuantities.length;i++){
 					rnaPositionQuantities[i] = rnaQuantifiers[i].getPositionRPKM(contig, this.position, isPlusStrand, positionQuantityMaxLength);
-					rnaPositionQuantityChanges[i] = rnaQuantifiers[i].getPositionQuantatyChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength);
+					rnaPositionQuantityChanges[i] = rnaQuantifiers[i].getPositionQuantityChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength);
 				}
 			}
 			if(rpfQuantifiers!=null && rnaQuantifiers!=null){
@@ -115,6 +120,7 @@ public class MergedFileParser {
 			rnaPositionQuantities = subParse(token[i++]);
 			rpfPositionQuantitiesNormalized = subParse(token[i++]);
 			rpfPositionQuantityChanges = subParse(token[i++]);
+			rpfAroundStopCodonQuantityChanges = subParse(token[i++]);
 			rnaPositionQuantityChanges = subParse(token[i++]);
 			rpfCDSQuantities = subParse(token[i++]);
 			rnaCDSQuantities = subParse(token[i++]);
@@ -147,6 +153,8 @@ public class MergedFileParser {
 			header += subGetHeader("RPF/RNA_Pos_RPKMs", rpfPositionQuantitiesNormalized) + "\t";
 			
 			header += subGetHeader("RPF_QuanChange", rpfPositionQuantityChanges) + "\t";
+			header += subGetHeader("RPF_StopCodonQuanChange", rpfAroundStopCodonQuantityChanges) + "\t";			
+			
 			header += subGetHeader("RNA_QuanChange", rnaPositionQuantityChanges) + "\t";
 			
 			header += subGetHeader("RPF_CDS_RPKMs", rpfCDSQuantities) + "\t";
@@ -202,6 +210,9 @@ public class MergedFileParser {
 			sb.append('\t');
 			
 			subToString(rpfPositionQuantityChanges, sb);
+			sb.append('\t');
+			
+			subToString(rpfAroundStopCodonQuantityChanges, sb);
 			sb.append('\t');
 			
 			subToString(rnaPositionQuantityChanges, sb);

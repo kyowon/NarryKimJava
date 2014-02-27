@@ -191,17 +191,35 @@ public class ScoringOutputParser {
 	}
 	
 	public static ArrayList<ScoredPosition> getUnionPositions(ScoringOutputParser[] parsers, String contig, double scoreThreshold){
-		HashSet<ScoredPosition> positions = new HashSet<ScoredPosition>();
+		HashMap<Integer, ArrayList<ScoredPosition>> positions = new HashMap<Integer, ArrayList<ScoredPosition>>();
 		for(int i=0; i<parsers.length;i++){
-			positions.addAll(parsers[i].getPositions(contig));
+			for(ScoredPosition position : parsers[i].getPositions(contig)){
+				if(!positions.containsKey(position.getPosition())) positions.put(position.getPosition(), new ArrayList<ScoredPosition>());
+				positions.get(position.getPosition()).add(position);
+			}			
 		}	
 		ArrayList<ScoredPosition> positionList = new ArrayList<ScoredPosition>();
-		for(ScoredPosition p : positions){
-			if(scoreThreshold > 0 && p.getScore() > scoreThreshold) positionList.add(p);
-			else if(scoreThreshold <= 0 && p.getScore() < -scoreThreshold) positionList.add(p);
+		
+		for(int position : positions.keySet()){
+			ArrayList<ScoredPosition> ps = positions.get(position);
+			ScoredPosition tp = null;
+			for(ScoredPosition p : ps){
+				if(scoreThreshold>0){
+					if(p.getScore() >= scoreThreshold){
+						positionList.add(p);
+						break;
+					}
+				}else{
+					tp = p;
+					if(p.getScore() >= -scoreThreshold){
+						tp = null;
+						break;
+					}
+				}
+				if(tp!=null) positionList.add(tp);
+			}			
 		}		
 		Collections.sort(positionList);
 		return positionList;
-	}
-	
+	}	
 }
