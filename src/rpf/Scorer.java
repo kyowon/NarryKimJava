@@ -44,6 +44,9 @@ public class Scorer {
 		this.annotationFileParser = annotationFileParser;
 	}
 	
+	public AnnotationFileParser getAnnotationFileParser(){
+		return annotationFileParser;
+	}
 	
 	public void scoreNWrite(double scoreThreshold, ZeroBasedFastaParser fastaParser, String outFile, boolean append){
 		try {

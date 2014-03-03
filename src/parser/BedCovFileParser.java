@@ -119,11 +119,11 @@ public class BedCovFileParser {
 		return totalCoverages;
 	}
 	
-	public ArrayList<Double> getCoverageBeforeNAfternextStopCodon(String contig, boolean isPlusStrand, int position, int length, int maxLength, ZeroBasedFastaParser fastaParser, boolean normalizeByLength){
+	public ArrayList<Double> getCoverageBeforeNAfternextStopCodonNStopCodonPosition(String contig, boolean isPlusStrand, int position, int length, int maxLength, ZeroBasedFastaParser fastaParser, boolean normalizeByLength){
 		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
 		ArrayList<Double> ret = new ArrayList<Double>();
 		if(coverages == null){
-			ret.add(.0); ret.add(.0); return ret;
+			return null;
 		}
 		ArrayList<ArrayList<Integer>> positions = annotationParser.getLiftOverPositionsTillNextStopCodon(contig, isPlusStrand, position, maxLength, fastaParser);
 		double before = 0;
@@ -157,6 +157,7 @@ public class BedCovFileParser {
 		}
 		if(normalizeByLength) after /= length;
 		ret.add(after);
+		ret.add((double)stopPosition);
 		return ret;
 	}
 	

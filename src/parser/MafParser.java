@@ -96,7 +96,7 @@ public class MafParser {
 							}
 							write = true;						
 						}
-						if(s.isEmpty()){ 							
+						if(s.startsWith("a score")){ 							
 							start = true;
 							if(write){
 								out.println(sp + "\t" + accessFile.getFilePointer());
@@ -284,16 +284,20 @@ public class MafParser {
 		}
 		*/
 		
-		String file = "/media/kyowon/Data1/RPF_Project/genomes/hg19/maf/";
+		String file = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/";
 		
-		MafParser test = new MafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/hg19.refFlat.txt"));
+		MafParser test = new MafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
 		test.generateIndexFile();
 		test.readIndexFile();
-		String[] seqs =  test.getSeqs("chr17", 45727472, true, 150); // why not 150???? TODO
+		String[] seqs =  test.getSeqs("chr4", 149780373, true, 150); // why not 150???? TODO
 		for(String seq : seqs){
 			System.out.println(seq + " " + seq.length());
 		}
-		//chr17	45727472
+		//chrX	131254689 chr13	23673470
+	
+/*chr9	120864455	+
+*/
+
 //GATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAA
 		System.out.println(DsDnCalculator.calculate(seqs));
 		//ATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAAG

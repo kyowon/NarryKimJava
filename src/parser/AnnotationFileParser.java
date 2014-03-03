@@ -374,7 +374,13 @@ public class AnnotationFileParser {
 		return getLiftOverPositions(gene, gene.isPlusStrand(), gene.isPlusStrand()? gene.cdsStart : gene.cdsEnd - 1, gene == null? 0 : Integer.MAX_VALUE, true);
 	}
 	
+	private int pstart = -1;
+	private String pcontig = "";
+	private boolean pIsPlusStrand = false;
+	private ArrayList<ArrayList<Integer>> pPositions = null;
+	
 	public ArrayList<ArrayList<Integer>> getLiftOverPositionsTillNextStopCodon(String contig, boolean isPlusStrand, int start, int maxLength, ZeroBasedFastaParser fastaParser){
+		if(pstart == start && pcontig.equals(contig) && pIsPlusStrand == isPlusStrand && pPositions != null)  return pPositions;	
 		AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
 		//AnnotatedGene tgene = getAnnotatedGene(contig, isPlusStrand, start);
 		ArrayList<ArrayList<Integer>> positions = getLiftOverPositions(gene, isPlusStrand, start, maxLength, true);
@@ -402,6 +408,11 @@ public class AnnotationFileParser {
 			//Collections.sort(subRet);
 			ret.add(subRet);
 		}
+		
+		pPositions = ret;
+		pstart = start;
+		pcontig = contig;
+		pIsPlusStrand = isPlusStrand;
 		return ret;
 	}
 	

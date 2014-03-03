@@ -33,10 +33,19 @@ public class Quantifier {
 		return (bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, true)+1) * 1e9 / (bedCovFileParser.getTotalReadCount()+1);
 	}
 	
-	public double getNextStopCodonQuantityChangeRatio(String contig, int position, boolean isPlusStrand, int length, int maxLength){
+	public ArrayList<Double> getNextStopCodonQuantityChangeRatioNStopPosition(String contig, int position, boolean isPlusStrand, int length, int maxLength){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		ArrayList<Double>covs = bedCovFileParser.getCoverageBeforeNAfternextStopCodon(contig, isPlusStrand, position, length, maxLength, fastaFileParser, false);
-		return (covs.get(0)+1)/(covs.get(1)+1);
+		ArrayList<Double>covs = bedCovFileParser.getCoverageBeforeNAfternextStopCodonNStopCodonPosition(contig, isPlusStrand, position, length, maxLength, fastaFileParser, false);
+		ArrayList<Double> ret = null;
+		
+		if(covs != null){
+			ret = new ArrayList<Double>();
+			ret.add((covs.get(0)+1)/(covs.get(1)+1));
+			ret.add(covs.get(2));
+			
+		}
+			
+		return ret;
 	}
 	
 	//  /([length of transcript]/1000)/([total reads]/10^6)
@@ -53,10 +62,10 @@ public class Quantifier {
 		return bedCovFileParser.getTotalCDSCoverage(gene, false);
 	}
 	
-	public double getPositionQuantity(String contig, int position, boolean isPlusStrand, int maxLength){
+	/*public double getPositionQuantity(String contig, int position, boolean isPlusStrand, int maxLength){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
 		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, false);
-	}
+	}*/
 	
 	public BedCovFileParser getBedCovPlusFileParser() {
 		return bedCovPlusFileParser;

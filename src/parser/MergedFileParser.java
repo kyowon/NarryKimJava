@@ -1,5 +1,7 @@
 package parser;
 
+import java.util.ArrayList;
+
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.ScoringOutputParser.ScoredPosition;
 import rpf.Quantifier;
@@ -9,8 +11,8 @@ import util.DsDnCalculator;
 public class MergedFileParser {
 	public class MergedResult{
 		//	IsAnnotated	ContainingGeneName	ContainingGBGeneName	txStart	txEnd	cdsStart	cdsEnd	genomicRegion	frameShift
-		private int positionQuantityChangeLength = 600;
-		private int positionQuantityMaxLength = 12000;
+		private int positionQuantityChangeLength = 300;
+		private int positionQuantityMaxLength = 20000;
 		
 		private String contig;
 		private int position;
@@ -25,6 +27,7 @@ public class MergedFileParser {
 		private double[] rpfPositionQuantitiesNormalized;//	
 		private double[] rpfPositionQuantityChanges;//
 		private double[] rpfAroundStopCodonQuantityChanges;//
+		private int stopPosition = -1;
 		
 		private double[] rnaCDSQuantities;//
 		
@@ -67,7 +70,11 @@ public class MergedFileParser {
 				for(int i=0; i<rpfPositionQuantities.length;i++){
 					rpfPositionQuantities[i] = rpfQuantifiers[i].getPositionRPKM(contig, this.position, isPlusStrand, positionQuantityMaxLength);
 					rpfPositionQuantityChanges[i] = rpfQuantifiers[i].getPositionQuantityChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength);
-					rpfAroundStopCodonQuantityChanges[i] = rpfQuantifiers[i].getNextStopCodonQuantityChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength, positionQuantityMaxLength);
+					ArrayList<Double> qs = rpfQuantifiers[i].getNextStopCodonQuantityChangeRatioNStopPosition(contig, this.position, isPlusStrand, positionQuantityChangeLength, positionQuantityMaxLength);
+					if(qs!=null){
+						rpfAroundStopCodonQuantityChanges[i] = qs.get(0);
+						stopPosition = (int)((double)qs.get(1));
+					}//else rpfAroundStopCodonQuantityChanges = null;
 				}
 				
 				//rpfAroundStopCodonQuantityChanges
@@ -101,7 +108,7 @@ public class MergedFileParser {
 			}
 		}
 		
-		public MergedResult(String s){
+		public MergedResult(String s){ //TODO fix next time- consider "_"
 			int i = 0;
 			String[] token = s.split("\t");
 			contig = token[i++];
@@ -121,6 +128,7 @@ public class MergedFileParser {
 			rpfPositionQuantitiesNormalized = subParse(token[i++]);
 			rpfPositionQuantityChanges = subParse(token[i++]);
 			rpfAroundStopCodonQuantityChanges = subParse(token[i++]);
+			stopPosition = Integer.parseInt(token[i++]); //TODO
 			rnaPositionQuantityChanges = subParse(token[i++]);
 			rpfCDSQuantities = subParse(token[i++]);
 			rnaCDSQuantities = subParse(token[i++]);
@@ -154,7 +162,7 @@ public class MergedFileParser {
 			
 			header += subGetHeader("RPF_QuanChange", rpfPositionQuantityChanges) + "\t";
 			header += subGetHeader("RPF_StopCodonQuanChange", rpfAroundStopCodonQuantityChanges) + "\t";			
-			
+			header += "StopCodonPosition\t";
 			header += subGetHeader("RNA_QuanChange", rnaPositionQuantityChanges) + "\t";
 			
 			header += subGetHeader("RPF_CDS_RPKMs", rpfCDSQuantities) + "\t";
@@ -194,7 +202,7 @@ public class MergedFileParser {
 			
 			sb.append(genomicRegion);sb.append('\t');
 			sb.append(frameShift);sb.append('\t');
-			sb.append(dsdnRatio>0?dsdnRatio : '_');sb.append('\t');
+			sb.append(dsdnRatio>=0?dsdnRatio : '_');sb.append('\t');
 			sb.append(gene == null ? '_' : (isAnnotated? 'T' : 'F'));sb.append('\t');
 			
 			subToString(scores, sb);
@@ -215,6 +223,9 @@ public class MergedFileParser {
 			subToString(rpfAroundStopCodonQuantityChanges, sb);
 			sb.append('\t');
 			
+			sb.append(stopPosition>=0? stopPosition : "_");
+			sb.append('\t');
+			
 			subToString(rnaPositionQuantityChanges, sb);
 			sb.append('\t');
 			
@@ -229,7 +240,7 @@ public class MergedFileParser {
 			
 			if(rpfCDSQuantitiesNormalized != null && rpfPositionQuantitiesNormalized != null)
 				sb.append(String.format("%.3e", getKL(rpfPositionQuantitiesNormalized, rpfCDSQuantitiesNormalized)));
-			else sb.append("N/A");
+			else sb.append("_");
 			sb.append('\t');
 			
 			sb.append(gene == null ? AnnotatedGene.getEmptyGeneString() : gene.toString());
@@ -251,11 +262,11 @@ public class MergedFileParser {
 					sb.append(String.format("%.3e", getNonuniformity(quantities)));
 				}
 			}else{
-				//sb.append("N/A");
+				//sb.append("_");
 				for(int i=0; i<numSample-1; i++){
-					sb.append("N/A;");
+					sb.append("_;");
 				}
-				sb.append("N/A\tN/A");
+				sb.append("_\t_");
 			}
 		}
 		
