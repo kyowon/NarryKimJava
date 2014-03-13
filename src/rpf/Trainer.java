@@ -3,15 +3,9 @@ package rpf;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
-
-import org.apache.commons.math3.analysis.polynomials.PolynomialFunction;
-import org.apache.commons.math3.analysis.polynomials.PolynomialFunction.Parametric;
-import org.apache.commons.math3.fitting.CurveFitter;
-import org.apache.commons.math3.optim.nonlinear.vector.jacobian.LevenbergMarquardtOptimizer;
 
 import parser.AnnotationFileParser;
 import parser.AnnotationFileParser.AnnotatedGene;
@@ -25,14 +19,21 @@ public class Trainer {
 	private int numberOfNonZeroElements = 7;
 	//private int coverageThreshold = 1;
 	
-	private ArrayList<double[]> signal = null;
-	private ArrayList<double[]> noise = null;
+	private ArrayList<double[]> startSignal = null;
+	private ArrayList<double[]> stopSignal = null;
+	
+	private ArrayList<double[]> startNoise = null;
+	private ArrayList<double[]> stopNoise = null;
+	
 	private BedCovFileParser bedCovPlusFileParser;
 	private BedCovFileParser bedCovMinusFileParser;
 	private AnnotationFileParser annotationFileParser;
-	private double[][] avgedSignal;
-	private double[] filter;
-	private double[] likelihoodFunctionCoefficients;
+	private double[][] avgedStartSignal;
+	private double[][] avgedStopSignal;
+	
+	private double[] startFilter;
+	private double[] stopFilter;
+	//private double[] likelihoodFunctionCoefficients;
 	private String outParamFile;
 	
 	public Trainer(String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFileParser, String outParamFile){
@@ -47,14 +48,20 @@ public class Trainer {
 		this.rightWindowSize = rightWindowSize;
 		this.numberOfNonZeroElements = numberOfNonZeroElements;
 		//this.coverageThreshold = coverageThreshold;
-		signal = new ArrayList<double[]>();
-		noise = new ArrayList<double[]>();
+		startSignal = new ArrayList<double[]>();
+		stopSignal = new ArrayList<double[]>();
+		startNoise = new ArrayList<double[]>();
+		stopNoise = new ArrayList<double[]>();
+		
 		getSignalNNoise(true);
 		//System.out.println(signal.size());
 		getSignalNNoise(false);
-		avgedSignal = getAvg(signal);
-		filter = getFilter(avgedSignal, noise);
-		likelihoodFunctionCoefficients = calculateLikelihoodFunctionCoefficients(filter, signal, noise, numberOfNonZeroElements);
+		avgedStartSignal = getAvg(startSignal);
+		startFilter = getFilter(avgedStartSignal, startNoise);
+		
+		avgedStopSignal = getAvg(stopSignal);
+		stopFilter = getFilter(avgedStopSignal, stopNoise);
+		//likelihoodFunctionCoefficients = calculateLikelihoodFunctionCoefficients(filter, signal, noise, numberOfNonZeroElements);
 		write(outParamFile);
 	}
 	
@@ -64,29 +71,46 @@ public class Trainer {
 		while(iterator.hasNext()){
 			AnnotatedGene gene = iterator.next();
 			if(isPlusStrand != gene.isPlusStrand()) continue;
-			int position = isPlusStrand? gene.getCdsStart() : gene.getCdsEnd() - 1;
+			int startPosition = isPlusStrand? gene.getCdsStart() : gene.getCdsEnd() - 1;
+			int stopPosition = isPlusStrand? gene.getCdsEnd() - 1: gene.getCdsStart();
+					
+			double[] startCov = bedCovFileParser.getSqrtCoverages(gene.getContig(), startPosition, leftWindowSize, rightWindowSize, isPlusStrand);
+			double[] stopCov = bedCovFileParser.getSqrtCoverages(gene.getContig(), stopPosition, leftWindowSize, rightWindowSize, isPlusStrand);
 			
-			double[] cov = bedCovFileParser.getSqrtCoverages(gene.getContig(), position, leftWindowSize, rightWindowSize, isPlusStrand);
 			
-			if(Scorer.numberOfNonZeroElements(cov) >= numberOfNonZeroElements){
+			if(Scorer.numberOfNonZeroElements(startCov) >= numberOfNonZeroElements){
 				//double[] sqrtCov = Scorer.getSqrtVector(cov);				
-				Scorer.normalize(cov);
-				signal.add(cov);				
+				Scorer.normalize(startCov);
+				startSignal.add(startCov);				
 			}
+			
+			if(Scorer.numberOfNonZeroElements(stopCov) >= numberOfNonZeroElements){
+				//double[] sqrtCov = Scorer.getSqrtVector(cov);				
+				Scorer.normalize(stopCov);
+				stopSignal.add(stopCov);				
+			}
+			
 			HashSet<Integer> offsets = new HashSet<Integer>();
 			for(int i=0;i<200;i++){
 				int offset =  (new Random().nextInt(500)) + 150;
 				if(offsets.contains(offset)) continue;
 				offsets.add(offset);
 				offset = isPlusStrand? offset : - offset;
-				double[] noisyCov = bedCovFileParser.getSqrtCoverages(gene.getContig(), position + offset, leftWindowSize, rightWindowSize, isPlusStrand);
-				if(Scorer.numberOfNonZeroElements(noisyCov) >= numberOfNonZeroElements){					
-					Scorer.normalize(noisyCov);
-					noise.add(noisyCov);	
+				double[] startNoiseCov = bedCovFileParser.getSqrtCoverages(gene.getContig(), startPosition + offset, leftWindowSize, rightWindowSize, isPlusStrand);
+				if(Scorer.numberOfNonZeroElements(startNoiseCov) >= numberOfNonZeroElements){					
+					Scorer.normalize(startNoiseCov);
+					startNoise.add(startNoiseCov);	
+				}
+				
+				double[] stopNoiseCov = bedCovFileParser.getSqrtCoverages(gene.getContig(), stopPosition + offset, leftWindowSize, rightWindowSize, isPlusStrand);
+				if(Scorer.numberOfNonZeroElements(stopNoiseCov) >= numberOfNonZeroElements){					
+					Scorer.normalize(stopNoiseCov);
+					stopNoise.add(stopNoiseCov);	
 				}
 			}	
 		}
 	}
+	
 	
 	private void write(String outParamFile){
 		try {
@@ -97,22 +121,34 @@ public class Trainer {
 			out.println("#NONZERO\t"+numberOfNonZeroElements);
 			//out.println("#COVTHRESHOLD\t"+coverageThreshold);
 			
-			out.println("#FILTER\t"+filter.length);
+			out.println("#STARTFILTER\t"+startFilter.length);
 				
-			for(int i=0;i<filter.length;i++){
-				out.println(filter[i]);
+			for(int i=0;i<startFilter.length;i++){
+				out.println(startFilter[i]);
 			}
 			
-			out.println("#SIGNAL\t"+avgedSignal.length);
+			out.println("#STARTSIGNAL\t"+avgedStartSignal.length);
 			
-			for(int i=0;i<avgedSignal.length;i++){
-				out.println(avgedSignal[i][0]);
+			for(int i=0;i<avgedStartSignal.length;i++){
+				out.println(avgedStartSignal[i][0]);
 			}
 			
-			out.println("#LIKELIHOOD\t" + likelihoodFunctionCoefficients.length);
-			for(double c : likelihoodFunctionCoefficients){
-				out.println(c);
+			out.println("#STOPFILTER\t"+stopFilter.length);
+			
+			for(int i=0;i<stopFilter.length;i++){
+				out.println(stopFilter[i]);
 			}
+			
+			out.println("#STOPSIGNAL\t"+avgedStopSignal.length);
+			
+			for(int i=0;i<avgedStopSignal.length;i++){
+				out.println(avgedStopSignal[i][0]);
+			}
+			
+		//	out.println("#LIKELIHOOD\t" + likelihoodFunctionCoefficients.length);
+		//	for(double c : likelihoodFunctionCoefficients){
+		//		out.println(c);
+		//	}
 			
 			out.close();
 			
@@ -173,7 +209,7 @@ public class Trainer {
 		return cov;
 	}
 	
-	private static double[] calculateLikelihoodFunctionCoefficients(double[] filter, ArrayList<double[]> signal, ArrayList<double[]> noise, int numberOfNonZeroElements){
+	/*private static double[] calculateLikelihoodFunctionCoefficients(double[] filter, ArrayList<double[]> signal, ArrayList<double[]> noise, int numberOfNonZeroElements){
 		double[] likelihoodFunctionCoefficients = new double[4];
 		ArrayList<Double> signalScores = new ArrayList<Double>();
 		ArrayList<Double> noiseScores = new ArrayList<Double>();
@@ -216,7 +252,7 @@ public class Trainer {
 		return likelihoodFunctionCoefficients;
 	}
 	
-	/*public static void main(String[] args){
+	public static void main(String[] args){
 		String keyword =  "RPF6_NS_RPF_1";
 		String annotationkey = "uORF";
 		String covFileprefix = "/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/" + keyword + "-uncollapsed";

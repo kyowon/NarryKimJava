@@ -2,7 +2,6 @@ package rpf;
 
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
-import java.util.ArrayList;
 import java.util.HashSet;
 
 import parser.AnnotationFileParser;
@@ -16,21 +15,24 @@ import parser.ZeroBasedFastaParser;
 
 public class MergeResults {
 	private ScoringOutputParser[] scoringOutputParsers;
-	private Scorer[] scorers = null; 
+	private Scorer[] harrScorers = null; 
+	private Scorer[] rpfScorers = null; 
 	private Quantifier[] rpfQuantifiers = null;
 	private Quantifier[] rnaQuantifiers = null;
 	private MafParser mafParser = null;
-	
+	private AnnotationFileParser annotationFileParser = null;
 	public MergeResults(String[] scoreOutFiles, 
 			String[] harrCovPlusFiles, String[] harrCovMinusFiles, 
 			String[] rpfCovPlusFiles, String[] rpfCovMinusFiles,
 			String[] rnaCovPlusFiles, String[] rnaCovMinusFiles,
-			String[] paramFiles,
+			String[] harrParamFiles,
+			String[] rpfParamFiles,
 			AnnotationFileParser annotationFileParser,
 			ZeroBasedFastaParser fastaFileParser,
 			MafParser mafParser){
 		scoringOutputParsers = new ScoringOutputParser[scoreOutFiles.length];
-		scorers = new Scorer[scoreOutFiles.length];
+		harrScorers = new Scorer[harrParamFiles.length];
+		rpfScorers = new Scorer[rpfParamFiles.length];
 		if(rpfCovPlusFiles!=null)
 			rpfQuantifiers = new Quantifier[rpfCovPlusFiles.length];
 		if(rnaCovPlusFiles!=null)
@@ -38,8 +40,13 @@ public class MergeResults {
 		
 		for(int i=0;i<scoringOutputParsers.length;i++){
 			scoringOutputParsers[i] = new ScoringOutputParser(scoreOutFiles[i]);
-			scorers[i] = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], paramFiles[i], annotationFileParser);
+			harrScorers[i] = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], harrParamFiles[i], annotationFileParser, fastaFileParser);
 		}
+		
+		for(int i=0;i<rpfScorers.length;i++){			
+			rpfScorers[i] = new Scorer(rpfCovPlusFiles[i], rpfCovMinusFiles[i], rpfParamFiles[i], annotationFileParser, fastaFileParser);
+		}
+		
 		if(rpfQuantifiers!=null){
 			for(int i=0;i<rpfQuantifiers.length;i++){
 				rpfQuantifiers[i] = new Quantifier(rpfCovPlusFiles[i], rpfCovMinusFiles[i], annotationFileParser, fastaFileParser);
@@ -51,12 +58,14 @@ public class MergeResults {
 			}
 		}
 		this.mafParser = mafParser;
+		this.annotationFileParser = annotationFileParser;
 	}
 	
-	public void merge(String outFile, double scoreThreshold){
+	public void merge(String outFile, double scoreThreshold, double rpfRPKMThreshold, double rnaRPKMThreshold, int positionQuantityChangeLength, int positionQuantityOffset, int maxLengthUntilStopcodon){
 		try {
 			PrintStream out = new PrintStream(outFile);
 			PrintStream mout = new PrintStream(outFile.replace('.', '_')+".m");
+			PrintStream tout = new PrintStream(outFile + ".train.csv");
 			//ArrayList<MergedResult> mergedResults = new ArrayList<MergedResult>();
 			HashSet<String> contigs = new HashSet<String>();
 			for(int i=0;i<scoringOutputParsers.length;i++){
@@ -66,18 +75,26 @@ public class MergeResults {
 			
 			for(String contig : contigs){
 				System.out.println("Merging " + contig);
-				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, contig, scoreThreshold)){
-					MergedResult mr = new MergedFileParser().new MergedResult(position, scorers, rpfQuantifiers, rnaQuantifiers, mafParser);
+				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, rpfQuantifiers, rnaQuantifiers, contig, scoreThreshold, rpfRPKMThreshold, rnaRPKMThreshold)){
+					MergedResult mr = new MergedFileParser().new MergedResult(position, harrScorers, rpfScorers, rpfQuantifiers, rnaQuantifiers, mafParser, positionQuantityChangeLength, positionQuantityOffset, maxLengthUntilStopcodon);
 					if(start){
 						out.println(mr.getHeader());
+						tout.println(mr.GetTrainingSetHeader());
 						start = false;
 					}
-					out.println(mr);	
+					out.println(mr);
+					
+					for(int index : position.getConditionIndices()){
+						String ts = mr.ToTrainingSetString(annotationFileParser, index);
+						if(ts != null) tout.println(ts);
+					}
+					
 					writeMfile(mout, position);	
 				}
 			}
 			out.close();
-			mout.close();		
+			mout.close();	
+			tout.close();
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
@@ -90,9 +107,9 @@ public class MergeResults {
 		else gname = position.getGene().getGeneName();
 		mout.print(gname);
 		//a{3}=[ 4 5 ; 7 8 ]'
-		for(int i=0;i<scorers.length;i++){
+		for(int i=0;i<harrScorers.length;i++){
 			mout.println("{"+(i+1)+"}=[");
-			BedCovFileParser sbp =  position.isPlusStrand()? scorers[i].getBedCovPlusFileParser() : scorers[i].getBedCovMinusFileParser();
+			BedCovFileParser sbp =  position.isPlusStrand()? harrScorers[i].getBedCovPlusFileParser() : harrScorers[i].getBedCovMinusFileParser();
 			subWriteMfile(mout, position, sbp);
 			if(rpfQuantifiers != null && rpfQuantifiers[i] != null){
 				BedCovFileParser rpfbp =  position.isPlusStrand()? rpfQuantifiers[i].getBedCovPlusFileParser() : rpfQuantifiers[i].getBedCovMinusFileParser();

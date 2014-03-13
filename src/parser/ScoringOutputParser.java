@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import parser.AnnotationFileParser.AnnotatedGene;
+import rpf.Quantifier;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class ScoringOutputParser {
@@ -18,13 +19,22 @@ public class ScoringOutputParser {
 		private String contig;		
 		private boolean isPlusStrand;
 		private int position;
-		private double score;
+		private double startScore;
+		//private double stopScore;
 		private String codon;
 		private boolean isAnnotated = false;
 		private AnnotatedGene gene = null;
 		private String genomicRegion;
 		private String frameShift;
+		private HashSet<Integer> conditionIndices = new HashSet<Integer>();
 		
+	
+		public HashSet<Integer> getConditionIndices() {
+			return conditionIndices;
+		}
+		public void setConditionIndices(HashSet<Integer> conditionIndices) {
+			this.conditionIndices = conditionIndices;
+		}
 		public String getContig() {
 			return contig;
 		}
@@ -35,7 +45,7 @@ public class ScoringOutputParser {
 			return position;
 		}
 		public double getScore() {
-			return score;
+			return startScore;
 		}
 		public String getCodon() {
 			return codon;
@@ -58,11 +68,12 @@ public class ScoringOutputParser {
 			contig = token[0];
 			position = Integer.parseInt(token[1]);
 			isPlusStrand = token[2].equals("+");
-			score = Double.parseDouble(token[3]);
+			startScore = Double.parseDouble(token[3]);
+			//stopScore = Double.parseDouble(token[4]);
 			codon = token[4];
 			genomicRegion = token[5];
 			frameShift = token[6];
-			if(!token[8].equals("_")){				
+			if(!token[7].equals("_")){				
 				isAnnotated = token[7].equals("T");
 				StringBuffer gsb = new StringBuffer();
 				for(int i=8;i<token.length;i++){
@@ -74,11 +85,12 @@ public class ScoringOutputParser {
 			
 		}
 		
-		private ScoredPosition(String contig, int position, boolean isPlusStrand, double score, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
+		private ScoredPosition(String contig, int position, boolean isPlusStrand, double startScore, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
 			this.contig = contig;
 			this.position = position;
 			this.isPlusStrand = isPlusStrand;
-			this.score = score;
+			this.startScore = startScore;
+			//this.stopScore = stopScore;
 			this.codon = codon;
 			this.genomicRegion = genomicRegion;
 			this.frameShift = frameShift;
@@ -113,7 +125,8 @@ public class ScoringOutputParser {
 			sb.append(contig); sb.append('\t');
 			sb.append(position); sb.append('\t');
 			sb.append((isPlusStrand? '+': '-')); sb.append('\t');
-			sb.append(score); sb.append('\t');
+			sb.append(startScore); sb.append('\t');
+			//sb.append(stopScore); sb.append('\t');
 			sb.append(codon);sb.append('\t');
 			sb.append(genomicRegion);sb.append('\t');
 			sb.append(frameShift);sb.append('\t');
@@ -186,39 +199,95 @@ public class ScoringOutputParser {
 	}
 	*/
 	
-	public static ScoredPosition getScoredPosition(String contig, int position, boolean isPlusStrand, double score, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
-		return  new ScoringOutputParser().new ScoredPosition(contig, position, isPlusStrand, score, codon, gene, isAnnotated, genomicRegion, frameShift);			
+	public static ScoredPosition getScoredPosition(String contig, int position, boolean isPlusStrand, double startScore, String codon, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
+		return  new ScoringOutputParser().new ScoredPosition(contig, position, isPlusStrand, startScore, codon, gene, isAnnotated, genomicRegion, frameShift);			
 	}
 	
-	public static ArrayList<ScoredPosition> getUnionPositions(ScoringOutputParser[] parsers, String contig, double scoreThreshold){
-		HashMap<Integer, ArrayList<ScoredPosition>> positions = new HashMap<Integer, ArrayList<ScoredPosition>>();
+	public static ArrayList<ScoredPosition> getUnionPositions(ScoringOutputParser[] parsers, Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers, String contig, double scoreThreshold, double rpfRPKMThreshold, double rnaRPKMThreshold){
+		//HashMap<Integer, ArrayList<ScoredPosition>> positions = new HashMap<Integer, ArrayList<ScoredPosition>>();
+		
+		ArrayList<ScoredPosition> positionList = new ArrayList<ScoredPosition>();
+		HashSet<ScoredPosition> positions = new HashSet<ScoredPosition>();
+		
 		for(int i=0; i<parsers.length;i++){
 			for(ScoredPosition position : parsers[i].getPositions(contig)){
-				if(!positions.containsKey(position.getPosition())) positions.put(position.getPosition(), new ArrayList<ScoredPosition>());
-				positions.get(position.getPosition()).add(position);
+				if(position.getScore() < scoreThreshold) continue;
+				if(positions.contains(position)) continue;
+				HashSet<Integer> rpfAbundantIndices = null;
+				if(rpfQuantifiers!=null){
+				//	boolean abundant = false;	
+					rpfAbundantIndices = new HashSet<Integer>();
+					for(int j=0;j<rpfQuantifiers.length; j++){
+						double rpfRPKM = rpfQuantifiers[j].getPositionRPKM(contig, position.getPosition(), position.isPlusStrand(), 150);
+						if(rpfRPKM > rpfRPKMThreshold){
+						//	abundant = true;
+							rpfAbundantIndices.add(j);
+							//break;
+						}
+					}
+					//if(!abundant) continue;					
+				}
+				
+				HashSet<Integer> rnaAbundantIndices = null;
+				if(rnaQuantifiers!=null){
+				//	boolean abundant = false;
+					rnaAbundantIndices = new HashSet<Integer>();
+					for(int j=0;j<rnaQuantifiers.length; j++){
+						double rnaRPKM = rnaQuantifiers[j].getPositionRPKM(contig, position.getPosition(), position.isPlusStrand(), 150);
+						if(rnaRPKM > rnaRPKMThreshold){
+						//	abundant = true;
+							rnaAbundantIndices.add(j);
+							//break;
+						}
+					}
+					//if(!abundant) continue;					
+				}
+				
+				HashSet<Integer> indices = new HashSet<Integer>();
+				
+				if(rpfAbundantIndices == null && rnaAbundantIndices == null){
+					for(int j=0; j<parsers.length;j++) indices.add(j);
+				}else if(rpfAbundantIndices != null && rnaAbundantIndices == null){
+					indices = rpfAbundantIndices;
+				}else if(rpfAbundantIndices == null && rnaAbundantIndices != null){
+					indices = rnaAbundantIndices;
+				}else{
+					for(int j : rpfAbundantIndices){
+						if(rnaAbundantIndices.contains(j)) indices.add(j);
+					}
+				}
+				
+				position.setConditionIndices(indices);
+				positions.add(position);
+				
+				//if(!positions.containsKey(position.getPosition())) positions.put(position.getPosition(), new ArrayList<ScoredPosition>());
+			//	positions.get(position.getPosition()).add(position);
 			}			
 		}	
-		ArrayList<ScoredPosition> positionList = new ArrayList<ScoredPosition>();
+		positionList.addAll(positions);
+	//	ArrayList<ScoredPosition> positionList = new ArrayList<ScoredPosition>();
 		
-		for(int position : positions.keySet()){
-			ArrayList<ScoredPosition> ps = positions.get(position);
-			ScoredPosition tp = null;
-			for(ScoredPosition p : ps){
-				if(scoreThreshold>0){
-					if(p.getScore() >= scoreThreshold){
-						positionList.add(p);
-						break;
-					}
-				}else{
+	//	for(int position : positions.keySet()){
+	//		positionList.addAll(positions.get(position));
+	//		ArrayList<ScoredPosition> ps = positions.get(position);
+			//ScoredPosition tp = null;
+		//	for(ScoredPosition p : ps){
+				//if(scoreThreshold>0){
+		//			if(p.getScore() >= scoreThreshold){
+			//			positionList.add(p);
+		//				break;
+		//			}
+				//}
+				/*else{
 					tp = p;
 					if(p.getScore() >= -scoreThreshold){
 						tp = null;
 						break;
 					}
-				}
-				if(tp!=null) positionList.add(tp);
-			}			
-		}		
+				}*/
+			//	if(tp!=null) positionList.add(tp);
+		//	}			
+		//}		
 		Collections.sort(positionList);
 		return positionList;
 	}	

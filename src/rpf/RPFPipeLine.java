@@ -7,20 +7,31 @@ import parser.MafParser;
 import parser.ZeroBasedFastaParser;
 
 public class RPFPipeLine {
-	private static String[] scoreOutFiles;
+	private static String[] harrScoreOutFiles;
+	private static String[] harrParamFiles;
 	private static String[] harrCovPlusFiles; 
 	private static String[] harrCovMinusFiles;
+	
+	//private static String[] rpfScoreOutFiles;
+	private static String[] rpfParamFiles;
 	private static String[] rpfCovPlusFiles; 
 	private static String[] rpfCovMinusFiles;
 	private static String[] rnaCovPlusFiles; 
 	private static String[] rnaCovMinusFiles;
-	private static String[] paramFiles;
+
 	private static String mafFolder;
 	private static ZeroBasedFastaParser fastaParser = null;
 	private static AnnotationFileParser annotationFileParser = null;
-	private static double scoreThreshold = 2;
+	private static double scoreThreshold = .1;
+	private static double rpfRPKMThreshold = 0;
+	private static double rnaRPKMThreshold = 5;
 	private static String outFile = null;
-	private static String outControlFile = null;
+	//private static String outControlFile = null;
+	
+	private static int positionQuantityChangeLength = 600;
+	private static int positionQuantityOffset = 15;
+	private static int maxLengthUntilStopcodon = 13000;
+	
 	
 	private static boolean parseSegment(String s, int mode){
 		boolean ret = true;
@@ -64,11 +75,17 @@ public class RPFPipeLine {
 		}else if(mode == 10){
 			outFile = s;
 		}else if(mode == 11){
-			outControlFile = s;
+		//	outControlFile = s;
 		}else if(mode == 12){
 			mafFolder = s;
+		}else if(mode == 13){
+			rpfRPKMThreshold = Double.parseDouble(s);
+		}else if(mode == 14){
+			rnaRPKMThreshold = Double.parseDouble(s);
 		}else ret = false;
 		
+		
+		//rpfRPKMThreshold
 		return ret;
 	}
 	
@@ -107,6 +124,10 @@ public class RPFPipeLine {
 				mode = 11;
 			}else if(args[i].equals("-maf")){				
 				mode = 12;
+			}else if(args[i].equals("-rpfRPKMThreshold")){				
+				mode = 13;
+			}else if(args[i].equals("-rnaRPKMThreshold")){				
+				mode = 13;
 			}else{
 				s += args[i] + " ";
 			}
@@ -115,12 +136,20 @@ public class RPFPipeLine {
 		if(harrCovPlusFiles == null || harrCovMinusFiles == null || fastaParser == null || annotationFileParser == null || outFile == null) return false;
 		//if(harrCovPlusFiles.length != harrCovMinusFiles.length) return false;
 		
-		paramFiles = new String[harrCovPlusFiles.length];
-		scoreOutFiles = new String[harrCovPlusFiles.length];
-		for(int i=0;i<paramFiles.length;i++){
-			paramFiles[i] = harrCovPlusFiles[i]+".param";
-			scoreOutFiles[i] = harrCovPlusFiles[i]+".score.tsv";
+		harrParamFiles = new String[harrCovPlusFiles.length];
+		harrScoreOutFiles = new String[harrCovPlusFiles.length];
+		for(int i=0;i<harrParamFiles.length;i++){
+			harrParamFiles[i] = harrCovPlusFiles[i]+".param";
+			harrScoreOutFiles[i] = harrCovPlusFiles[i]+".score"+ scoreThreshold +".tsv";
 		}
+		
+		rpfParamFiles = new String[rpfCovPlusFiles.length];
+		//rpfScoreOutFiles = new String[rpfCovPlusFiles.length];
+		for(int i=0;i<rpfParamFiles.length;i++){
+			rpfParamFiles[i] = rpfCovPlusFiles[i]+".param";
+	//		rpfScoreOutFiles[i] = rpfCovPlusFiles[i]+".score"+ scoreThreshold +".tsv";
+		}
+		
 		
 		return true;
 	}
@@ -133,31 +162,50 @@ public class RPFPipeLine {
 		}
 				
 		for(int i=0;i<harrCovPlusFiles.length;i++){
-			if(!new File(paramFiles[i]).exists()){
-				Trainer trainer = new Trainer(harrCovPlusFiles[i], harrCovMinusFiles[i], annotationFileParser, paramFiles[i]);
+			if(!new File(harrParamFiles[i]).exists()){
+				Trainer trainer = new Trainer(harrCovPlusFiles[i], harrCovMinusFiles[i], annotationFileParser, harrParamFiles[i]);
 				System.out.println("Training for " + harrCovPlusFiles[i] + " and " + harrCovMinusFiles[i]);
-				trainer.train(30, 50, 5); // harr
+				trainer.train(60, 90, 10); // harr
 				System.out.println("Training done..");
 			}
-			if(!new File(scoreOutFiles[i]).exists()){
+			if(!new File(harrScoreOutFiles[i]).exists()){
 				System.out.println("Scoring for " + harrCovPlusFiles[i] + " and " + harrCovMinusFiles[i]);
-				Scorer scorer = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], paramFiles[i], annotationFileParser);
-				scorer.scoreNWrite(scoreThreshold, fastaParser, scoreOutFiles[i], false);
-				scorer.scoreNWrite(-0.1, fastaParser, scoreOutFiles[i], true);
+				Scorer scorer = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], harrParamFiles[i], annotationFileParser, fastaParser);
+				scorer.scoreNWrite(scoreThreshold, harrScoreOutFiles[i]+".beforeWindowFilter.tsv", false);
+				scorer.writeWindowFilteredOutput(harrScoreOutFiles[i]+".beforeWindowFilter.tsv", harrScoreOutFiles[i], 30);
+				//scorer.scoreNWrite(-0.1, fastaParser, scoreOutFiles[i], true);
 				System.out.println("Scoring done..");
 			}
+		}
+		
+		for(int i=0;i<rpfCovPlusFiles.length;i++){
+			if(!new File(rpfParamFiles[i]).exists()){
+				Trainer trainer = new Trainer(rpfCovPlusFiles[i], rpfCovMinusFiles[i], annotationFileParser, rpfParamFiles[i]);
+				System.out.println("Training for " + rpfCovPlusFiles[i] + " and " + rpfCovMinusFiles[i]);
+				trainer.train(60, 150, 20); // rpf
+				System.out.println("Training done..");
+			}
+			/*if(!new File(rpfScoreOutFiles[i]).exists()){
+				System.out.println("Scoring for " + rpfCovPlusFiles[i] + " and " + rpfCovMinusFiles[i]);
+				Scorer scorer = new Scorer(rpfCovPlusFiles[i], rpfCovMinusFiles[i], rpfParamFiles[i], annotationFileParser);
+				scorer.scoreNWrite(scoreThreshold, fastaParser, rpfScoreOutFiles[i]+".beforeWindowFilter.tsv", false);
+				scorer.writeWindowFilteredOutput(rpfScoreOutFiles[i]+".beforeWindowFilter.tsv", rpfScoreOutFiles[i], 25);
+				//scorer.scoreNWrite(-0.1, fastaParser, scoreOutFiles[i], true);
+				System.out.println("Scoring done..");
+			}*/
 		}
 		MafParser mafParser = new MafParser(mafFolder, annotationFileParser);
 		mafParser.generateIndexFile();
 		mafParser.readIndexFile();
 		//DsDnOutParser dsdnParser = new DsDnOutParser(dsdnFile, annotationFileParser);
-		MergeResults merge = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, annotationFileParser, fastaParser, mafParser);
+		
+		MergeResults merge = new MergeResults(harrScoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, harrParamFiles, rpfParamFiles, annotationFileParser, fastaParser, mafParser);
 		System.out.println("Merging results");
-		merge.merge(outFile, scoreThreshold);
-		merge = null;
-		MergeResults mergeControl = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, annotationFileParser, fastaParser, mafParser);
-		System.out.println("Merging results - control");
-		mergeControl.merge(outControlFile, -0.05);
+		merge.merge(outFile, scoreThreshold, rpfRPKMThreshold, rnaRPKMThreshold, positionQuantityChangeLength, positionQuantityOffset, maxLengthUntilStopcodon);
+	//	merge = null;
+	//	MergeResults mergeControl = new MergeResults(scoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, paramFiles, annotationFileParser, fastaParser, mafParser);
+	//	System.out.println("Merging results - control");
+	//	mergeControl.merge(outControlFile, -0.05);
 		
 		System.out.println("Merging done..");
 	}
@@ -174,8 +222,11 @@ public class RPFPipeLine {
 				+ "\n-maf [maf file folder]"
 				+ "\n-fasta [fasta file]"
 				+ "\n-ref [refFlat file]"
-				+ "\n-scoreThreshold [scoreThreshold - default 2]"
+				+ "\n-scoreThreshold [scoreThreshold - default 0.3]"
+				+ "\n-rpfRPKMThreshold [rpf RPKM threshold - default 20]"
+				+ "\n-rnaRPKMThreshold [rna RPKM threshold - default 20]"
 				+ "\n-outputFile [output file]"
-				+ "\n-outputControlFile [outputControl file] (results with poor harr score)");
+				//+ "\n-outputControlFile [outputControl file] (results with poor harr score)"
+				);
 	}
 }

@@ -289,7 +289,7 @@ public class MafParser {
 		MafParser test = new MafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
 		test.generateIndexFile();
 		test.readIndexFile();
-		String[] seqs =  test.getSeqs("chr4", 149780373, true, 150); // why not 150???? TODO
+		String[] seqs =  test.getSeqs("chr3", 149780373, true, 150); // why not 150???? TODO
 		for(String seq : seqs){
 			System.out.println(seq + " " + seq.length());
 		}

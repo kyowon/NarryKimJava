@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 
 import net.sf.samtools.util.BufferedLineReader;
@@ -311,7 +310,9 @@ public class AnnotationFileParser {
 			if(position >= gene.getCdsStart() && position < gene.getCdsEnd()){
 				name += "_ORF";
 				int[][] introns = gene.getIntrons();
+				//System.out.println(introns.length);
 				for(int i=0;i<introns.length;i++){
+					//System.out.println(introns[i][0] + " " + introns[i][1]);
 					if(position >=introns[i][0] && position <= introns[i][1]){
 						name += "_Intron";
 						break;
@@ -516,11 +517,14 @@ public class AnnotationFileParser {
 	//
 		//getLiftOverPositionsTillNextStopCodon(//)//test.getAnnotatedGene("chr5", false, 102410577))
 		
-		for(ArrayList<Integer> positions : test.getLiftOverPositionsTillNextStopCodon("chr5", false, 102410577, 150 , fasta)){
+		//System.out.println(test.getGenomicRegionNameAndFrameShift("chr7", true, 6324070));
+		
+		for(ArrayList<Integer> positions : test.getLiftOverPositionsTillNextStopCodon("chr7", false, 146768438-1, 15000 , fasta)){
 			System.out.println(positions.get(0) + " " + positions.get(positions.size()-1));
-			//System.out.println();
-			System.out.println(ZeroBasedFastaParser.getComplementarySequence(fasta.getSequence("chr5", positions),false));
+			System.out.println(positions);
+		//	System.out.println(ZeroBasedFastaParser.getComplementarySequence(fasta.getSequence("chr5", positions),false));
 			//break;
+			
 		}
 		//SREK1	NM_001270493	chr5	+	65440045	65453568	65440204	65451900	3	65440045,65449290,65451892,	65440365,65449424,65453568,
 

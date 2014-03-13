@@ -25,33 +25,34 @@ public class Quantifier {
 	
 	public double getCDSRPKM(AnnotatedGene gene){
 		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
-		return (bedCovFileParser.getTotalCDSCoverage(gene, true)+1) * 1e9 / (bedCovFileParser.getTotalReadCount()+1);
+		return (bedCovFileParser.getTotalCDSCoverage(gene, true) * 1e9 + 1) / (bedCovFileParser.getTotalReadCount()+1);
 	}
-	
+	//10^9*C/NL
 	public double getPositionRPKM(String contig, int position, boolean isPlusStrand, int maxLength){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		return (bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, true)+1) * 1e9 / (bedCovFileParser.getTotalReadCount()+1);
+		return (bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, true) * 1e9 + 1) / (bedCovFileParser.getTotalReadCount()+1);
 	}
 	
 	public ArrayList<Double> getNextStopCodonQuantityChangeRatioNStopPosition(String contig, int position, boolean isPlusStrand, int length, int maxLength){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
+	//	position = isPlusStrand? position - offset : position + offset;
 		ArrayList<Double>covs = bedCovFileParser.getCoverageBeforeNAfternextStopCodonNStopCodonPosition(contig, isPlusStrand, position, length, maxLength, fastaFileParser, false);
 		ArrayList<Double> ret = null;
 		
 		if(covs != null){
 			ret = new ArrayList<Double>();
-			ret.add((covs.get(0)+1)/(covs.get(1)+1));
+			if(covs.get(0)+covs.get(1)<length/10) ret.add(1.0);
+			else ret.add((covs.get(0)+1)/(covs.get(1)+1));
 			ret.add(covs.get(2));
-			
-		}
-			
+		}			
 		return ret;
 	}
 	
 	//  /([length of transcript]/1000)/([total reads]/10^6)
-	public double getPositionQuantityChangeRatio(String contig, int position, boolean isPlusStrand, int length){
+	public double getPositionQuantityChangeRatio(String contig, int position, boolean isPlusStrand, int length, int offset){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		int prevPosition = isPlusStrand? position - length : position + length;
+		//int position = isPlusStrand? position - offset : position + offset;
+		int prevPosition = isPlusStrand? position - offset - length : position + offset + length;
 		double qb = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, prevPosition, length, false) + 1;
 		double qa = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, position, length, false) + 1; 
 		return qa/qb;

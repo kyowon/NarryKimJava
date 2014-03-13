@@ -58,6 +58,28 @@ public class BedCovFileParser {
 		return coveragesToreturn.iterator();
 	}
 	
+	
+	private Iterator<Integer> getBedCoverageIterator(String contig, int start, boolean isPlusStrand, int maxLength, ZeroBasedFastaParser fastaParser){// start inclusive
+		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
+		ArrayList<Integer> coveragesToreturn = new ArrayList<Integer>();
+		
+		if(coverages == null) return coveragesToreturn.iterator();		
+		
+		ArrayList<ArrayList<Integer>> positions = annotationParser.getLiftOverPositionsTillNextStopCodon(contig, isPlusStrand, start, maxLength, fastaParser);
+		if(positions == null || positions.isEmpty()) return coveragesToreturn.iterator();
+		
+		for(ArrayList<Integer> subPositions : positions){
+			for(int position : subPositions){
+				Integer coverage = coverages.get(position);
+				coveragesToreturn.add(coverage == null ? 0 : coverage);
+			}
+			//System.out.println(position + " " + coverage);
+		}	
+		//System.out.println(positions);
+		return coveragesToreturn.iterator();
+	}
+	
+	
 	public double[] getSqrtCoverages(String contig, int position, int leftWindowSize, int rightWindowSize, boolean isPlusStrand){
 		double[] cov = getCoverages(contig, position, leftWindowSize, rightWindowSize, isPlusStrand);
 		double[] sqrtCov = new double[cov.length];
@@ -85,37 +107,72 @@ public class BedCovFileParser {
 		return coverages;
 	}
 	
+	public double[] getSqrtCoveragesTillnextStopCodon(String contig, int position, int leftWindowSize, boolean isPlusStrand, int maxLength, ZeroBasedFastaParser fastaParser){
+		double[] cov = getCoveragesTillnextStopCodon(contig, position, leftWindowSize, isPlusStrand, maxLength, fastaParser);
+		double[] sqrtCov = new double[cov.length];
+		for(int i=0; i<cov.length; i++){
+			if(cov[i]>0) sqrtCov[i] = Math.sqrt(cov[i]);
+		}
+		return sqrtCov;
+	}
+	
+	public double[] getCoveragesTillnextStopCodon(String contig, int position, int leftWindowSize, boolean isPlusStrand, int maxLength, ZeroBasedFastaParser fastaParser){
+		ArrayList<Integer> coverageList = new ArrayList<Integer>();
+		int start;
+		if(isPlusStrand){
+			start = position - leftWindowSize;
+		}else{
+			start = position + leftWindowSize;
+		}
+		Iterator<Integer> iterator = getBedCoverageIterator(contig, start, isPlusStrand, maxLength, fastaParser);
+		
+		while(iterator.hasNext()){
+			int coverage = iterator.next();
+			coverageList.add(coverage);
+		}	
+		double[] coverages = new double[coverageList.size()];
+		for(int i=0;i<coverages.length;i++){
+			coverages[i] = coverageList.get(i);
+		}		
+		return coverages;
+	}
+	
+	
 	public double getTotalCDSCoverage(AnnotatedGene gene, boolean normalizeByLength){
 		HashMap<Integer, Integer> coverages = coverageMap.get(gene.getContig());
 		if(coverages == null) return 0;
 		double totalCoverages = 0;
+		int tl = 0;
 		ArrayList<ArrayList<Integer>> positions = annotationParser.getLiftOverCDSPositions(gene);
 	
 		for(ArrayList<Integer> subPositions : positions){
 			for(int position : subPositions){
 				Integer coverage = coverages.get(position);
+				tl++;
 				if(coverage == null) continue;
 				totalCoverages += coverage;
 			}	
 		}
-		if(normalizeByLength) totalCoverages/=positions.size();
+		if(normalizeByLength) totalCoverages/=tl;
 		return totalCoverages;
 	}
 	
-	public double getTotalCoverageTillnextStopCodon(String contig, boolean isPlusStrand, int position, int maxLength, ZeroBasedFastaParser fastaParser, boolean normalizeByLength){
+	public double getTotalCoverageTillnextStopCodon(String contig, boolean isPlusStrand, int position, int maxLength, ZeroBasedFastaParser fastaParser, boolean normalizeByLength){ // use getCoveragesTillnextStopCodon - fix later TODO
 		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
 		if(coverages == null) return 0;
 		double totalCoverages = 0;
+		int tl = 0;
 		ArrayList<ArrayList<Integer>> positions = annotationParser.getLiftOverPositionsTillNextStopCodon(contig, isPlusStrand, position, maxLength, fastaParser);
 		//System.out.println(positions.size());
 		for(ArrayList<Integer> subPositions : positions){
 			for(int p : subPositions){
 				Integer coverage = coverages.get(p);
+				tl++;
 				if(coverage == null) continue;
 				totalCoverages += coverage;
 			}	
 		}
-		if(normalizeByLength) totalCoverages/=positions.size();
+		if(normalizeByLength) totalCoverages/=tl;
 		return totalCoverages;
 	}
 	
@@ -166,15 +223,17 @@ public class BedCovFileParser {
 		HashMap<Integer, Integer> coverages = coverageMap.get(contig);
 		if(coverages == null) return 0;
 		double totalCoverages = 0;
+		int tl = 0;
 		ArrayList<ArrayList<Integer>> positions = annotationParser.getLiftOverPositions(contig, isPlusStrand, position, length);
 		for(ArrayList<Integer> subPositions : positions){
 			for(int p : subPositions){
 				Integer coverage = coverages.get(p);
+				tl++;
 				if(coverage == null) continue;
 				totalCoverages += coverage;
 			}
 		}	
-		if(normalizeByLength) totalCoverages/=positions.size();
+		if(normalizeByLength) totalCoverages/=tl;
 		return totalCoverages;
 	}
 	
@@ -201,12 +260,12 @@ public class BedCovFileParser {
 	}
 	
 	public static void main(String[] args){
-		BedCovFileParser test = new BedCovFileParser("/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/Harr_C-uncollapsed.plus.cov", 
+		BedCovFileParser test = new BedCovFileParser("/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/RPF-30_1-uncollapsed.plus.cov", 
 				new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
 	//chr10	127852386
-
+		
 		int i=0;
-		for(double cov : test.getCoverages("chr10", 127852386, 30,10, true))
+		for(double cov : test.getCoverages("chr5", 3803296, 30,100, true))
 			System.out.println(i++ + " " + cov);
 	}
 	
