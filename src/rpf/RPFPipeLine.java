@@ -28,7 +28,7 @@ public class RPFPipeLine {
 	private static String outFile = null;
 	//private static String outControlFile = null;
 	
-	private static int positionQuantityChangeLength = 600;
+	private static int positionQuantityChangeLength = 150;
 	private static int positionQuantityOffset = 15;
 	private static int maxLengthUntilStopcodon = 13000;
 	
@@ -182,7 +182,7 @@ public class RPFPipeLine {
 			if(!new File(rpfParamFiles[i]).exists()){
 				Trainer trainer = new Trainer(rpfCovPlusFiles[i], rpfCovMinusFiles[i], annotationFileParser, rpfParamFiles[i]);
 				System.out.println("Training for " + rpfCovPlusFiles[i] + " and " + rpfCovMinusFiles[i]);
-				trainer.train(60, 150, 20); // rpf
+				trainer.train(150, 150, 10); // rpf
 				System.out.println("Training done..");
 			}
 			/*if(!new File(rpfScoreOutFiles[i]).exists()){

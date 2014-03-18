@@ -1,5 +1,6 @@
 package rpf;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.util.HashSet;
@@ -64,37 +65,59 @@ public class MergeResults {
 	public void merge(String outFile, double scoreThreshold, double rpfRPKMThreshold, double rnaRPKMThreshold, int positionQuantityChangeLength, int positionQuantityOffset, int maxLengthUntilStopcodon){
 		try {
 			PrintStream out = new PrintStream(outFile);
-			PrintStream mout = new PrintStream(outFile.replace('.', '_')+".m");
-			PrintStream tout = new PrintStream(outFile + ".train.csv");
+			String dir = new File(outFile).getParent();
+			new File(dir +System.getProperty("file.separator") +  new File(outFile).getName() + "_train").mkdir();
+			new File(dir +System.getProperty("file.separator") + new File(outFile).getName() + "_test").mkdir();
+			
+			PrintStream[] trainOut = new PrintStream[rpfScorers.length];//(dir + System.getProperty("file.separator") + new File(outFile).getName() + "_train" + System.getProperty("file.separator") + "train.arff");
+			PrintStream[] testOut = new PrintStream[rpfScorers.length]; 
+			
+			for(int i=0;i<testOut.length;i++){
+				testOut[i] = new PrintStream(dir + System.getProperty("file.separator") + new File(outFile).getName() + "_test" + System.getProperty("file.separator") + "test_" + i + ".arff");
+				trainOut[i] = new PrintStream(dir + System.getProperty("file.separator") + new File(outFile).getName() + "_train" + System.getProperty("file.separator") + "train_" + i + ".arff");
+			}
+			
+			
 			//ArrayList<MergedResult> mergedResults = new ArrayList<MergedResult>();
 			HashSet<String> contigs = new HashSet<String>();
 			for(int i=0;i<scoringOutputParsers.length;i++){
 				contigs.addAll(scoringOutputParsers[i].getContigs());
 			}
 			boolean start = true;
+			boolean harrRPFsynced = scoringOutputParsers.length == rpfQuantifiers.length;
 			
 			for(String contig : contigs){
 				System.out.println("Merging " + contig);
-				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, rpfQuantifiers, rnaQuantifiers, contig, scoreThreshold, rpfRPKMThreshold, rnaRPKMThreshold)){
+				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(scoringOutputParsers, rpfQuantifiers, rnaQuantifiers, annotationFileParser, contig, scoreThreshold, rpfRPKMThreshold, rnaRPKMThreshold)){
 					MergedResult mr = new MergedFileParser().new MergedResult(position, harrScorers, rpfScorers, rpfQuantifiers, rnaQuantifiers, mafParser, positionQuantityChangeLength, positionQuantityOffset, maxLengthUntilStopcodon);
 					if(start){
 						out.println(mr.getHeader());
-						tout.println(mr.GetTrainingSetHeader());
+						for(int i=0;i<testOut.length;i++) trainOut[i].println(mr.GetArffSetHeader());
+						for(int i=0;i<testOut.length;i++) testOut[i].println(mr.GetArffSetHeader());						
 						start = false;
 					}
-					out.println(mr);
 					
-					for(int index : position.getConditionIndices()){
-						String ts = mr.ToTrainingSetString(annotationFileParser, index);
-						if(ts != null) tout.println(ts);
-					}
+					if(Math.abs(mr.getStopPostion() - position.getPosition()) > 25){
+						out.println(mr);
 					
-					writeMfile(mout, position);	
+						for(int rpfrnaIndex : position.getRPFRNAIndices()){
+							String ts = mr.ToTrainingSetString(rpfrnaIndex, harrRPFsynced);
+							if(ts != null) trainOut[rpfrnaIndex].println(ts);
+							String test = mr.ToTestSetString(rpfrnaIndex, harrRPFsynced);
+							testOut[rpfrnaIndex].println(test);
+						}
+						
+					//	writeMfile(mout, position);
+					}	
 				}
 			}
 			out.close();
-			mout.close();	
-			tout.close();
+		//	mout.close();	
+			
+			for(int i=0;i<testOut.length;i++){
+				testOut[i].close();
+				trainOut[i].close();
+			}
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}

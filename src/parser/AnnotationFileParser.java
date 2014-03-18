@@ -375,46 +375,61 @@ public class AnnotationFileParser {
 		return getLiftOverPositions(gene, gene.isPlusStrand(), gene.isPlusStrand()? gene.cdsStart : gene.cdsEnd - 1, gene == null? 0 : Integer.MAX_VALUE, true);
 	}
 	
-	private int pstart = -1;
+	//private int pstart = -1;
+	//private int pminLength = 0;
 	private String pcontig = "";
-	private boolean pIsPlusStrand = false;
-	private ArrayList<ArrayList<Integer>> pPositions = null;
+	//private boolean pIsPlusStrand = false;
+	//private ArrayList<ArrayList<Integer>> pPositions = null;
+	private HashMap<Integer, HashMap<Integer, HashMap<Boolean, ArrayList<ArrayList<Integer>>>>> pmap = null;
 	
-	public ArrayList<ArrayList<Integer>> getLiftOverPositionsTillNextStopCodon(String contig, boolean isPlusStrand, int start, int maxLength, ZeroBasedFastaParser fastaParser){
-		if(pstart == start && pcontig.equals(contig) && pIsPlusStrand == isPlusStrand && pPositions != null)  return pPositions;	
-		AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
-		//AnnotatedGene tgene = getAnnotatedGene(contig, isPlusStrand, start);
-		ArrayList<ArrayList<Integer>> positions = getLiftOverPositions(gene, isPlusStrand, start, maxLength, true);
-		ArrayList<ArrayList<Integer>> ret = new ArrayList<ArrayList<Integer>>();
-		boolean stop = false;
-		ArrayList<Integer> tp = new ArrayList<Integer>();
-		for(int j=0;j<positions.size();j++){
-			ArrayList<Integer> subPositions = positions.get(j);
-			ArrayList<Integer> subRet = new ArrayList<Integer>();
-			for(int i=0;i<subPositions.size();i++){				
-				subRet.add(subPositions.get(i));
-				tp.add(subPositions.get(i));
-				if(tp.size()%3 ==0 && tp.size()>=3){
-					String tc = fastaParser.getSequence(contig, tp.subList(tp.size()-3, tp.size()));
-					if(!isPlusStrand) tc = ZeroBasedFastaParser.getComplementarySequence(tc, false);
-					tc = tc.toUpperCase();
-					if(tc.equals("TAG") || tc.equals("TAA") || tc.equals("TGA")){ 					
-						ret.add(subRet);
-						stop = true;
-						break;
+	// super stupid .. fix later
+	public ArrayList<ArrayList<Integer>> getLiftOverPositionsTillNextStopCodon(String contig, boolean isPlusStrand, int start, int minLength, int maxLength, ZeroBasedFastaParser fastaParser){
+		if(!pcontig.equals(contig)) pmap = new HashMap<Integer, HashMap<Integer, HashMap<Boolean, ArrayList<ArrayList<Integer>>>>>();
+		if(!pmap.containsKey(start)) pmap.put(start, new HashMap<Integer, HashMap<Boolean, ArrayList<ArrayList<Integer>>>>());
+		HashMap<Integer, HashMap<Boolean, ArrayList<ArrayList<Integer>>>> spmap = pmap.get(start);
+		if(!spmap.containsKey(minLength)) spmap.put(minLength, new HashMap<Boolean, ArrayList<ArrayList<Integer>>>());
+		HashMap<Boolean, ArrayList<ArrayList<Integer>>> sspmap = spmap.get(minLength);
+		pcontig = contig;
+		
+		ArrayList<ArrayList<Integer>> pret = sspmap.get(isPlusStrand);
+		if(pret == null){			
+			//if(pstart == start && pminLength == minLength && pcontig.equals(contig) && pIsPlusStrand == isPlusStrand && pPositions != null)  return pPositions;	
+			AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
+			//AnnotatedGene tgene = getAnnotatedGene(contig, isPlusStrand, start);
+			ArrayList<ArrayList<Integer>> positions = getLiftOverPositions(gene, isPlusStrand, start, maxLength, true);
+			ArrayList<ArrayList<Integer>> ret = new ArrayList<ArrayList<Integer>>();
+			boolean stop = false;
+			int len = 0;
+			ArrayList<Integer> tp = new ArrayList<Integer>();
+			for(int j=0;j<positions.size();j++){
+				ArrayList<Integer> subPositions = positions.get(j);
+				ArrayList<Integer> subRet = new ArrayList<Integer>();
+				for(int i=0;i<subPositions.size();i++){				
+					subRet.add(subPositions.get(i));
+					tp.add(subPositions.get(i));
+					if(len++ > minLength && tp.size()%3 ==0 && tp.size()>=3){
+						String tc = fastaParser.getSequence(contig, tp.subList(tp.size()-3, tp.size()));
+						if(!isPlusStrand) tc = ZeroBasedFastaParser.getComplementarySequence(tc, false);
+						tc = tc.toUpperCase();
+						if(tc.equals("TAG") || tc.equals("TAA") || tc.equals("TGA")){ 					
+							ret.add(subRet);
+							stop = true;
+							break;
+						}
 					}
 				}
+				if(stop) break;
+				//Collections.sort(subRet);
+				ret.add(subRet);
 			}
-			if(stop) break;
-			//Collections.sort(subRet);
-			ret.add(subRet);
-		}
-		
-		pPositions = ret;
-		pstart = start;
-		pcontig = contig;
-		pIsPlusStrand = isPlusStrand;
-		return ret;
+			
+			//pPositions = ret;
+			//pstart = start;
+			//pminLength = minLength;
+			sspmap.put(isPlusStrand, ret);
+			//pIsPlusStrand = isPlusStrand;
+			return ret;
+		}else return pret;
 	}
 	
 	
@@ -519,7 +534,7 @@ public class AnnotationFileParser {
 		
 		//System.out.println(test.getGenomicRegionNameAndFrameShift("chr7", true, 6324070));
 		
-		for(ArrayList<Integer> positions : test.getLiftOverPositionsTillNextStopCodon("chr7", false, 146768438-1, 15000 , fasta)){
+		for(ArrayList<Integer> positions : test.getLiftOverPositionsTillNextStopCodon("chr7", false, 146768438-1, 150, 15000 , fasta)){
 			System.out.println(positions.get(0) + " " + positions.get(positions.size()-1));
 			System.out.println(positions);
 		//	System.out.println(ZeroBasedFastaParser.getComplementarySequence(fasta.getSequence("chr5", positions),false));

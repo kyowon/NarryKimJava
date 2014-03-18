@@ -74,8 +74,8 @@ public class Trainer {
 			int startPosition = isPlusStrand? gene.getCdsStart() : gene.getCdsEnd() - 1;
 			int stopPosition = isPlusStrand? gene.getCdsEnd() - 1: gene.getCdsStart();
 					
-			double[] startCov = bedCovFileParser.getSqrtCoverages(gene.getContig(), startPosition, leftWindowSize, rightWindowSize, isPlusStrand);
-			double[] stopCov = bedCovFileParser.getSqrtCoverages(gene.getContig(), stopPosition, leftWindowSize, rightWindowSize, isPlusStrand);
+			double[] startCov = bedCovFileParser.getCoverages(gene.getContig(), startPosition, leftWindowSize, rightWindowSize, isPlusStrand);
+			double[] stopCov = bedCovFileParser.getCoverages(gene.getContig(), stopPosition, leftWindowSize, rightWindowSize, isPlusStrand);
 			
 			
 			if(Scorer.numberOfNonZeroElements(startCov) >= numberOfNonZeroElements){
@@ -96,13 +96,13 @@ public class Trainer {
 				if(offsets.contains(offset)) continue;
 				offsets.add(offset);
 				offset = isPlusStrand? offset : - offset;
-				double[] startNoiseCov = bedCovFileParser.getSqrtCoverages(gene.getContig(), startPosition + offset, leftWindowSize, rightWindowSize, isPlusStrand);
+				double[] startNoiseCov = bedCovFileParser.getCoverages(gene.getContig(), startPosition + offset, leftWindowSize, rightWindowSize, isPlusStrand);
 				if(Scorer.numberOfNonZeroElements(startNoiseCov) >= numberOfNonZeroElements){					
 					Scorer.normalize(startNoiseCov);
 					startNoise.add(startNoiseCov);	
 				}
 				
-				double[] stopNoiseCov = bedCovFileParser.getSqrtCoverages(gene.getContig(), stopPosition + offset, leftWindowSize, rightWindowSize, isPlusStrand);
+				double[] stopNoiseCov = bedCovFileParser.getCoverages(gene.getContig(), stopPosition + offset, leftWindowSize, rightWindowSize, isPlusStrand);
 				if(Scorer.numberOfNonZeroElements(stopNoiseCov) >= numberOfNonZeroElements){					
 					Scorer.normalize(stopNoiseCov);
 					stopNoise.add(stopNoiseCov);	

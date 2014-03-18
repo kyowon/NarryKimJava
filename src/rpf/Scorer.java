@@ -249,8 +249,9 @@ public class Scorer {
 	
 	public double getStartScore(String contig, int position, boolean isPlusStrand, boolean considerNumberOfNonZeroElements){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;	
-		double[] cov = bedCovFileParser.getSqrtCoverages(contig, position, leftWindowSize, rightWindowSize, isPlusStrand);
+		double[] cov = bedCovFileParser.getCoverages(contig, position, leftWindowSize, rightWindowSize, isPlusStrand);
 		double score = 0;
+		
 		if(!considerNumberOfNonZeroElements || numberOfNonZeroElements(cov) >= numberOfNonZeroElements) 
 			score = (getRawStartScore(cov));
 		return score;
@@ -260,13 +261,14 @@ public class Scorer {
 	public double getStopScore(String contig, int startPosition, boolean isPlusStrand, boolean considerNumberOfNonZeroElements, int maxLength){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;	
 		int stopPostion = -1;
-		ArrayList<ArrayList<Integer>> lps = annotationFileParser.getLiftOverPositionsTillNextStopCodon(contig, isPlusStrand, startPosition, maxLength, fastaParser);
+		ArrayList<ArrayList<Integer>> lps = annotationFileParser.getLiftOverPositionsTillNextStopCodon(contig, isPlusStrand, startPosition, 0, maxLength, fastaParser);
 		if(!lps.isEmpty()){ 
 			ArrayList<Integer> slps = lps.get(lps.size()-1);
 			if(!slps.isEmpty()) stopPostion = slps.get(slps.size()-1);
 		}
 		if(stopPostion > 0){
-			double[] cov = bedCovFileParser.getSqrtCoverages(contig, stopPostion, leftWindowSize, rightWindowSize, isPlusStrand);
+			//System.out.println(stopPostion);
+			double[] cov = bedCovFileParser.getCoverages(contig, stopPostion, leftWindowSize, rightWindowSize, isPlusStrand);
 			double score = 0;
 			if(!considerNumberOfNonZeroElements || numberOfNonZeroElements(cov) >= numberOfNonZeroElements) 
 				score = (getRawStopScore(cov));
@@ -279,17 +281,22 @@ public class Scorer {
 	
 	public double getStartScore(String contig, int position, boolean isPlusStrand, int maxLength, boolean considerNumberOfNonZeorElements){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;	
-		double[] cov = bedCovFileParser.getSqrtCoveragesTillnextStopCodon(contig, position, leftWindowSize, isPlusStrand, maxLength, fastaParser);
+		double[] cov = bedCovFileParser.getCoveragesTillnextStopCodon(contig, position, leftWindowSize, isPlusStrand, maxLength, fastaParser);
 		double score = 0;
-		if(!considerNumberOfNonZeorElements || numberOfNonZeroElements(cov) >= numberOfNonZeroElements) 
+		//System.out.println("hh " + numberOfNonZeroElements(cov));
+		if(!considerNumberOfNonZeorElements || numberOfNonZeroElements(cov) >= numberOfNonZeroElements){
 			score = (getRawStartScore(cov));
+			//
+		}
 		return score;
 	}
 	
 	private static double getRawScore(double[] filter, double[] cov, double filterNorm){
 		//if(numberOfNonZeroElements(cov) < numberOfNonZeroElements) return 0;
 	//	double[] sqrtCov = getSqrtVector(cov);
+		//System.out.println("hh ");
 		double norm = getNorm(cov);
+		//System.out.println(norm);
 		if(norm <= 0) return 0;
 		
 		double[] efilter = getExtendedFilter(filter, cov);
@@ -297,7 +304,11 @@ public class Scorer {
 			filterNorm = getNorm(efilter);
 		}
 		
-		return getInnerProduct(efilter, cov) / filterNorm / norm;
+		double ip = getInnerProduct(efilter, cov);
+		
+		//System.out.println("hh " + ip + " " + filterNorm + " " + norm);
+		
+		return ip / filterNorm / norm;
 	}
 	
 	private static double[] getExtendedFilter(double[] h, double[] s){
@@ -316,8 +327,12 @@ public class Scorer {
 	//	hp[1] = h[h.length-2];
 	//	hp[2] = h[h.length-1];
 		
+		double seed = 1.0002;
+		double f = 1;
 		for(int i=h.length; i<eh.length;i++){
 			eh[i] = hp[(i-h.length)%hp.length];
+		//	eh[i] /= f;
+		//	f =seed * f;
 		}
 		return eh;
 	}
@@ -371,8 +386,11 @@ public class Scorer {
 	
 	public static double getNorm(double[] v){
 		double sum = 0;
-		for(double t : v)
+		for(double t : v){
 			sum += t*t;
+			//System.out.print(t + " ");
+		}
+		//System.out.println();
 		return Math.sqrt(sum);
 	}
 	
@@ -473,22 +491,45 @@ public class Scorer {
 	}
 	
 	public static void main(String[] args){
-
-		String bedCovPlusFile = "/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/RPF-0_1-uncollapsed.plus.cov";
+//chr2	71370812	-
+		
+		double[] h= {1,0,0,1,0,0,2,0,0,3,0,0,1,0,0};
+		double[] s= {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+		double[] e = Scorer.getExtendedFilter(h, s);
+		for(double d : e) System.out.print(d+" ");;
+	/*	String bedCovPlusFile = "/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/RPF-0_1-uncollapsed.plus.cov";
 		String bedCovMinusFile = "/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/RPF-0_1-uncollapsed.minus.cov";
 		String paramFile = "/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/RPF-0_1-uncollapsed.plus.cov.param";
 		AnnotationFileParser annotationFileParser = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt");
 		ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.fa");
 		
 		Scorer test = new Scorer(bedCovPlusFile, bedCovMinusFile, paramFile, annotationFileParser, fastaParser);
-		double score = test.getStartScore("chr17", 28450588, true, 13000, false);
-		System.out.println(score);
-		//chr17	28450588
+		double score;// = test.getStartScore("chr2", 71370812, false, 13000, false);
+		
+		 
+		//score = test.getStopScore("chr2", 71370812, false, false, 13000); // .getStopScore("chr2", 71370812, false, false, leftWindowSize);
+		//System.out.println(score);
+		
+	//	paramFile = "/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/Harr_C-uncollapsed.plus.cov.param";
+		 
+		//chr6	83267522	-
 
+		
+	//	test = new Scorer(bedCovPlusFile, bedCovMinusFile, paramFile, annotationFileParser, fastaParser);
+	//	score = test.getStartScore("chr6", 85874375, true, false);
+		//
+	//	System.out.println(score);
+		
+		paramFile = "/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/RPF-0_1-uncollapsed.plus.cov.param";
+		test = new Scorer(bedCovPlusFile, bedCovMinusFile, paramFile, annotationFileParser, fastaParser);
+			
+		score = test.getStartScore("chr6", 85874375, true, 13000, false);
+		
+		System.out.println(score);
 		//Scorer test = new Scorer(covFilePlus, covFileMinus, paramFile).setAnnotationFileFile(refFlat);
 		//test.scoreNWrite(2, fasta, outFile);
 		//test.writeWindowFilteredOutput(outFile, covFileprefix + ".windowed.out", 50);
-	
+	*/
 	}
 	
 }

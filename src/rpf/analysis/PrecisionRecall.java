@@ -20,7 +20,7 @@ public class PrecisionRecall {
 			AnnotatedGene gene = iterator.next();
 			int position = gene.isPlusStrand()? gene.getCdsStart() : gene.getCdsEnd();
 			BedCovFileParser covParser = gene.isPlusStrand()? covPlusParser : covMinusParser;
-			double[] cov = covParser.getSqrtCoverages(gene.getContig(), position, leftWindowSize, rightWindowSize, gene.isPlusStrand());
+			double[] cov = covParser.getCoverages(gene.getContig(), position, leftWindowSize, rightWindowSize, gene.isPlusStrand());
 			if(Scorer.numberOfNonZeroElements(cov) < numberOfNonZeroElements) continue;
 			
 			if(!map.containsKey(gene.getContig())) map.put(gene.getContig(), new HashMap<Boolean, HashSet<Integer>>());
