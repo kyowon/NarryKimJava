@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import parser.AnnotationFileParser;
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.BedCovFileParser;
+import parser.ScoringOutputParser.ScoredPosition;
 import parser.ZeroBasedFastaParser;
 
 public class Quantifier {
@@ -23,15 +24,24 @@ public class Quantifier {
 		this.fastaFileParser = fastaFileParser;
 	}
 	
+	public boolean isAbundant(ScoredPosition position, double RPKM, int maxLength, int offset){
+		return RPKM <= getPositionRPKM(position.getContig(), position.getPosition(), position.isPlusStrand(), maxLength, offset);
+	}
+	
+	
 	public double getCDSRPKM(AnnotatedGene gene){
 		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
 		return (bedCovFileParser.getTotalCDSCoverage(gene, true) * 1e9 + 1) / (bedCovFileParser.getTotalReadCount()+1);
 	}
 	//10^9*C/NL
-	public double getPositionRPKM(String contig, int position, boolean isPlusStrand, int maxLength){
+	public double getPositionRPKM(String contig, int position, boolean isPlusStrand, int maxLength, int offset){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		int offset = 30;
 		return (bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position + (isPlusStrand? -offset : offset), offset, maxLength+offset, fastaFileParser, true) * 1e9 + 1) / (bedCovFileParser.getTotalReadCount()+1);
+	}
+	
+	public double getPositionCount(String contig, int position, boolean isPlusStrand, int maxLength, int offset){
+		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
+		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position + (isPlusStrand? -offset : offset), offset, maxLength+offset, fastaFileParser, false);
 	}
 	
 	public ArrayList<Double> getNextStopCodonQuantityChangeRatioNStopPosition(String contig, int position, boolean isPlusStrand, int length, int maxLength){
@@ -54,8 +64,9 @@ public class Quantifier {
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
 		//int position = isPlusStrand? position - offset : position + offset;
 		int prevPosition = isPlusStrand? position - offset - length : position + offset + length;
+		int afterPosition = isPlusStrand? position - offset : position + offset;
 		double qb = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, prevPosition, length, false);
-		double qa = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, position, length, false); 
+		double qa = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, afterPosition, length, false); 
 		
 		if(qa + qb < 10) return -1;
 		
@@ -80,19 +91,18 @@ public class Quantifier {
 		return bedCovMinusFileParser;
 	}
 	
-	/*public static void main(String[] args) {
-		Quantifier test = new Quantifier("/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/RPF6_Thy_RPF_1-uncollapsed.plus.cov"
-				,"/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/RPF6_Thy_RPF_1-uncollapsed.minus.cov"
-				, "/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt",
-				"/media/kyowon/Data1/RPF_Project/genomes/hg19.fa");
+	public static void main(String[] args) {
+		Quantifier test = new Quantifier("/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/Harr_C-uncollapsed.plus.cov"
+				,"/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/Harr_C-uncollapsed.minus.cov"
+				, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"),
+				new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.fa"));
 		
-		AnnotatedGene gene = new AnnotatedGene("SRXN1	NM_080725	chr20	-	627267	634014	629357	633829	2	627267,633619,	629561,634014,");
-		System.out.println(test.getPositionQuantity("chr20", 306568, true));
+		System.out.println(test.getPositionCount("chr7", 6324070, true, 50, 13));
+		System.out.println(test.getPositionRPKM("chr7", 6324070, true, 50, 13));
 		
-		System.out.println(test.getPositionQuantity("chr20", 633829 - 1 , false));
+		//AnnotatedGene gene = new AnnotatedGene("SRXN1	NM_080725	chr20	-	627267	634014	629357	633829	2	627267,633619,	629561,634014,");
 		
-		System.out.println(test.getCDSQuantity(gene));
 		
-	}*/
+	}
 
 }

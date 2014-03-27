@@ -11,6 +11,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 
 import parser.AnnotationFileParser;
@@ -52,22 +53,23 @@ public class Scorer {
 		return annotationFileParser;
 	}
 	
-	public void scoreNWrite(double scoreThreshold, String outFile, boolean append){
+	public void scoreNWrite(double scoreThreshold, HashSet<String> allowedCodons, String outFile, boolean append){
 		try {
 			// out = new PrintWriter(new BufferedWriter(new FileWriter("writePath", true)));
 			PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(outFile, append)));
-			scoreNWrite(scoreThreshold, true, out);
-			scoreNWrite(scoreThreshold, false, out);
+			scoreNWrite(scoreThreshold, true, allowedCodons, out);
+			scoreNWrite(scoreThreshold, false, allowedCodons, out);
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 	
-	private void scoreNWrite(double scoreThreshold, boolean isPlusStrand, PrintWriter out){
+	private void scoreNWrite(double scoreThreshold, boolean isPlusStrand, HashSet<String> allowedCodons, PrintWriter out){
 		//ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser(fastaFile);
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;	
 		for(String contig : bedCovFileParser.getContigs()){
+			System.out.println("Scoring for " + contig + " " + (isPlusStrand? "+" : "-") + " strand");
 			Iterator<Integer> iterator;
 			iterator = bedCovFileParser.getNonZeroCoveragePositionIterator(contig);
 			int lastConsidered = 0;
@@ -81,6 +83,31 @@ public class Scorer {
 				for(int currentPosition=Math.max(lastConsidered + 1, start);currentPosition<end;currentPosition++){
 					//double[] cov = bedCovFileParser.getSqrtCoverages(contig, currentPosition, leftWindowSize, rightWindowSize, isPlusStrand);
 					
+					boolean isAnnotated = false;
+					ArrayList<String> genomicRegionAndFrameShift = null;
+					if(annotationFileParser != null){
+						gene = annotationFileParser.getAnnotatedGene(contig, isPlusStrand, currentPosition);
+						if(gene != null) isAnnotated = true;
+						else gene = annotationFileParser.getContainingGene(contig, isPlusStrand, currentPosition);		
+						genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(contig, isPlusStrand, currentPosition);
+						
+						//stopScore = getStopScore(contig, currentPosition, isPlusStrand, false, maxLength);
+						
+						//if(genomicRegionAndFrameShift.get(0).endsWith("Intron")) continue;
+					}	
+					String codon = null;
+					if(!fastaParser.containsContig(contig)){
+						codon = "N/A";
+					}else if(isPlusStrand){
+						codon = fastaParser.getSequence(contig, currentPosition, currentPosition+3);
+					}else{							
+						codon = ZeroBasedFastaParser.getComplementarySequence(fastaParser.getSequence(contig, currentPosition-2, currentPosition+1), true);
+					}	
+					
+					if(!genomicRegionAndFrameShift.get(0).equals("NM_3_UTR")){
+						
+						if(!allowedCodons.contains(codon)) continue;
+					}
 				//	if(numberOfNonZeroElements(cov) < numberOfNonZeroElements) continue;
 					double startScore = getStartScore(contig, currentPosition, isPlusStrand, true);
 					if(startScore <= 0) continue;
@@ -88,28 +115,10 @@ public class Scorer {
 					lastConsidered = currentPosition;
 										
 					if(scoreThreshold > 0 && startScore > scoreThreshold || scoreThreshold < 0 && startScore < -scoreThreshold){
-						String codon;
-						if(!fastaParser.containsContig(contig)){
-							codon = "N/A";
-						}else if(isPlusStrand){
-							codon = fastaParser.getSequence(contig, currentPosition, currentPosition+3);
-						}else{							
-							codon = ZeroBasedFastaParser.getComplementarySequence(fastaParser.getSequence(contig, currentPosition-2, currentPosition+1), true);
-						}						
+											
 						
 						//double stopScore = 0;
-						boolean isAnnotated = false;
-						ArrayList<String> genomicRegionAndFrameShift = null;
-						if(annotationFileParser != null){
-							gene = annotationFileParser.getAnnotatedGene(contig, isPlusStrand, currentPosition);
-							if(gene != null) isAnnotated = true;
-							else gene = annotationFileParser.getContainingGene(contig, isPlusStrand, currentPosition);		
-							genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(contig, isPlusStrand, currentPosition);
-							
-							//stopScore = getStopScore(contig, currentPosition, isPlusStrand, false, maxLength);
-							
-							//if(genomicRegionAndFrameShift.get(0).endsWith("Intron")) continue;
-						}						
+											
 						ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(contig, currentPosition, isPlusStrand, startScore, codon, gene, isAnnotated, genomicRegionAndFrameShift.get(0), genomicRegionAndFrameShift.get(1));
 						out.println(scoredPosition);						
 					}					
@@ -118,6 +127,7 @@ public class Scorer {
 		}
 	}
 
+	
 	
 	
 	void writeWindowFilteredOutput(String outFile, String outWindowFile, int window){
@@ -162,6 +172,39 @@ public class Scorer {
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}		
+	}
+	
+	void writeQuantityFilteredOutput(String outFile, String outFilteredFile, Quantifier quantifier, double RPKM, int maxLength, int offset){
+		Quantifier[] quantifiers = new Quantifier[1];
+		quantifiers[0] = quantifier;
+		writeQuantityFilteredOutput(outFile, outFilteredFile, quantifiers, RPKM, maxLength, offset);
+	}
+	void writeQuantityFilteredOutput(String outFile, String outFilteredFile, Quantifier[] quantifiers, double RPKM, int maxLength, int offset){
+		if(new File(outFilteredFile).exists()){
+			return;
+		}
+		ScoringOutputParser outParser = new ScoringOutputParser(outFile);
+		PrintStream out;
+		try {
+			out = new PrintStream(outFilteredFile);
+			for(String contig : outParser.getContigs()){
+				ArrayList<ScoredPosition> positions = outParser.getPositions(contig);
+				for(ScoredPosition position : positions){
+					boolean isAbundant = false;
+					for(Quantifier q : quantifiers){
+						if(q.isAbundant(position, RPKM, maxLength, offset)){
+							isAbundant = true;
+							break;
+						}
+					}
+					if(isAbundant)				
+						out.println(position);
+				}
+			}
+			out.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}	
 	}
 	
 	private void read(String paramFile){
@@ -279,7 +322,7 @@ public class Scorer {
 	
 	//getSqrtCoveragesTillnextStopCodon(String contig, int position, int leftWindowSize, boolean isPlusStrand, int maxLength, ZeroBasedFastaParser fastaParser)
 	
-	public double getStartScore(String contig, int position, boolean isPlusStrand, int maxLength, boolean considerNumberOfNonZeorElements){
+	/*public double getStartScore(String contig, int position, boolean isPlusStrand, int maxLength, boolean considerNumberOfNonZeorElements){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;	
 		double[] cov = bedCovFileParser.getCoveragesTillnextStopCodon(contig, position, leftWindowSize, isPlusStrand, maxLength, fastaParser);
 		double score = 0;
@@ -289,7 +332,7 @@ public class Scorer {
 			//
 		}
 		return score;
-	}
+	}*/
 	
 	private static double getRawScore(double[] filter, double[] cov, double filterNorm){
 		//if(numberOfNonZeroElements(cov) < numberOfNonZeroElements) return 0;
@@ -327,12 +370,12 @@ public class Scorer {
 	//	hp[1] = h[h.length-2];
 	//	hp[2] = h[h.length-1];
 		
-		double seed = 1.0002;
+		double seed = 1.0001;
 		double f = 1;
 		for(int i=h.length; i<eh.length;i++){
 			eh[i] = hp[(i-h.length)%hp.length];
-		//	eh[i] /= f;
-		//	f =seed * f;
+			eh[i] /= f;
+			f =seed * f;
 		}
 		return eh;
 	}

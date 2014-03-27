@@ -181,11 +181,27 @@ public class DsDnCalculator {
 		//return (nNSSubs * nSSites) / (nNSSites * nSSubs);
 	}
 	
-	static public float calculate(String[] sequences){
-		if(sequences.length < 2) return 1;
-		float[] n = getNonSynSubNSites(sequences);
-		float nSSites = sequences[0].length() - n[1];
-		float nSSubs = sequences[0].length()/3 - n[0];	
+	static public float calculate(String[] sequences, int minSeqNum){
+		//if(sequences.length < 2) return 1;
+		
+		String[] seq;
+			
+		if(sequences.length < minSeqNum){
+			StringBuffer emptyString = new StringBuffer();
+			for(int i=0;i<sequences[0].length();i++) emptyString.append("-");
+		
+			seq = new String[minSeqNum];
+			for(int i=0;i<seq.length;i++){
+				if(sequences.length > i) seq[i] = sequences[i];
+				else{
+					seq[i] = emptyString.toString();
+				}
+			}
+		}else seq = sequences;
+		
+		float[] n = getNonSynSubNSites(seq);
+		float nSSites = seq[0].length() - n[1];
+		float nSSubs = seq[0].length()/3 - n[0];	
 		return (n[0] * nSSites) / (n[1] * nSSubs);
 	}
 

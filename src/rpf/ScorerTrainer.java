@@ -12,7 +12,7 @@ import parser.AnnotationFileParser.AnnotatedGene;
 import parser.BedCovFileParser;
 import util.MC;
 
-public class Trainer {
+public class ScorerTrainer {
 
 	private int leftWindowSize = 30;
 	private int rightWindowSize = 200;
@@ -36,7 +36,7 @@ public class Trainer {
 	//private double[] likelihoodFunctionCoefficients;
 	private String outParamFile;
 	
-	public Trainer(String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFileParser, String outParamFile){
+	public ScorerTrainer(String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFileParser, String outParamFile){
 		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFileParser);
 		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFileParser);
 		this.annotationFileParser = annotationFileParser;	

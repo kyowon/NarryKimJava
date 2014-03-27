@@ -129,14 +129,18 @@ public class MafParser {
 		if(index >= 0){
 			cposition = sps.get(index);			
 			for(int i=0;i<seqs.get(0).length();i++){
+				boolean isInserted = false;
 				if(seqs.get(0).charAt(i) == '-'){
-					continue;
+					isInserted = true;
+				//	continue;
 				}
-				cposition++;
+				
+				if(!isInserted) cposition++;
 				if(cposition <= position) continue;
 				for(int j=0;j< ret.size();j++){
 					ret.get(j).append(seqs.size() <= j? '-' : seqs.get(j).charAt(i));
 				}
+				if(isInserted) continue;
 				if(--length<=0) break;
 			}	
 	    }
@@ -289,7 +293,7 @@ public class MafParser {
 		MafParser test = new MafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
 		test.generateIndexFile();
 		test.readIndexFile();
-		String[] seqs =  test.getSeqs("chr3", 149780373, true, 150); // why not 150???? TODO
+		String[] seqs =  test.getSeqs("chr7", 6324070, true, 45); // why not 150???? TODO
 		for(String seq : seqs){
 			System.out.println(seq + " " + seq.length());
 		}
@@ -299,7 +303,7 @@ public class MafParser {
 */
 
 //GATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAA
-		System.out.println(DsDnCalculator.calculate(seqs));
+		System.out.println(DsDnCalculator.calculate(seqs, 45));
 		//ATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAAG
 		
 		//ATTGCACGCTGTGCCGGCCCTGGAGAAATGGCAGATAAATTATTACTCACTACTCCCTCCAAAAAATTTACATGTCAAGGTCCCGTGGATATCACTATTCAAGCCAAGTGTAATCCCTGCTTATCAAATCCATGTAAAAATGATGGCACC 150
