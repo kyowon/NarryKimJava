@@ -133,7 +133,8 @@ public class MergeResults {
 							if(ts != null){
 								trainOut[rpfrnaIndex].println(ts);
 								mout.println(ts.replace("?", "NaN").substring(0, ts.lastIndexOf(',')));
-								mgout.println("'" + position.getGenomicRegion().replace('_', ' ') + (position.isAnnotated()? "(Translation Start)" : "")+ "'");
+								//mgout.println("'" + position.getGenomicRegion().replace('_', ' ') + (position.isAnnotated()? "(Translation Start)" : "")+ "'");
+								mgout.println("'" + ts.substring(ts.lastIndexOf(',')+1)  + "'");
 							}
 							
 						}
@@ -145,22 +146,46 @@ public class MergeResults {
 			
 			mout.println("];");
 			mgout.println("};");
-			
+			//TODO make scorethreshold..
+			double predictionThreshold = 0.75;
 			System.out.println("Merged positions : " + mrs.size());
 			for(int i=0;i<testOut.length;i++){
-				Classifier.evaluate(trainString[i], true);
-				Classifier.classify(trainString[i], testString[i], mrs, i, true);
+				Classifier.evaluate(trainString[i], true, predictionThreshold);
+				Classifier.classify(trainString[i], testString[i], mrs, i, true, predictionThreshold);
 			}
 			PrintStream out = new PrintStream(outFile);
-			
-			//out.println(mr.getHeader()); 
+			PrintStream out_diff_high = new PrintStream(outFile.substring(0, outFile.lastIndexOf("."))+".diff_higher_than_" + predictionThreshold + ".csv");
+			PrintStream out_diff_low = new PrintStream(outFile.substring(0, outFile.lastIndexOf("."))+".diff_lower_than_" + predictionThreshold + ".csv");
+			//out.println(mr.getHeader());
+			ArrayList<MergedResult> lowScoredResults = new ArrayList<MergedResult>(); 
 			for(int i=0; i<mrs.size();i++){
 				MergedResult mr = mrs.get(i);
-				if(i == 0) out.println(mr.getHeader());
+				if(i == 0){
+					out.println(mr.getHeader());
+					out_diff_high.println(mr.getHeader());
+					out_diff_low.println(mr.getHeader());
+				}
 				out.println(mr);
+				
+				if(!mr.isPredictionCorrect()){
+					boolean high = true;
+					double[] scores = mr.getPredictedClassesScores();
+					for(double score : scores){
+						if(score < predictionThreshold){
+							high = false;
+							break;
+						}
+					}
+					if(high) out_diff_high.println(mr);
+					else lowScoredResults.add(mr);
+				}
+			}
+			for(MergedResult mr : lowScoredResults){
+				out_diff_low.println(mr);
 			}
 			
-			
+			out_diff_high.close();
+			out_diff_low.close();
 			out.close();
 			mout.close();	
 			mgout.close();

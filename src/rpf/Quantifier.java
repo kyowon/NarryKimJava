@@ -25,18 +25,18 @@ public class Quantifier {
 	}
 	
 	public boolean isAbundant(ScoredPosition position, double RPKM, int maxLength, int offset){
-		return RPKM <= getPositionRPKM(position.getContig(), position.getPosition(), position.isPlusStrand(), maxLength, offset);
+		return RPKM < getPositionRPKM(position.getContig(), position.getPosition(), position.isPlusStrand(), maxLength, offset);
 	}
 	
 	
 	public double getCDSRPKM(AnnotatedGene gene){
 		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
-		return (bedCovFileParser.getTotalCDSCoverage(gene, true) * 1e9 + 1) / (bedCovFileParser.getTotalReadCount()+1);
+		return (bedCovFileParser.getTotalCDSCoverage(gene, true) * 1e9) / (bedCovFileParser.getTotalReadCount()+1);
 	}
 	//10^9*C/NL
 	public double getPositionRPKM(String contig, int position, boolean isPlusStrand, int maxLength, int offset){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		return (bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position + (isPlusStrand? -offset : offset), offset, maxLength+offset, fastaFileParser, true) * 1e9 + 1) / (bedCovFileParser.getTotalReadCount()+1);
+		return (bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position + (isPlusStrand? -offset : offset), offset, maxLength+offset, fastaFileParser, true) * 1e9) / (bedCovFileParser.getTotalReadCount()+1);
 	}
 	
 	public double getPositionCount(String contig, int position, boolean isPlusStrand, int maxLength, int offset){
@@ -52,8 +52,9 @@ public class Quantifier {
 		
 		if(covs != null){
 			ret = new ArrayList<Double>();
-			if(covs.get(0)+covs.get(1)<10) ret.add(-1.0);
-			else ret.add((covs.get(0)+1)/(covs.get(1)+1));
+			//if(covs.get(0)+covs.get(1)<2) ret.add(-1.0);
+			//else 
+				ret.add((covs.get(0)+2)/(covs.get(1)+2));
 			ret.add(covs.get(2));
 		}			
 		return ret;
@@ -68,9 +69,9 @@ public class Quantifier {
 		double qb = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, prevPosition, length, false);
 		double qa = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, afterPosition, length, false); 
 		
-		if(qa + qb < 10) return -1;
+		//if(qa + qb < 10) return -1;
 		
-		return (qa+1)/(qb+1);
+		return (qa+2)/(qb+2);
 	}
 	
 	public double getCDSQuantity(AnnotatedGene gene){

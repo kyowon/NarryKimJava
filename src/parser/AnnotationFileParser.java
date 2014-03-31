@@ -125,8 +125,8 @@ public class AnnotationFileParser {
 		
 		public static String getHeader(){
 			StringBuffer sb = new StringBuffer();
-			sb.append("GenomeBrowserGeneName");sb.append('\t');
 			sb.append("GeneName");sb.append('\t');
+			sb.append("Accession");sb.append('\t');
 			sb.append("Contig");sb.append('\t');
 			sb.append("Strand");sb.append('\t');
 			sb.append("txStart");sb.append('\t');

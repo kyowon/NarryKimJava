@@ -115,13 +115,13 @@ public class RPFPipeLine {
 			System.out.println();
 		}else if(mode == 14){
 			harrRPKMThreshold = Double.parseDouble(s);
-			System.out.println("Harr RPKM threshold (within 60 nts): " + s);
+			System.out.println("Harr RPKM threshold (within " + positionQuantityChangeLength + " nts): " + s);
 		}else if(mode == 15){
 			rpfRPKMThreshold = Double.parseDouble(s);
-			System.out.println("RPF RPKM threshold (within 60 nts): " + s);
+			System.out.println("RPF RPKM threshold (within " + positionQuantityChangeLength + " nts): " + s);
 		}else if(mode == 16){
 			rnaRPKMThreshold = Double.parseDouble(s);
-			System.out.println("RNA RPKM threshold (within 60 nts): " + s);
+			System.out.println("RNA RPKM threshold (within " + positionQuantityChangeLength + " nts): " + s);
 		}else ret = false;
 		
 		
@@ -294,9 +294,9 @@ public class RPFPipeLine {
 				+ "\n-scoreThreshold [scoreThreshold - default 0.3]"
 				//+ "\n-rpfRPKMThreshold [rpf RPKM threshold - default 0]"
 				//+ "\n-rnaRPKMThreshold [rna RPKM threshold - default 0]"
-				+ "\n-rnaRPKMthreshold [rna RPKM threshold (60 nt window) - default 5]"
-				+ "\n-rpfRPKMthreshold [rpf RPKM threshold (60 nt window) - default 5]"
-				+ "\n-harrRPKMThreshold [harr RPKM threshold (60 nt window) - default 10]"
+				+ "\n-rnaRPKMthreshold [rna RPKM threshold (" + positionQuantityChangeLength +" nt window) - default 5]"
+				+ "\n-rpfRPKMthreshold [rpf RPKM threshold (" + positionQuantityChangeLength + " nt window) - default 5]"
+				+ "\n-harrRPKMThreshold [harr RPKM threshold (" + positionQuantityChangeLength + " nt window) - default 10]"
 				+ "\n-startCodons [start codons to consider - default ATG and CTG, seperated by space]"
 				+ "\n-outputFile [output file]"
 				//+ "\n-outputControlFile [outputControl file] (results with poor harr score)"

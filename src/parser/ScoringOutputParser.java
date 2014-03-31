@@ -9,7 +9,6 @@ import java.util.HashSet;
 import java.util.Set;
 
 import parser.AnnotationFileParser.AnnotatedGene;
-import rpf.Quantifier;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class ScoringOutputParser {
