@@ -1,11 +1,16 @@
 package rpf;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 
+import jspp.SearchMatrix;
+import jspp.SignalPeptidePredictor;
 import parser.AnnotationFileParser;
 import parser.BedCovFileParser;
 import parser.MergedFileParser;
@@ -23,17 +28,30 @@ public class MergeResults {
 	private Quantifier[] rnaQuantifiers = null;
 	private MafParser mafParser = null;
 	private AnnotationFileParser annotationFileParser = null;
+	private SignalPeptidePredictor pd = null;
+	private ZeroBasedFastaParser fastaFileParser = null;
+	private int[][] groups;
+	
 	public MergeResults(String[] rpfScoreOutFiles, 
 			String[] harrCovPlusFiles, String[] harrCovMinusFiles, 
 			String[] rpfCovPlusFiles, String[] rpfCovMinusFiles,
 			String[] rnaCovPlusFiles, String[] rnaCovMinusFiles,
 			String[] harrParamFiles,
 			String[] rpfParamFiles,
+			int[][] groups,
 			AnnotationFileParser annotationFileParser,
 			ZeroBasedFastaParser fastaFileParser,
 			MafParser mafParser){
+		this.groups = groups;
+		if(harrParamFiles != null){
+			harrScorers = new Scorer[harrParamFiles.length];
+			
+			for(int i=0;i<harrScorers.length;i++){		
+				harrScorers[i] = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], harrParamFiles[i], annotationFileParser, fastaFileParser);
+			}
+		}
+		
 		rpfScoringOutputParsers = new ScoringOutputParser[rpfScoreOutFiles.length];
-		harrScorers = new Scorer[harrParamFiles.length];
 		rpfScorers = new Scorer[rpfParamFiles.length];
 		if(rpfCovPlusFiles!=null)
 			rpfQuantifiers = new Quantifier[rpfCovPlusFiles.length];
@@ -43,11 +61,7 @@ public class MergeResults {
 		for(int i=0;i<rpfScoringOutputParsers.length;i++){
 			rpfScoringOutputParsers[i] = new ScoringOutputParser(rpfScoreOutFiles[i]);			
 		}
-		
-		for(int i=0;i<harrScorers.length;i++){		
-			harrScorers[i] = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], harrParamFiles[i], annotationFileParser, fastaFileParser);
-		}
-		
+	
 		for(int i=0;i<rpfScorers.length;i++){			
 			rpfScorers[i] = new Scorer(rpfCovPlusFiles[i], rpfCovMinusFiles[i], rpfParamFiles[i], annotationFileParser, fastaFileParser);
 		}
@@ -64,6 +78,26 @@ public class MergeResults {
 		}
 		this.mafParser = mafParser;
 		this.annotationFileParser = annotationFileParser;
+		
+		///media/kyowon/Data1/RPF_Project/tools/matrices(SearchMatrix-objects)/eukarya.smx
+		File pmatrix=new File("./../tools/matrices(SearchMatrix-objects)/eukarya.smx");
+	      ObjectInputStream in;
+		try {
+			in = new ObjectInputStream(new FileInputStream(pmatrix));
+			SearchMatrix smp;
+			try {
+				smp = (SearchMatrix) in.readObject();
+				pd = new SignalPeptidePredictor(smp);
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		    in.close();    
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		this.fastaFileParser = fastaFileParser;
 	}
 	
 	public void merge(String outFile, double scoreThreshold, int positionQuantityChangeLength, int positionQuantityOffset, int maxLengthUntilStopcodon, HashSet<String> allowedCodons){
@@ -87,15 +121,14 @@ public class MergeResults {
 				trainString[i] = dir + System.getProperty("file.separator") + new File(outFile).getName()  + "_classification" + System.getProperty("file.separator") + "train_" + i + ".arff";
 				trainOut[i] = new PrintStream(trainString[i]);
 			}
-			
-			
+						
 			//ArrayList<MergedResult> mergedResults = new ArrayList<MergedResult>();
 			HashSet<String> contigs = new HashSet<String>();
 			for(int i=0;i<rpfScoringOutputParsers.length;i++){
 				contigs.addAll(rpfScoringOutputParsers[i].getContigs());
 			}
 			boolean start = true;
-			boolean harrRPFsynced = harrScorers.length == rpfQuantifiers.length;
+			boolean harrRPFsynced = harrScorers != null && harrScorers.length == rpfQuantifiers.length;
 			
 			ArrayList<MergedResult> mrs = new ArrayList<MergedResult>();
 			
@@ -107,7 +140,7 @@ public class MergeResults {
 					//}else if(!position.getCodon().equals("ATG") && !position.getCodon().equals("CTG")) continue;
 					
 					//if(position.getCodon() != )
-					MergedResult mr = new MergedFileParser().new MergedResult(position, harrScorers, rpfScorers, rpfQuantifiers, rnaQuantifiers, mafParser, positionQuantityChangeLength, positionQuantityOffset, maxLengthUntilStopcodon);
+					MergedResult mr = new MergedFileParser().new MergedResult(position, harrScorers, rpfScorers, rpfQuantifiers, rnaQuantifiers, groups, fastaFileParser, mafParser, pd, positionQuantityChangeLength, positionQuantityOffset, maxLengthUntilStopcodon);
 					if(start){						
 						for(int i=0;i<testOut.length;i++) trainOut[i].println(mr.GetArffSetHeader());
 						for(int i=0;i<testOut.length;i++) testOut[i].println(mr.GetArffSetHeader());		
@@ -147,45 +180,60 @@ public class MergeResults {
 			mout.println("];");
 			mgout.println("};");
 			//TODO make scorethreshold..
-			double predictionThreshold = 0.75;
-			System.out.println("Merged positions : " + mrs.size());
-			for(int i=0;i<testOut.length;i++){
-				Classifier.evaluate(trainString[i], true, predictionThreshold);
-				Classifier.classify(trainString[i], testString[i], mrs, i, true, predictionThreshold);
-			}
-			PrintStream out = new PrintStream(outFile);
-			PrintStream out_diff_high = new PrintStream(outFile.substring(0, outFile.lastIndexOf("."))+".diff_higher_than_" + predictionThreshold + ".csv");
-			PrintStream out_diff_low = new PrintStream(outFile.substring(0, outFile.lastIndexOf("."))+".diff_lower_than_" + predictionThreshold + ".csv");
-			//out.println(mr.getHeader());
-			ArrayList<MergedResult> lowScoredResults = new ArrayList<MergedResult>(); 
-			for(int i=0; i<mrs.size();i++){
-				MergedResult mr = mrs.get(i);
-				if(i == 0){
-					out.println(mr.getHeader());
-					out_diff_high.println(mr.getHeader());
-					out_diff_low.println(mr.getHeader());
-				}
-				out.println(mr);
-				
-				if(!mr.isPredictionCorrect()){
-					boolean high = true;
-					double[] scores = mr.getPredictedClassesScores();
-					for(double score : scores){
-						if(score < predictionThreshold){
-							high = false;
-							break;
-						}
-					}
-					if(high) out_diff_high.println(mr);
-					else lowScoredResults.add(mr);
-				}
-			}
-			for(MergedResult mr : lowScoredResults){
-				out_diff_low.println(mr);
-			}
+			double[] predictionThresholds = {0.25, 0.5, 0.75, 0.9};
 			
-			out_diff_high.close();
-			out_diff_low.close();
+			PrintStream out = new PrintStream(outFile);
+			PrintStream out_statistics = new PrintStream(outFile.substring(0, outFile.lastIndexOf(".")) + ".statistics.txt");
+			
+			PrintStream[] out_diff_high = new PrintStream[predictionThresholds.length]; 
+			
+			for(int i=0;i<testOut.length;i++){
+				Classifier.classify(trainString[i], testString[i], mrs, i, true, .5);
+			}
+				
+			
+			for(int j=0;j<predictionThresholds.length;j++){
+				System.out.println("Merged positions : " + mrs.size());
+				out_statistics.println("Prediction score threshold: " + predictionThresholds[j]);
+				System.out.println("Prediction score threshold: " + predictionThresholds[j]);
+				for(int i=0;i<testOut.length;i++){
+					String stat = Classifier.evaluate(trainString[i], true, predictionThresholds[j]);
+					out_statistics.println(stat);
+					System.out.println(stat);
+				//	Classifier.classify(trainString[i], testString[i], mrs, i, true, .5);
+				}
+			
+				
+				out_diff_high[j] = new PrintStream(outFile.substring(0, outFile.lastIndexOf("."))+".diff_higher_than_" + predictionThresholds[j] + ".csv");				
+				
+				
+				for(int i=0; i<mrs.size();i++){
+					MergedResult mr = mrs.get(i);
+					if(j == 0){
+						if(i == 0){
+							out.println(mr.getHeader());					
+						}
+						out.println(mr);
+					}
+					if(i == 0){
+						out_diff_high[j].println(mr.getHeader());		
+					}
+					if(!mr.isPredictionCorrect()){
+						boolean high = false;
+						double[] scores = mr.getPredictedClassesScores();
+						for(double score : scores){
+							if(score >= predictionThresholds[j]){
+								high = true;
+								break;
+							}
+						}
+						if(high) out_diff_high[j].println(mr);
+						//else lowScoredResults.add(mr);
+					}
+				}				
+				out_diff_high[j].close();
+			}
+			out_statistics.close();
 			out.close();
 			mout.close();	
 			mgout.close();
@@ -198,40 +246,9 @@ public class MergeResults {
 		}
 	}	
 	
+
 	
-	private void writeMfile(PrintStream mout, ScoredPosition position){
-		
-		
-		/*String gname;
-		if(!position.isAnnotated()) gname = position.getContig() +"_"+position.getPosition()+"_"+(position.isPlusStrand()? "P" : "M");
-		else gname = position.getGene().getGeneName();
-		mout.print(gname);
-		//a{3}=[ 4 5 ; 7 8 ]'
-		for(int i=0;i<harrScorers.length;i++){
-			mout.println("{"+(i+1)+"}=[");
-			BedCovFileParser sbp =  position.isPlusStrand()? harrScorers[i].getBedCovPlusFileParser() : harrScorers[i].getBedCovMinusFileParser();
-			subWriteMfile(mout, position, sbp);
-			if(rpfQuantifiers != null && rpfQuantifiers[i] != null){
-				BedCovFileParser rpfbp =  position.isPlusStrand()? rpfQuantifiers[i].getBedCovPlusFileParser() : rpfQuantifiers[i].getBedCovMinusFileParser();
-				subWriteMfile(mout, position, rpfbp);
-			}
-			if(rnaQuantifiers != null && rnaQuantifiers[i] != null){
-				BedCovFileParser rnabp =  position.isPlusStrand()? rnaQuantifiers[i].getBedCovPlusFileParser() : rnaQuantifiers[i].getBedCovMinusFileParser();
-				subWriteMfile(mout, position, rnabp);
-			}
-			mout.println("]';");	
-		}				
-			*/		
-	}
-	
-	private void subWriteMfile(PrintStream mout, ScoredPosition position, BedCovFileParser bp){
-		double[] cov = bp.getCoverages(position.getContig(), position.getPosition(), 30, 100, position.isPlusStrand());
-		for(Double c : cov){
-			mout.append(c.toString());
-			mout.append('\t');
-		}
-		mout.append('\n');
-	}
+
 		
 	public static void main(String[] args){ // quantities can be from different files!!!!  param and bedCovPlusFiles should be added for quan.
 		String[] scoreOutFiles = {	"/media/kyowon/Data1/RPF_Project/data/Samfiles/Uncollapsed/Noco_Harr10m.sorted.out",

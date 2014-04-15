@@ -80,14 +80,14 @@ public class BedCovFileParser {
 	}
 	
 	
-	/*public double[] getSqrtCoverages(String contig, int position, int leftWindowSize, int rightWindowSize, boolean isPlusStrand){
+	public double[] getSqrtCoverages(String contig, int position, int leftWindowSize, int rightWindowSize, boolean isPlusStrand){
 		double[] cov = getCoverages(contig, position, leftWindowSize, rightWindowSize, isPlusStrand);
 		double[] sqrtCov = new double[cov.length];
 		for(int i=0; i<cov.length; i++){
 			if(cov[i]>0) sqrtCov[i] = Math.sqrt(cov[i]);
 		}
 		return sqrtCov;
-	}*/
+	}
 	
 	public double[] getCoverages(String contig, int position, int leftWindowSize, int rightWindowSize, boolean isPlusStrand){
 		double[] coverages = new double[leftWindowSize + rightWindowSize];
@@ -247,7 +247,7 @@ public class BedCovFileParser {
 				String[] token = s.split("\t");
 				String contig = token[0];
 				int position = Integer.parseInt(token[1]);
-				int coverage = (int)Double.parseDouble(token[2]);
+				int coverage = (int)Double.parseDouble(token[token.length-1]);
 				if(!coverageMap.containsKey(contig)) coverageMap.put(contig, new HashMap<Integer, Integer>());
 				coverageMap.get(contig).put(position, coverage);
 				totalReadCount += coverage;

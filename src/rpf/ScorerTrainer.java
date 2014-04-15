@@ -157,7 +157,7 @@ public class ScorerTrainer {
 			}
 	}
 	
-	private static double[][] getAvg(ArrayList<double[]> observations){
+	public static double[][] getAvg(ArrayList<double[]> observations){
 		if(observations.isEmpty()) return null;
 		double[] avg = new double[observations.get(0).length];
 		for(double[] o : observations){
@@ -181,7 +181,7 @@ public class ScorerTrainer {
 		return ret;
 	}
 	
-	private static double[] getFilter(double[][] avgedSignal, ArrayList<double[]> noise){		
+	public static double[] getFilter(double[][] avgedSignal, ArrayList<double[]> noise){		
 		double[][] R = getCovMatrix(noise);
 		double[][] Rinv = MC.invert(R);
 		double[][] Rinvs = MC.multiply(Rinv, avgedSignal);

@@ -121,6 +121,18 @@ public class Codon extends ArrayList<Nucleotide>{
 		return aaCodonstable.get(aa.toUpperCase());
 	}
 	
+	static public String getAminoAcids(String seq){
+		StringBuffer aas = new StringBuffer();
+		for(int i=0;i<seq.length()/3;i++){
+			String codon = seq.substring(i*3, i*3+3);
+			String aa = getStandardCodon(codon).getCodingAA();
+			if(aa.equals("X")) break;
+			aas.append(aa);
+		}
+		
+		return aas.toString();
+	}
+	
 	static public ArrayList<Codon> getMatchingStandardCodons(String regex){
 		ArrayList<Codon> matchingCodons = new ArrayList<Codon>();
 		Pattern pattern = Pattern.compile(regex);

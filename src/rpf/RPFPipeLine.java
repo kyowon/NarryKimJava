@@ -1,11 +1,13 @@
 package rpf;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 
 import parser.AnnotationFileParser;
 import parser.MafParser;
 import parser.ZeroBasedFastaParser;
+import util.DnDsCalculator;
 
 public class RPFPipeLine {
 	//private static String[] harrScoreOutFiles;
@@ -30,9 +32,10 @@ public class RPFPipeLine {
 	private static double rpfRPKMThreshold = 5;
 	private static double harrRPKMThreshold = 5;
 	private static String outFile = null;
+	private static int[][] groups = null;
 	//private static String outControlFile = null;// RPKM 6.8 ...
 	
-	private static int positionQuantityChangeLength = 50;
+	private static int positionQuantityChangeLength = 51; // should be 3 mult
 	private static int positionQuantityOffset = 13; //TODO automation
 	private static int maxLengthUntilStopcodon = 13000;
 	
@@ -40,6 +43,7 @@ public class RPFPipeLine {
 	private static boolean parseSegment(String s, int mode){
 		boolean ret = true;
 		String[] token = s.split(" ");
+		if(token.length == 0 || token[0].isEmpty()) return ret;
 		if(mode == 1){
 			harrCovPlusFiles = new String[token.length];
 			System.out.print("Harr cov plus files : ");
@@ -122,7 +126,20 @@ public class RPFPipeLine {
 		}else if(mode == 16){
 			rnaRPKMThreshold = Double.parseDouble(s);
 			System.out.println("RNA RPKM threshold (within " + positionQuantityChangeLength + " nts): " + s);
+		}else if(mode == 17){
+			DnDsCalculator.numSpecies = Integer.parseInt(s);
+			System.out.println("Number of species in maf file: " + s);
+		}else if(mode == 18){
+			groups = new int[token.length][];
+			for(int i=0;i<groups.length;i++){
+				String[] st = token[i].split(",");
+				groups[i] = new int[st.length];
+				for(int j=0;j<st.length;j++){
+					groups[i][j] = Integer.parseInt(st[j]);
+				}
+			}
 		}else ret = false;
+		
 		
 		
 		//rpfRPKMThreshold
@@ -178,19 +195,27 @@ public class RPFPipeLine {
 				mode = 15;
 			}else if(args[i].equals("-rnaRPKMThreshold")){				
 				mode = 16;
-			}else{
+			}else if(args[i].equals("-numSpeciesInMafFile")){				
+				mode = 17;
+			}else if(args[i].equals("-groups")){
+				mode = 18;
+			}
+			//
+			else{
 				s += args[i] + " ";
 			}
 		}
 		if(mode > 0) if (!parseSegment(s.trim(), mode)) return false;
-		if(harrCovPlusFiles == null || harrCovMinusFiles == null || fastaParser == null || annotationFileParser == null || outFile == null) return false;
+		if(rpfCovPlusFiles == null || rpfCovMinusFiles == null || fastaParser == null || annotationFileParser == null || outFile == null) return false;
 		//if(harrCovPlusFiles.length != harrCovMinusFiles.length) return false;
 		
-		harrParamFiles = new String[harrCovPlusFiles.length];
-		//harrScoreOutFiles = new String[harrCovPlusFiles.length];
-		for(int i=0;i<harrParamFiles.length;i++){
-			harrParamFiles[i] = harrCovPlusFiles[i]+".param";
-			//harrScoreOutFiles[i] = harrCovPlusFiles[i]+".score"+ scoreThreshold +".tsv";
+		if(harrCovPlusFiles != null){
+			harrParamFiles = new String[harrCovPlusFiles.length];
+			//harrScoreOutFiles = new String[harrCovPlusFiles.length];
+			for(int i=0;i<harrParamFiles.length;i++){
+				harrParamFiles[i] = harrCovPlusFiles[i]+".param";
+				//harrScoreOutFiles[i] = harrCovPlusFiles[i]+".score"+ scoreThreshold +".tsv";
+			}
 		}
 		
 		rpfParamFiles = new String[rpfCovPlusFiles.length];
@@ -200,12 +225,15 @@ public class RPFPipeLine {
 			rpfScoreOutFiles[i] = rpfCovPlusFiles[i]+".score"+ scoreThreshold +".tsv";
 		}
 		
+		if(groups == null)
+			groups = new int[rpfScoreOutFiles.length][1];
 		
 		return true;
 	}
 	
 	public static void main(String[] args){
-		
+		//ClassLoader classLoader = ExcelFile.class.getClassLoader();
+	    
 		if(!parseArgs(args)){
 			printUsage();
 			System.exit(0);
@@ -215,23 +243,24 @@ public class RPFPipeLine {
 			allowedCodons = new HashSet<String>();
 			allowedCodons.add("ATG"); allowedCodons.add("CTG");			
 		}
-		for(int i=0;i<harrCovPlusFiles.length;i++){
-			if(!new File(harrParamFiles[i]).exists()){
-				ScorerTrainer trainer = new ScorerTrainer(harrCovPlusFiles[i], harrCovMinusFiles[i], annotationFileParser, harrParamFiles[i]);
-				System.out.println("Training for " + harrCovPlusFiles[i] + " and " + harrCovMinusFiles[i]);
-				trainer.train(60, 40, 6); // harr
-				System.out.println("Training done..");
+		if(harrCovPlusFiles!=null){
+			for(int i=0;i<harrCovPlusFiles.length;i++){
+				if(!new File(harrParamFiles[i]).exists()){
+					ScorerTrainer trainer = new ScorerTrainer(harrCovPlusFiles[i], harrCovMinusFiles[i], annotationFileParser, harrParamFiles[i]);
+					System.out.println("Training for " + harrCovPlusFiles[i] + " and " + harrCovMinusFiles[i]);
+					trainer.train(60, 40, 6); // harr
+					System.out.println("Training done..");
+				}
+				/*if(!new File(harrScoreOutFiles[i]).exists()){
+					System.out.println("Scoring for " + harrCovPlusFiles[i] + " and " + harrCovMinusFiles[i]);
+					Scorer scorer = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], harrParamFiles[i], annotationFileParser, fastaParser);
+					scorer.scoreNWrite(scoreThreshold, harrScoreOutFiles[i]+".beforeWindowFilter.tsv", false);
+					scorer.writeWindowFilteredOutput(harrScoreOutFiles[i]+".beforeWindowFilter.tsv", harrScoreOutFiles[i], 30);
+					//scorer.scoreNWrite(-0.1, fastaParser, scoreOutFiles[i], true);
+					System.out.println("Scoring done..");
+				}*/
 			}
-			/*if(!new File(harrScoreOutFiles[i]).exists()){
-				System.out.println("Scoring for " + harrCovPlusFiles[i] + " and " + harrCovMinusFiles[i]);
-				Scorer scorer = new Scorer(harrCovPlusFiles[i], harrCovMinusFiles[i], harrParamFiles[i], annotationFileParser, fastaParser);
-				scorer.scoreNWrite(scoreThreshold, harrScoreOutFiles[i]+".beforeWindowFilter.tsv", false);
-				scorer.writeWindowFilteredOutput(harrScoreOutFiles[i]+".beforeWindowFilter.tsv", harrScoreOutFiles[i], 30);
-				//scorer.scoreNWrite(-0.1, fastaParser, scoreOutFiles[i], true);
-				System.out.println("Scoring done..");
-			}*/
 		}
-		
 		for(int i=0;i<rpfCovPlusFiles.length;i++){
 			if(!new File(rpfParamFiles[i]).exists()){
 				ScorerTrainer trainer = new ScorerTrainer(rpfCovPlusFiles[i], rpfCovMinusFiles[i], annotationFileParser, rpfParamFiles[i]);
@@ -251,18 +280,21 @@ public class RPFPipeLine {
 				Quantifier rnaQuantifier = new Quantifier(rnaCovPlusFiles[i], rnaCovMinusFiles[i], annotationFileParser, fastaParser);
 				scorer.writeQuantityFilteredOutput(rpfScoreOutFiles[i]+".rpfQuantityFiltered.tsv", rpfScoreOutFiles[i]+".rnaQuantityFiltered.tsv", rnaQuantifier, rnaRPKMThreshold, positionQuantityChangeLength, 0);	
 				
-				if(harrCovPlusFiles.length == rpfCovPlusFiles.length){ // synced
-					Quantifier harrQuantifier = new Quantifier(harrCovPlusFiles[i], harrCovMinusFiles[i], annotationFileParser, fastaParser);
-					scorer.writeQuantityFilteredOutput(rpfScoreOutFiles[i]+".rnaQuantityFiltered.tsv", rpfScoreOutFiles[i]+".harrQuantityFiltered.tsv", harrQuantifier, harrRPKMThreshold, positionQuantityChangeLength, positionQuantityOffset);	
-				}else{
-					Quantifier[] harrQuantifiers = new Quantifier[harrCovPlusFiles.length];
-					for(int j=0;j<harrQuantifiers.length;j++){
-						harrQuantifiers[j] = new Quantifier(harrCovPlusFiles[j], harrCovMinusFiles[j], annotationFileParser, fastaParser);
+				if(harrCovPlusFiles!=null){
+					if(harrCovPlusFiles.length == rpfCovPlusFiles.length){ // synced
+						Quantifier harrQuantifier = new Quantifier(harrCovPlusFiles[i], harrCovMinusFiles[i], annotationFileParser, fastaParser);
+						scorer.writeQuantityFilteredOutput(rpfScoreOutFiles[i]+".rnaQuantityFiltered.tsv", rpfScoreOutFiles[i]+".harrQuantityFiltered.tsv", harrQuantifier, harrRPKMThreshold, positionQuantityChangeLength, positionQuantityOffset);	
+					}else{
+						Quantifier[] harrQuantifiers = new Quantifier[harrCovPlusFiles.length];
+						for(int j=0;j<harrQuantifiers.length;j++){
+							harrQuantifiers[j] = new Quantifier(harrCovPlusFiles[j], harrCovMinusFiles[j], annotationFileParser, fastaParser);
+						}	
+						scorer.writeQuantityFilteredOutput(rpfScoreOutFiles[i]+".rnaQuantityFiltered.tsv", rpfScoreOutFiles[i]+".harrQuantityFiltered.tsv", harrQuantifiers, harrRPKMThreshold, positionQuantityChangeLength, positionQuantityOffset);
 					}
-					scorer.writeQuantityFilteredOutput(rpfScoreOutFiles[i]+".rnaQuantityFiltered.tsv", rpfScoreOutFiles[i]+".harrQuantityFiltered.tsv", harrQuantifiers, harrRPKMThreshold, positionQuantityChangeLength, positionQuantityOffset);
+					scorer.writeWindowFilteredOutput(rpfScoreOutFiles[i]+".harrQuantityFiltered.tsv", rpfScoreOutFiles[i], positionQuantityChangeLength);
+				}else{
+					scorer.writeWindowFilteredOutput(rpfScoreOutFiles[i]+".rnaQuantityFiltered.tsv", rpfScoreOutFiles[i], positionQuantityChangeLength);
 				}
-				
-				scorer.writeWindowFilteredOutput(rpfScoreOutFiles[i]+".harrQuantityFiltered.tsv", rpfScoreOutFiles[i], positionQuantityChangeLength);
 				//scorer.scoreNWrite(-0.1, fastaParser, scoreOutFiles[i], true);
 				System.out.println("Scoring done..");
 			}
@@ -272,7 +304,7 @@ public class RPFPipeLine {
 		mafParser.readIndexFile();
 		//DsDnOutParser dsdnParser = new DsDnOutParser(dsdnFile, annotationFileParser);
 		
-		MergeResults merge = new MergeResults(rpfScoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, harrParamFiles, rpfParamFiles, annotationFileParser, fastaParser, mafParser);
+		MergeResults merge = new MergeResults(rpfScoreOutFiles, harrCovPlusFiles, harrCovMinusFiles, rpfCovPlusFiles, rpfCovMinusFiles, rnaCovPlusFiles, rnaCovMinusFiles, harrParamFiles, rpfParamFiles, groups, annotationFileParser, fastaParser, mafParser);
 		System.out.println("Merging results");
 		merge.merge(outFile, scoreThreshold, positionQuantityChangeLength, positionQuantityOffset, maxLengthUntilStopcodon, allowedCodons);
 
@@ -291,6 +323,7 @@ public class RPFPipeLine {
 				+ "\n-maf [maf file folder]"
 				+ "\n-fasta [fasta file]"
 				+ "\n-ref [refFlat file]"
+				+ "\n-groups [group info (0-based, sample seperated by , and group seperated by space  For example, 0,1,2,3 4,5,6 means 0 1 2 3 are one group and 4 5 6 are the other)]"
 				+ "\n-scoreThreshold [scoreThreshold - default 0.3]"
 				//+ "\n-rpfRPKMThreshold [rpf RPKM threshold - default 0]"
 				//+ "\n-rnaRPKMThreshold [rna RPKM threshold - default 0]"
@@ -298,6 +331,7 @@ public class RPFPipeLine {
 				+ "\n-rpfRPKMthreshold [rpf RPKM threshold (" + positionQuantityChangeLength + " nt window) - default 5]"
 				+ "\n-harrRPKMThreshold [harr RPKM threshold (" + positionQuantityChangeLength + " nt window) - default 10]"
 				+ "\n-startCodons [start codons to consider - default ATG and CTG, seperated by space]"
+				+ "\n-numSpeciesInMafFile [number of species in maf file - default 46 (for hg19)]"
 				+ "\n-outputFile [output file]"
 				//+ "\n-outputControlFile [outputControl file] (results with poor harr score)"
 				);

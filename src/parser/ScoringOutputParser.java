@@ -137,7 +137,7 @@ public class ScoringOutputParser {
 			}else{ 
 				sb.append('_');
 				sb.append('\t');
-				sb.append(AnnotatedGene.getEmptyGeneString());
+				sb.append(AnnotatedGene.getEmptyString());
 			}
 			return sb.toString(); 
 		}		

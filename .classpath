@@ -23,5 +23,11 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="lib" path="/home/kyowon/Documents/EclipseWorkspace/NarryKimJava/extlib/weka-3-7-10/weka-src.jar"/>
+	<classpathentry kind="src" path="/MS_Java"/>
+	<classpathentry kind="lib" path="/home/kyowon/Documents/EclipseWorkspace/NarryKimJava/extlib/jspp">
+		<attributes>
+			<attribute name="javadoc_location" value="file:/home/kyowon/Documents/EclipseWorkspace/NarryKimJava/extlib/jspp/doc/"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

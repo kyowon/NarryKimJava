@@ -74,6 +74,25 @@ public class Quantifier {
 		return (qa+2)/(qb+2);
 	}
 	
+	// only for NM_ORF T.. 
+	public double getCDSRPKMChangeRatio(AnnotatedGene gene, int position, boolean isPlusStrand, int offset){
+		if(gene == null) return -1;
+		//BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
+		
+		int start1 = isPlusStrand? gene.getCdsStart() : gene.getCdsEnd() - 1;
+		int end1 = position + (isPlusStrand? - offset : offset);
+		
+		int start2 = position + (isPlusStrand? offset : - offset);
+		int end2 = isPlusStrand? gene.getCdsEnd() - 1 : gene.getCdsStart();
+		
+		//int position = isPlusStrand? position - offset : position + offset;
+		double qb = getPositionRPKM(gene.getContig(), start1, isPlusStrand, Math.abs(end1 - start1), 0);
+		double qa = getPositionRPKM(gene.getContig(), start2, isPlusStrand, Math.abs(end2 - start2), 0);
+		//if(qa + qb < 10) return -1;
+		
+		return qa/qb;
+	}
+	
 	public double getCDSQuantity(AnnotatedGene gene){
 		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
 		return bedCovFileParser.getTotalCDSCoverage(gene, false);

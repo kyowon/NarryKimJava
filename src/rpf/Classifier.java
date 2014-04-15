@@ -23,7 +23,7 @@ public class Classifier {
 			if(removeLengthAttribute){
 				String[] options = new String[2];
 				options[0] = "-R";
-				options[1] = "14";
+				options[1] = "15";
 				Remove rm = new Remove();
 				rm.setOptions(options);
 				rm.setInputFormat(testData);
@@ -78,7 +78,7 @@ public class Classifier {
 			if(removeLengthAttribute){
 				String[] options = new String[2];
 				options[0] = "-R";
-				options[1] = "14";
+				options[1] = "15";
 				Remove rm = new Remove();
 				rm.setOptions(options);
 				rm.setInputFormat(testData);
@@ -120,7 +120,7 @@ public class Classifier {
 					//System.out.println(clsLabel + " " + dist[(int) clsLabel]);
 				}
 			}
-			System.out.println("Number of Instances after prediction score filtering\t"+filteredTestData.size());			
+		//	System.out.println("Number of Instances after prediction score filtering\t"+filteredTestData.size());			
 			
 			// evaluate classifier and print some statistics
 			Evaluation eval = new Evaluation(filteredTrainData);
@@ -136,7 +136,7 @@ public class Classifier {
 		}
 	}
 	
-	static public void evaluate(String train1, boolean removeLengthAttribute, double predictionThreshold){
+	static public String evaluate(String train1, boolean removeLengthAttribute, double predictionThreshold){
 		try {
 			Instances testData = DataSource.read(train1);
 			//Instances trainData = DataSource.read(train2);		
@@ -146,7 +146,7 @@ public class Classifier {
 			if(removeLengthAttribute){
 				String[] options = new String[2];
 				options[0] = "-R";
-				options[1] = "14";
+				options[1] = "15";
 				Remove rm = new Remove();
 				rm.setOptions(options);
 				rm.setInputFormat(testData);
@@ -162,27 +162,29 @@ public class Classifier {
 			//rf.setNumExecutionSlots(Thread.activeCount());
 			rf.buildClassifier(filteredTestData);
 			
-			System.out.println("Number of Instances before prediction score filtering\t"+filteredTestData.size());
+			String s = "Number of Instances before prediction score filtering\t"+filteredTestData.size() + "\n";
+					//+ "Number of Instances after prediction score filtering\t"+filteredTestData.size() + "\n";
+			
 			for (int i = 0; i < filteredTestData.numInstances(); i++) {
 				double clsLabel = rf.classifyInstance(filteredTestData.instance(i));
 				double[] dist = rf.distributionForInstance(filteredTestData.instance(i));
 				if(dist[(int) clsLabel] < predictionThreshold) filteredTestData.remove(i);
 			}
-			System.out.println("Number of Instances after prediction score filtering\t"+filteredTestData.size());
 			
 		//	filteredTrainData.setClassIndex(filteredTrainData.numAttributes() - 1);
 			
 			Evaluation eval = new Evaluation(filteredTestData);
 	
 			eval.crossValidateModel(rf, filteredTestData, 10, new Random(1));
-			System.out.println(eval.toSummaryString("\nResults\n\n", true));
-			System.out.println(eval.toMatrixString());
-			System.out.println(eval.toClassDetailsString());
-			
+			s += eval.toSummaryString("\nResults\n\n", true);
+			s += eval.toClassDetailsString() + "\n";
+			s += eval.toMatrixString();
+			return s;
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		return null;
 	}
 	
 	static public void main(String[] args){
@@ -192,7 +194,7 @@ public class Classifier {
 		//String output = "/media/kyowon/Data1/RPF_Project/samples/sample3/results/out_0.3.csv_test/test_0_classified.arff";
 		boolean removeLengthAttribute = true;
 		
-		Classifier.evaluate(train1, train2, removeLengthAttribute, .75);
+		Classifier.evaluate(train1, train2, removeLengthAttribute, .5);
 	//	Classifier.classify(train1, test, output, removeLengthAttribute);
 	}
 	

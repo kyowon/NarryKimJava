@@ -107,11 +107,65 @@ public class AnnotationFileParser {
 			return sb.toString();
 		}
 		
-		public static String getEmptyGeneString(){
+		public String toSimpleString(){
+			StringBuffer sb = new StringBuffer();			
+			sb.append(genomeBrowserGeneName); sb.append('\t');
+			sb.append(geneName); 
+			
+			return sb.toString();
+		}
+		
+		public String toDetailedInfoString(){
+			StringBuffer sb = new StringBuffer();			
+			//sb.append(genomeBrowserGeneName); sb.append('\t');
+			//sb.append(geneName); sb.append('\t');
+			//sb.append(contig); sb.append('\t');
+			sb.append(isPlusStrand? '+' : '-'); sb.append('\t');
+			sb.append(txStart); sb.append('\t');
+			sb.append(txEnd); sb.append('\t');
+			sb.append(cdsStart); sb.append('\t');
+			sb.append(cdsEnd); sb.append('\t');
+			sb.append(exonCount); sb.append('\t');
+			for(int t : exonStarts){
+				sb.append(t);sb.append(',');
+			}
+			sb.append('\t');
+			for(int t : exonEnds){
+				sb.append(t);sb.append(',');
+			}
+			return sb.toString();
+		}
+		
+		public static String getEmptyString(){
 			StringBuffer sb = new StringBuffer();			
 			sb.append('_'); sb.append('\t');
 			sb.append('_'); sb.append('\t');
 			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); sb.append('\t');
+			sb.append('_'); 
+			return sb.toString();
+		}
+		
+		public static String getEmptySimpleString(){
+			StringBuffer sb = new StringBuffer();			
+			sb.append('_'); sb.append('\t');
+			//sb.append('_'); sb.append('\t');
+			sb.append('_'); //sb.append('\t');
+			//sb.append('_'); 
+			return sb.toString();
+		}
+		
+		public static String getEmptyInfoString(){
+			StringBuffer sb = new StringBuffer();			
+		//	sb.append('_'); sb.append('\t');
+		//	sb.append('_'); sb.append('\t');
+		//	sb.append('_'); sb.append('\t');
 			sb.append('_'); sb.append('\t');
 			sb.append('_'); sb.append('\t');
 			sb.append('_'); sb.append('\t');
@@ -128,6 +182,26 @@ public class AnnotationFileParser {
 			sb.append("GeneName");sb.append('\t');
 			sb.append("Accession");sb.append('\t');
 			sb.append("Contig");sb.append('\t');
+			sb.append("Strand");sb.append('\t');
+			sb.append("txStart");sb.append('\t');
+			sb.append("txEnd");sb.append('\t');
+			sb.append("cdsStart");sb.append('\t');
+			sb.append("cdsEnd");sb.append('\t');
+			sb.append("ExonCount");sb.append('\t');
+			sb.append("ExonStarts");sb.append('\t');
+			sb.append("ExonEnds");		
+			return sb.toString();
+		}
+		
+		public static String getSimpleHeader(){
+			StringBuffer sb = new StringBuffer();
+			sb.append("GeneName");sb.append('\t');
+			sb.append("Accession");
+			return sb.toString();
+		}
+		
+		public static String getDetailedInfoHeader(){
+			StringBuffer sb = new StringBuffer();
 			sb.append("Strand");sb.append('\t');
 			sb.append("txStart");sb.append('\t');
 			sb.append("txEnd");sb.append('\t');
@@ -305,24 +379,25 @@ public class AnnotationFileParser {
 		}else{
 			if(gene.getGenomeBrowserGeneName().startsWith("LINC")) name = "LINC";
 			else if(gene.getGeneName().startsWith("NR")) name = "NR";
-			else name = "NM";
-			
-			if(position >= gene.getCdsStart() && position < gene.getCdsEnd()){
-				name += "_ORF";
-				int[][] introns = gene.getIntrons();
-				//System.out.println(introns.length);
-				for(int i=0;i<introns.length;i++){
-					//System.out.println(introns[i][0] + " " + introns[i][1]);
-					if(position >=introns[i][0] && position <= introns[i][1]){
-						name += "_Intron";
-						break;
-					}
-				}				
-			}else{
-				if(isPlusStrand && position < gene.getCdsStart()) name += "_5_UTR";
-				else if(!isPlusStrand && position >= gene.getCdsEnd()) name += "_5_UTR";
-				else name += "_3_UTR";
-			}	
+			else{
+				name = "NM";
+				if(position >= gene.getCdsStart() && position < gene.getCdsEnd()){
+					name += "_ORF";
+					int[][] introns = gene.getIntrons();
+					//System.out.println(introns.length);
+					for(int i=0;i<introns.length;i++){
+						//System.out.println(introns[i][0] + " " + introns[i][1]);
+						if(position >=introns[i][0] && position <= introns[i][1]){
+							name += "_Intron";
+							break;
+						}
+					}				
+				}else{
+					if(isPlusStrand && position < gene.getCdsStart()) name += "_5_UTR";
+					else if(!isPlusStrand && position >= gene.getCdsEnd()) name += "_5_UTR";
+					else name += "_3_UTR";
+				}
+			}
 			Integer j = 0;
 			if(isPlusStrand){
 				int i = 0;

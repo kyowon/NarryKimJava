@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 
-import util.DsDnCalculator;
+import util.DnDsCalculator;
 import util.Nucleotide;
 import net.sf.samtools.util.BufferedLineReader;
 
@@ -132,7 +132,7 @@ public class MafParser {
 				boolean isInserted = false;
 				if(seqs.get(0).charAt(i) == '-'){
 					isInserted = true;
-				//	continue;
+					//continue; // TODO 
 				}
 				
 				if(!isInserted) cposition++;
@@ -289,11 +289,11 @@ public class MafParser {
 		*/
 		
 		String file = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/";
-		
+		//MafParser.minNumSpecies
 		MafParser test = new MafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
 		test.generateIndexFile();
 		test.readIndexFile();
-		String[] seqs =  test.getSeqs("chr7", 6324070, true, 45); // why not 150???? TODO
+		String[] seqs =  test.getSeqs("chr7", 74807232, true, 50); // why not 150???? TODO
 		for(String seq : seqs){
 			System.out.println(seq + " " + seq.length());
 		}
@@ -303,7 +303,7 @@ public class MafParser {
 */
 
 //GATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAA
-		System.out.println(DsDnCalculator.calculate(seqs, 45));
+		System.out.println(DnDsCalculator.calculate(seqs));
 		//ATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAAG
 		
 		//ATTGCACGCTGTGCCGGCCCTGGAGAAATGGCAGATAAATTATTACTCACTACTCCCTCCAAAAAATTTACATGTCAAGGTCCCGTGGATATCACTATTCAAGCCAAGTGTAATCCCTGCTTATCAAATCCATGTAAAAATGATGGCACC 150

@@ -1,12 +1,15 @@
 package parser;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
+import jspp.SignalPeptidePredictor;
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.ScoringOutputParser.ScoredPosition;
 import rpf.Quantifier;
 import rpf.Scorer;
-import util.DsDnCalculator;
+import util.Codon;
+import util.DnDsCalculator;
 
 public class MergedFileParser {
 	public class MergedResult{
@@ -31,6 +34,7 @@ public class MergedFileParser {
 		private double[] rpfPositionQuantities;//
 		private double[] positionTE;//	
 		private double[] rpfPositionQuantityChanges;//
+		private double[] rpfCDSRPKMchanges;
 		private double[] releaseScore;//
 		private int stopPosition = -1;
 		private double[] rnaCDSQuantities;//
@@ -38,10 +42,13 @@ public class MergedFileParser {
 		private double[] rnaPositionQuantityChanges;//
 		private String genomicRegion;
 		private String frameShift;
-		private double dsdnRatioAfter = -1;
-		private double dsdnRatioBefore = -1;
+		private double dndsRatioAfter = -1;
+		private double dndsRatioBefore = -1;
+		private double signalPeptideScore = -1;
 		private boolean isAnnotated;
 		private AnnotatedGene gene;
+		//private int numSample = 0;
+		private int[][] groups;
 		
 		public String getContig() {
 			return contig;
@@ -131,12 +138,12 @@ public class MergedFileParser {
 			return frameShift;
 		}
 
-		public double getDsdnRatioAfter() {
-			return dsdnRatioAfter;
+		public double getDnDsRatioAfter() {
+			return dndsRatioAfter;
 		}
 
-		public double getDsdnRatioBefore() {
-			return dsdnRatioBefore;
+		public double getDnDsRatioBefore() {
+			return dndsRatioBefore;
 		}
 
 		public boolean isAnnotated() {
@@ -157,8 +164,8 @@ public class MergedFileParser {
 			return correct;
 		}
 		
-		public MergedResult(ScoredPosition scoredPosition, Scorer[] harrScorers, Scorer[] rpfScorers, Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers, MafParser mafParser,
-				int positionQuantityChangeLength, int positionQuantityOffset, int maxLengthUntilStopcodon){
+		public MergedResult(ScoredPosition scoredPosition, Scorer[] harrScorers, Scorer[] rpfScorers, Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers, int[][] groups, ZeroBasedFastaParser fastaFileParser, MafParser mafParser,
+				SignalPeptidePredictor pd, int positionQuantityChangeLength, int positionQuantityOffset, int maxLengthUntilStopcodon){
 			this.contig = scoredPosition.getContig();
 			this.position = scoredPosition.getPosition();
 			this.isPlusStrand = scoredPosition.isPlusStrand();
@@ -167,15 +174,17 @@ public class MergedFileParser {
 			this.frameShift = scoredPosition.getFrameShift();
 			this.isAnnotated = scoredPosition.isAnnotated();
 			this.gene = scoredPosition.getGene();
+			this.groups = groups;
 			
 			if(harrScorers != null){
 				this.harrStartScores = new double[harrScorers.length];
+					
 				for(int i=0;i<this.harrStartScores.length;i++){
 					this.harrStartScores[i] = harrScorers[i].getStartScore(this.contig, this.position, this.isPlusStrand, false);
 				}
 				
-				if(gene!=null && !this.genomicRegion.endsWith("Intron")){
-					this.harrStopScores = new double[harrScorers.length];					
+				if(gene!=null && !this.genomicRegion.endsWith("Intron")){	
+					this.harrStopScores = new double[harrScorers.length];
 					for(int i=0;i<this.harrStopScores.length;i++){
 						this.harrStopScores[i] = harrScorers[i].getStopScore(this.contig, this.position, this.isPlusStrand, false, maxLengthUntilStopcodon);
 					
@@ -183,6 +192,7 @@ public class MergedFileParser {
 				}
 			}
 			//if(rpfScorers !=null){
+			//this.numSample = rpfScorers.length;
 			this.rpfStartScores = new double[rpfScorers.length];
 			this.predictedClasses = new String[rpfScorers.length];
 			this.predictedClassesScores = new double[rpfScorers.length];
@@ -198,6 +208,24 @@ public class MergedFileParser {
 			//}
 			
 			
+			String sequence = null;
+			if(!fastaFileParser.containsContig(contig)){
+				sequence = "N/A";
+			}else if(isPlusStrand){
+				sequence = fastaFileParser.getSequence(contig, position, position + 70*3);
+			}else{							
+				sequence = ZeroBasedFastaParser.getComplementarySequence(fastaFileParser.getSequence(contig, position - 70*3 + 1, position + 1), true);
+			}	
+			
+			sequence =  Codon.getAminoAcids(sequence);
+			int cpos = pd.predictEnhancedPosition(sequence);
+			//pd.isSignalPeptide();
+			signalPeptideScore = pd.getScore();			
+			//
+			if(this.isAnnotated){
+				//System.out.println(sequence + " " + signalPeptideScore + " " + pd.isSignalPeptide());
+			}			
+	        
 			if(rpfQuantifiers!=null){
 				if(gene != null){				
 					rpfCDSQuantities = new double[rpfQuantifiers.length];
@@ -208,6 +236,8 @@ public class MergedFileParser {
 				rpfPositionQuantities = new double[rpfQuantifiers.length];
 				rpfPositionQuantityChanges = new double[rpfQuantifiers.length];
 				if(gene!=null && !this.genomicRegion.endsWith("Intron")) releaseScore = new double[rpfQuantifiers.length];
+				if(gene!=null && this.genomicRegion.equals("NM_ORF") && !this.isAnnotated) rpfCDSRPKMchanges = new double[rpfQuantifiers.length];
+					
 				for(int i=0; i<rpfPositionQuantities.length;i++){
 					rpfPositionQuantities[i] = rpfQuantifiers[i].getPositionRPKM(contig, this.position, isPlusStrand, maxLengthUntilStopcodon, positionQuantityOffset);
 					rpfPositionQuantityChanges[i] = rpfQuantifiers[i].getPositionQuantityChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength, positionQuantityOffset);
@@ -220,21 +250,27 @@ public class MergedFileParser {
 							stopPosition = (int)((double)qs.get(1));
 						}
 					}//else rpfAroundStopCodonQuantityChanges = null;
+					if(rpfCDSRPKMchanges!=null){
+						rpfCDSRPKMchanges[i] = rpfQuantifiers[i].getCDSRPKMChangeRatio(gene, this.position, isPlusStrand, positionQuantityOffset);
+					}
+					
 				}
 				
 				if(mafParser!=null){ 
 					//this.dsdnRatioAfter = DsDnCalculator.calculate(mafParser.getSeqs(contig, position + (isPlusStrand? -30:30), isPlusStrand, Math.min(60, 30 + Math.abs(position - stopPosition))));
-					String[] after = mafParser.getSeqs(contig, position, isPlusStrand , positionQuantityChangeLength);
+					int offset = 0;//cpos*3;
+					String[] after = mafParser.getSeqs(contig, position + (isPlusStrand? offset : -offset), isPlusStrand , positionQuantityChangeLength);
 					String[] before = mafParser.getSeqs(contig, position + (isPlusStrand? -positionQuantityChangeLength:positionQuantityChangeLength), isPlusStrand , positionQuantityChangeLength);
-					this.dsdnRatioAfter = DsDnCalculator.calculate(after, positionQuantityChangeLength);
-					this.dsdnRatioBefore = DsDnCalculator.calculate(before, positionQuantityChangeLength);
+					this.dndsRatioAfter = DnDsCalculator.calculate(after); 
+					this.dndsRatioBefore = DnDsCalculator.calculate(before);
 					//this.dsdnRatio = Math.log(dsdnRatio + .0001)/Math.log(2);
 				}
 				//rpfAroundStopCodonQuantityChanges
 			}
 			
+			
 			if(rnaQuantifiers!=null){
-				if(gene != null){				
+				if(gene != null && !genomicRegion.startsWith("NR")){				
 					rnaCDSQuantities = new double[rnaQuantifiers.length];
 					for(int i=0; i<rnaQuantifiers.length;i++){
 						rnaCDSQuantities[i] = rnaQuantifiers[i].getCDSRPKM(gene);
@@ -249,7 +285,7 @@ public class MergedFileParser {
 				}
 			}
 			if(rpfQuantifiers!=null && rnaQuantifiers!=null){
-				if(gene != null && !this.genomicRegion.endsWith("Intron")){
+				if(gene != null && !genomicRegion.startsWith("NR") && !this.genomicRegion.endsWith("Intron")){
 					cdsTE = new double[rpfQuantifiers.length];
 					for(int i=0; i<cdsTE.length;i++){
 						cdsTE[i] = rnaCDSQuantities[i] == 0?  0 : rpfCDSQuantities[i] / rnaCDSQuantities[i];
@@ -333,72 +369,69 @@ public class MergedFileParser {
 		}
 		
 		public String getHeader(){
-			String header =  "Contig\tPosition\tStrand\tCodon\tGenomicRegion\tAnnotated\t";
-			header += subGetHeader("Predicted", predictedClasses) + "\t";
-			header += subGetHeader("PredictionScore", predictedClassesScores, false) + "\t";
+			String header =  "Contig\tPosition\tStrand\tCodon\t" + AnnotatedGene.getSimpleHeader() + "\tGenomicRegion\tAnnotated\t";
+			header += subGetHeader("Predicted", groups) + "\t";
+			header += subGetHeader("PredictionScore", groups, false) + "\t";
 					//"Predicted\tPredictionScore\t";
-			header += "Frame\tDnDsratio\tStopCodonPosition\tLength\t";
+			header += "Frame\tDnDsBefore\tDnDsAfter\tSignalPeptideScore\tStopCodonPosition\tLength\t";
 			//header += "";
-			header += subGetHeader("HarrMatchScore", harrStartScores) + "\t";
-			header += subGetHeader("HarrStopCodonMatchScore", harrStopScores) + "\t";
-			header += subGetHeader("RPFMatchScore", rpfStartScores) + "\t";
-			header += subGetHeader("RPFStopCodonMatchScore", rpfStopScores) + "\t";
+			header += subGetHeader("HarrMatchScore", harrStartScores == null? null : new int[harrStartScores.length][1]) + "\t";
+			header += subGetHeader("HarrStopCodonMatchScore", harrStartScores == null? null : new int[harrStartScores.length][1]) + "\t";
+			header += subGetHeader("RPFMatchScore", groups) + "\t";
+			header += subGetHeader("RPFStopCodonMatchScore", groups) + "\t";
 			
-			header += subGetHeader("RPFRPKM", rpfPositionQuantities) + "\t";
-			header += subGetHeader("RNARPKM", rnaPositionQuantities) + "\t";
-			header += subGetHeader("TE", positionTE) + "\t"; 
+			header += subGetHeader("RPFRPKM", groups) + "\t";
+			header += subGetHeader("RNARPKM", groups) + "\t";
+			header += subGetHeader("TE", groups) + "\t"; 
 			
-			header += subGetHeader("RPFFoldChange", rpfPositionQuantityChanges) + "\t";
-			header += subGetHeader("Release", releaseScore) + "\t";			
+			header += subGetHeader("RPFFoldChange", groups) + "\t";
+			header += subGetHeader("RPFFoldChange(a/b position)", groups) + "\t";
+			header += subGetHeader("Release", groups) + "\t";			
 		
-			header += subGetHeader("RNAFoldChange", rnaPositionQuantityChanges) + "\t";
+			header += subGetHeader("RNAFoldChange", groups) + "\t";
 			
-			header += subGetHeader("RPFCDSRPKMs", rpfCDSQuantities) + "\t";
-			header += subGetHeader("RNACDSRPKMs", rnaCDSQuantities) + "\t";
-			header += subGetHeader("CDSTE", cdsTE) + "\t";
+			header += subGetHeader("RPFCDSRPKMs", groups) + "\t";
+			header += subGetHeader("RNACDSRPKMs", groups) + "\t";
+			header += subGetHeader("CDSTE", groups) + "\t";
 			
 			header += "TEDiff(Pos vs. CDS)\t";
 			
-			header += AnnotatedGene.getHeader();
+			header += AnnotatedGene.getDetailedInfoHeader();
 			
 			return header;
 		}
 		
-		private String subGetHeader(String prefix, double[] quantities){
-			return subGetHeader(prefix, quantities, true);
+		private String subGetHeader(String prefix, int[][] groups){
+			return subGetHeader(prefix, groups, true);
 		}
 		
-		private String subGetHeader(String prefix, double[] quantities, boolean appendUnuniformity){
+		private String subGetHeader(String prefix, int[][] groups, boolean appendUnuniformity){
 			String header = "";
 			
-			if(quantities != null){
-				for(int i=0;i<quantities.length-1;i++){
-					header += prefix + (i+1) + ";";
-				}
-				header += prefix + quantities.length;
-			}else{
+			if(groups == null){
 				header += prefix;
+			}else{
+				HashMap<Integer, String> suffixMap = new HashMap<Integer, String>();
+				int sm = 0;
+				for(int i=0;i<groups.length;i++){
+					for(int j=0;j<groups[i].length;j++){
+						suffixMap.put(groups[i][j], (i+1) + "_" + (j+1));
+						sm ++;
+					}
+				}
+				
+				for(int i=0;i<sm;i++){
+					header += prefix + suffixMap.get(i);
+					if(i == sm - 1) break;
+					header += ";";
+				
+				}
 			}
-			if(appendUnuniformity) header += "\t" + prefix + "_Ununiformity";
+			if(appendUnuniformity) header += "\t" + prefix + "_Diversity";
 			
 			return header;
 		}
 		
-		private String subGetHeader(String prefix, String[] quantities){
-			String header = "";
-			
-			if(quantities != null){
-				for(int i=0;i<quantities.length-1;i++){
-					header += prefix + (i+1) + ";";
-				}
-				header += prefix + quantities.length;
-			}else{
-				header += prefix;
-			}
-		//	header += prefix + "Ununiformity";
-			
-			return header;
-		}
 		
 		@Override
 		public String toString(){			
@@ -408,27 +441,40 @@ public class MergedFileParser {
 			sb.append(isPlusStrand? '+' : '-');sb.append('\t');
 			sb.append(codon);sb.append('\t');
 			
+			sb.append(gene == null ? AnnotatedGene.getEmptySimpleString() : gene.toSimpleString());
+			sb.append('\t');
 			sb.append(genomicRegion);sb.append('\t');
 			//TODO predicted class make this as a function..
 			sb.append(annotatedClass);sb.append('\t');
 			
-			if(predictedClasses == null){
-				sb.append("_");
-			}else{
-				for(int i=0; i<predictedClasses.length-1;i++){
-					sb.append(predictedClasses[i]);
-					sb.append(";");
-				}
-				sb.append(predictedClasses[predictedClasses.length-1]);
+			/*boolean isConsistent = true;
+			for(int i=0; i<predictedClasses.length-1;i++){
+				sb.append(predictedClasses[i]);
+				sb.append(";");
+				if(!predictedClasses[i].toUpperCase().equals(predictedClasses[i+1].toUpperCase())) isConsistent = false;
 			}
+			sb.append(predictedClasses[predictedClasses.length-1] + "\t");
+			sb.append(isConsistent);
+			
+			sb.append('\t');
+			*/
+			
+			subToString(predictedClasses, sb, groups);
 			sb.append('\t');
 			
-			subToString(predictedClassesScores, sb, false);
+			
+			subToString(predictedClassesScores, sb, groups, false);
+			//subToString(, sb, false);
 			sb.append('\t');
 			
 			
 			sb.append(frameShift);sb.append('\t');
-			sb.append(dsdnRatioAfter>=0?dsdnRatioAfter : '_');sb.append('\t');
+			sb.append(dndsRatioBefore>=0?dndsRatioBefore : '_');sb.append('\t');
+			sb.append(dndsRatioAfter>=0?dndsRatioAfter : '_');sb.append('\t');
+			sb.append(signalPeptideScore>=0?signalPeptideScore : '_');sb.append('\t');
+			
+			
+			
 			//sb.append(gene == null ? '_' : (isAnnotated? 'T' : 'F'));sb.append('\t');
 			
 			sb.append(stopPosition>=0? stopPosition : "_");
@@ -438,58 +484,63 @@ public class MergedFileParser {
 			sb.append('\t');
 			
 			
-			subToString(harrStartScores, sb);
+			subToString(harrStartScores, sb, harrStartScores == null? 0 : harrStartScores.length);
 			sb.append('\t');
 			
 			subToString(harrStopScores, sb, harrStartScores == null? 0 : harrStartScores.length);
 			sb.append('\t');
 			
 			
-			subToString(rpfStartScores, sb);
+			subToString(rpfStartScores, sb, groups);
 			sb.append('\t');
 			
-			subToString(rpfStopScores, sb, rpfStartScores == null? 0 : rpfStartScores.length);
+			subToString(rpfStopScores, sb, groups);
 			sb.append('\t');
 			
-			subToString(rpfPositionQuantities, sb);
+			subToString(rpfPositionQuantities, sb, groups);
 			sb.append('\t');
 			
-			subToString(rnaPositionQuantities, sb);
+			subToString(rnaPositionQuantities, sb, groups);
 			sb.append('\t');
 			
-			subToString(positionTE, sb);
+			subToString(positionTE, sb, groups);
 			sb.append('\t');
 			
-			subToString(rpfPositionQuantityChanges, sb);
+			subToString(rpfPositionQuantityChanges, sb, groups);
 			sb.append('\t');
 			
-			subToString(releaseScore, sb, rpfPositionQuantities == null? 0 : rpfPositionQuantities.length);
+			subToString(rpfCDSRPKMchanges, sb, groups);
+			sb.append('\t');
+			
+			
+			
+			subToString(releaseScore, sb, groups);
 			sb.append('\t');	
 			
-			subToString(rnaPositionQuantityChanges, sb);
+			subToString(rnaPositionQuantityChanges, sb, groups);
 			sb.append('\t');
 			
-			subToString(rpfCDSQuantities, sb, rpfPositionQuantities == null? 0 : rpfPositionQuantities.length);
+			subToString(rpfCDSQuantities, sb, groups);
 			sb.append('\t');
 			
-			subToString(rnaCDSQuantities, sb, rnaPositionQuantities == null? 0 : rnaPositionQuantities.length);
+			subToString(rnaCDSQuantities, sb, groups);
 			sb.append('\t');
 			
-			subToString(cdsTE, sb, cdsTE == null? 0 : cdsTE.length);
+			subToString(cdsTE, sb, groups);
 			sb.append('\t');
 			
 			if(cdsTE != null && positionTE != null)
-				sb.append(String.format("%.3e", getKL(positionTE, cdsTE)));
+				sb.append(String.format("%.3e", getKL(positionTE, cdsTE, groups)));
 			else sb.append("_");
 			sb.append('\t');
 			
-			sb.append(gene == null ? AnnotatedGene.getEmptyGeneString() : gene.toString());
+			sb.append(gene == null ? AnnotatedGene.getEmptyInfoString() : gene.toDetailedInfoString());
 			return sb.toString();
 		}
 		
 		
 		public String GetArffSetHeader(){
-			return "@relation w\n\n@attribute DsDnAfter numeric\n@attribute DsDnBefore numeric\n@attribute DsDnDiff numeric\n@attribute HStart numeric\n@attribute HStop numeric\n@attribute RStart numeric"
+			return "@relation w\n\n@attribute DnDsA numeric\n@attribute DnDsB numeric\n@attribute DnDsD numeric\n@attribute SigPep numeric\n@attribute HStart numeric\n@attribute HStop numeric\n@attribute RStart numeric"
 			+ "\n@attribute RStop numeric\n@attribute RPFChange numeric\n@attribute RNAChange numeric"
 			+ "\n@attribute RPFRPKM numeric\n@attribute RNARPKM numeric\n@attribute TE numeric\n@attribute RELEASE numeric\n@attribute LEN numeric"
 			+ "\n@attribute Class {5U,T,TS,NC}\n\n@data";
@@ -498,18 +549,18 @@ public class MergedFileParser {
 		
 		
 		public String GetArffSetMfileHeader(){
-			return "att={'DnDs After';'DnDs Before';'DnDs Change'; 'Harr Match Score'; 'Harr Stop Codon Match Score'; 'RPF Match Score'; 'RPF Stop Codon Match Score'; 'RPF Fold Change'; 'RNA Fold Change'; 'RPF RPKM';"
-					+ "'RNA RPKM'; 'Tranlation Efficiency'; 'Release Score'; 'Length'; 'Class'};\n value=[";
+			return "att={'DnDs After';'DnDs Before';'DnDs Diff'; 'SigPep Score'; 'Harr Match Score'; 'Harr Stop Codon Match Score'; 'RPF Match Score'; 'RPF Stop Codon Match Score'; 'RPF Fold Change'; 'RNA Fold Change'; 'RPF RPKM';"
+					+ "'RNA RPKM'; 'Tranlation Efficiency'; 'Release'; 'Length'; 'Class'};\n value=[";
 			//return "DsDn,HStart,HStop,RStart, RStop, RPFChange,RNAChange,RPFRPKM,RNARPKM,TE,RELEASE,Class";
 		}
 		
 		public String ToTestSetString(int rpfrnaIndex, boolean harrRPFsynced){
 			StringBuffer sb = new StringBuffer();
 			
-			sb.append(Math.log(dsdnRatioAfter + .0001)/Math.log(2));sb.append(',');
-			sb.append(Math.log(dsdnRatioBefore + .0001)/Math.log(2));sb.append(',');
-			sb.append(Math.log((dsdnRatioBefore + .0001)/(dsdnRatioAfter+ .0001))/Math.log(2));sb.append(',');
-
+			sb.append(Math.log(dndsRatioAfter + .0001)/Math.log(2));sb.append(',');
+			sb.append(Math.log(dndsRatioBefore + .0001)/Math.log(2));sb.append(',');
+			sb.append(Math.log((dndsRatioBefore + .0001)/(dndsRatioAfter+ .0001))/Math.log(2));sb.append(',');
+			sb.append(signalPeptideScore<0? '?' :  signalPeptideScore);sb.append(',');
 			if(harrStartScores!=null){
 				if(harrRPFsynced){					
 					sb.append(harrStartScores[rpfrnaIndex] == 0.0? "?" : harrStartScores[rpfrnaIndex]);sb.append(',');			
@@ -586,8 +637,7 @@ public class MergedFileParser {
 			sb.append("?");
 			
 			return sb.toString();
-		}
-		
+		}		
 		
 		public String ToTrainingSetString(int rpfrnaIndex, boolean harrRPFsynced){
 			
@@ -612,10 +662,11 @@ public class MergedFileParser {
 			
 			if(c>0){
 				StringBuffer sb = new StringBuffer();
-				sb.append(Math.log(dsdnRatioAfter + .0001)/Math.log(2));sb.append(',');
-				sb.append(Math.log(dsdnRatioBefore + .0001)/Math.log(2));sb.append(',');
-				sb.append(Math.log((dsdnRatioBefore + .0001)/(dsdnRatioAfter+ .0001))/Math.log(2));sb.append(',');
-
+				sb.append(Math.log(dndsRatioAfter + .0001)/Math.log(2));sb.append(',');
+				sb.append(Math.log(dndsRatioBefore + .0001)/Math.log(2));sb.append(',');
+				sb.append(Math.log((dndsRatioBefore + .0001)/(dndsRatioAfter+ .0001))/Math.log(2));sb.append(',');
+				sb.append(signalPeptideScore<0? '?' :  signalPeptideScore);sb.append(',');
+				
 				if(harrStartScores!=null){
 					if(harrRPFsynced){
 						//if(harrStartScores.length > rpfrnaIndex){
@@ -711,20 +762,31 @@ public class MergedFileParser {
 			// non translating (N) : for sample, take intergenic region (ATG or CTG)
 			// inner translation start (I) : for sample 0, take unannotated but NM_ORF points (non ATG or CTG) 
 		}
-		
-		private void subToString(double[] quantities, StringBuffer sb){
-			subToString(quantities, sb, true);
+
+		private void subToString(double[] quantities, StringBuffer sb, int[][] groups){
+			subToString(quantities, sb, groups, true);
 		}
-		
-		private void subToString(double[] quantities, StringBuffer sb, boolean appendUnuniformity){
-			subToString(quantities, sb, quantities == null? 0 : quantities.length, appendUnuniformity);
+
+		private void subToString(String[] predictions, StringBuffer sb, int[][] groups){
+			double[] quantities = new double[predictions.length];
+			for(int i=0;i<quantities.length;i++){
+				if(predictions[i].equals("TS")){
+					quantities[i] = 3;
+				}else if(predictions[i].equals("T")){
+					quantities[i] = 2;
+				}else if(predictions[i].equals("5U")){
+					quantities[i] = 1;
+				}				
+			}
+			
+			subToString(quantities, sb, groups, true);
 		}
 		
 		private void subToString(double[] quantities, StringBuffer sb, int numSample){
-			subToString(quantities, sb, numSample, true);
+			subToString(quantities, sb, new int[numSample][1], true);
 		}
 		
-		private void subToString(double[] quantities, StringBuffer sb, int numSample, boolean appendUnuniformity){ 
+		private void subToString(double[] quantities, StringBuffer sb, int[][] groups, boolean appendUnuniformity){ 
 			if(quantities!=null && quantities.length>0){
 				for(int i=0; i<quantities.length-1; i++){
 					sb.append(String.format("%.3e", quantities[i])); sb.append(';');
@@ -733,34 +795,60 @@ public class MergedFileParser {
 				if(appendUnuniformity){
 				sb.append('\t');
 					if(quantities.length > 1){
-						sb.append(String.format("%.3e", getNonuniformity(quantities)));
+						sb.append(String.format("%.3e", getNonuniformity(quantities, groups)));
 					}else sb.append("_");
 				}
 			}else{
 				//sb.append("_");
-				for(int i=0; i<numSample-1; i++){
-					sb.append("_;");
+				
+				for(int i=0; i<groups.length; i++){
+					for(int j=0;j<groups[i].length;j++){
+						if(i == groups.length-1 && j == groups[i].length-1) break;
+						sb.append("_;");
+					}
 				}
 				sb.append("_");
 				if(appendUnuniformity) sb.append("\t_");
 			}
 		}
 		
-		private double getNonuniformity(double[] dist){
-			double sum = 0;
-			for(double v : dist){
-				sum += v + 1;
-			}
-			if(sum == 0) return 0;
+		
+		// check if non negative!!
+		private double getNonuniformity(double[] dist, int[][] groups){
+			
+			double[] gdist = getGroupDistribution(dist, groups, 1.0);
+			
 			double kl = 0;
-			for(double v : dist){
-				double vn = (v + 1)/sum;
-				if(vn > 0) kl += vn * Math.log(vn*dist.length);
+			for(double v : gdist){
+				if(v > 0) kl += v * Math.log(v*gdist.length);
 			}
 			return kl;		
 		}
 		
-		private double getKL(double[] dist1, double[] dist2){// s
+		private double[] getGroupDistribution(double[] dist, int[][] groups, double offset){
+			double[] gdist = new double[groups.length];
+			for(int i=0; i<gdist.length;i++){
+				for(int j : groups[i]){
+					gdist[i] += dist[j];
+				}
+				gdist[i] += offset;
+			}
+			
+			double sum = 0;
+			
+			for(double v : gdist){
+				sum += v;
+			}
+			
+			if(sum != 0){
+				for(int i=0;i<gdist.length;i++){
+					gdist[i] /= sum;
+				}
+			}
+			return gdist;
+		}
+		
+		private double getKL(double[] dist1, double[] dist2, int[][] groups){// s
 			double sum = 0;
 			
 			double[] dist1cp = new double[dist1.length];

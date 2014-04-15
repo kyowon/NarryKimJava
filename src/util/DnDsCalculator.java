@@ -5,11 +5,11 @@ import java.util.HashMap;
 
 
 
-public class DsDnCalculator {
+public class DnDsCalculator {
 	
 	static private HashMap<String, ArrayList<Double>> nonSynSiteMap = null;
 	static private HashMap<ArrayList<String>, Double> nonSynSubMap = null;
-	
+	static public int numSpecies = 45;
 	static{
 		nonSynSiteMap = new HashMap<String, ArrayList<Double>>();
 		nonSynSubMap = new HashMap<ArrayList<String>, Double>();
@@ -181,24 +181,33 @@ public class DsDnCalculator {
 		//return (nNSSubs * nSSites) / (nNSSites * nSSubs);
 	}
 	
-	static public float calculate(String[] sequences, int minSeqNum){
+	static public float calculate(String[] sequences){
 		//if(sequences.length < 2) return 1;
 		
 		String[] seq;
 			
-		if(sequences.length < minSeqNum){
+		if(sequences.length < numSpecies){
 			StringBuffer emptyString = new StringBuffer();
 			for(int i=0;i<sequences[0].length();i++) emptyString.append("-");
 		
-			seq = new String[minSeqNum];
+			seq = new String[numSpecies];
 			for(int i=0;i<seq.length;i++){
 				if(sequences.length > i) seq[i] = sequences[i];
 				else{
 					seq[i] = emptyString.toString();
 				}
 			}
-		}else seq = sequences;
-		
+		}else{
+			seq = new String[numSpecies];
+			for(int i=0;i<seq.length;i++){
+				//if(sequences.length > i) 
+				seq[i] = sequences[i];
+				//else{
+				//	seq[i] = emptyString.toString();
+			//	}
+			}
+		}
+			
 		float[] n = getNonSynSubNSites(seq);
 		float nSSites = seq[0].length() - n[1];
 		float nSSubs = seq[0].length()/3 - n[0];	
