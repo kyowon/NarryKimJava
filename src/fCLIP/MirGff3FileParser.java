@@ -1,40 +1,38 @@
 package fCLIP;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 
+import net.sf.picard.util.IntervalTree;
+import net.sf.picard.util.IntervalTree.Node;
+import parser.Bed12Parser;
 import parser.BufferedLineReader;
-import parser.AnnotationFileParser.AnnotatedGene;
-import parser.AnnotationFileParser.txEndComparator;
-import parser.AnnotationFileParser.txStartComparator;
 
 public class MirGff3FileParser {
 	
-	public class startComparator implements Comparator<MiRNA>{
+	public class fivePComparator implements Comparator<MiRNA>{
 		public int compare(MiRNA o1, MiRNA o2) {
-			int i= new Integer(o1.start).compareTo(new Integer(o2.start));
+			int i= new Integer(o1.fivepPosition).compareTo(new Integer(o2.fivepPosition));
 			if(i!=0) return i;
-			return new Integer(o1.end).compareTo(new Integer(o2.end));
+			return new Integer(o1.threepPosition).compareTo(new Integer(o2.threepPosition));
 		}
 	}
-	public class endComparator implements Comparator<MiRNA>{
+	public class threePComparator implements Comparator<MiRNA>{
 		public int compare(MiRNA o1, MiRNA o2) {
-			int i= new Integer(o1.end).compareTo(new Integer(o2.end));
+			int i= new Integer(o1.threepPosition).compareTo(new Integer(o2.threepPosition));
 			if(i!=0) return i;
-			return new Integer(o1.start).compareTo(new Integer(o2.start));
+			return new Integer(o1.fivepPosition).compareTo(new Integer(o2.fivepPosition));
 		}
 	}
 	
 	public static class MiRNA{
 		private String contig;
 		private String name;
-		private int start;
-		private int end;
+		private int fivepPosition; // inclusive
+		private int threepPosition;
 		private boolean isPlusStrand;
 		//private int[][] pres;
 		public String getContig() {
@@ -45,12 +43,99 @@ public class MirGff3FileParser {
 			return name;
 		}
 
-		public int getStart() {
-			return start;
+		public int get5p() {
+			return fivepPosition;
 		}
 
-		public int getEnd() {
-			return end;
+		public int get3p() {
+			return threepPosition;
+		}
+		
+		
+		
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result
+					+ ((contig == null) ? 0 : contig.hashCode());
+			result = prime * result + fivepPosition;
+			result = prime * result + (isPlusStrand ? 1231 : 1237);
+			result = prime * result + ((name == null) ? 0 : name.hashCode());
+			result = prime * result + threepPosition;
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (!(obj instanceof MiRNA))
+				return false;
+			MiRNA other = (MiRNA) obj;
+			if (contig == null) {
+				if (other.contig != null)
+					return false;
+			} else if (!contig.equals(other.contig))
+				return false;
+			if (fivepPosition != other.fivepPosition)
+				return false;
+			if (isPlusStrand != other.isPlusStrand)
+				return false;
+			if (name == null) {
+				if (other.name != null)
+					return false;
+			} else if (!name.equals(other.name))
+				return false;
+			if (threepPosition != other.threepPosition)
+				return false;
+			return true;
+		}
+
+		public ArrayList<Integer> get5pCoordinate(int leftWindowSize, int rightWindowSize){
+			return get5pCoordinate(leftWindowSize, rightWindowSize, 0);
+		}
+		
+		public ArrayList<Integer> get5pCoordinate(int leftWindowSize, int rightWindowSize, int offset){
+			ArrayList<Integer> coordinate = new ArrayList<Integer>();
+			if(isPlusStrand){
+				int start = fivepPosition - leftWindowSize;
+				int end = fivepPosition + rightWindowSize;
+				for(int i=start;i<end;i++){
+					coordinate.add(i + offset);
+				}
+			}else{
+				int start = fivepPosition + leftWindowSize;
+				int end = fivepPosition - rightWindowSize;
+				for(int i=start;i>end;i--){
+					coordinate.add(i + offset);
+				}
+			}
+			return coordinate;
+		}
+		
+		public ArrayList<Integer> get3pCoordinate(int leftWindowSize, int rightWindowSize){
+			return get3pCoordinate(leftWindowSize, rightWindowSize, 0);
+		}
+
+		public ArrayList<Integer> get3pCoordinate(int leftWindowSize, int rightWindowSize, int offset){
+			ArrayList<Integer> coordinate = new ArrayList<Integer>();
+			if(isPlusStrand){
+				int start = threepPosition - leftWindowSize;
+				int end = threepPosition + rightWindowSize;
+				for(int i=start;i<end;i++){
+					coordinate.add(i + offset);
+				}
+			}else{
+				int start = threepPosition + leftWindowSize;
+				int end = threepPosition - rightWindowSize;
+				for(int i=start;i>end;i--){
+					coordinate.add(i + offset);
+				}
+			}
+			return coordinate;
 		}
 
 		public boolean isPlusStrand() {
@@ -62,25 +147,49 @@ public class MirGff3FileParser {
 			String[] token = lines[0].split("\t");
 			this.contig = token[0];
 			this.name = token[token.length-1].substring(token[token.length-1].lastIndexOf("Name=")+5);
-			this.start = Integer.parseInt(token[3]);
-			this.end = Integer.parseInt(token[4]);
 			this.isPlusStrand = token[6].equals("+");
+			if(this.isPlusStrand){
+				this.fivepPosition = Integer.parseInt(token[3]);
+				this.threepPosition = Integer.parseInt(token[4]);
+			}else{
+				this.fivepPosition = Integer.parseInt(token[4]);
+				this.threepPosition = Integer.parseInt(token[3]);
+			}
 			//if(lines.length > 1){
 				//TODO if necessary..
 			//}
 		}
 		
-		private MiRNA(int start, int end){ // constructor for comparison
-			this.start = start;
-			this.end = end;
+		private MiRNA(int fivepPosition, int threepPosition){ // constructor for comparison
+			this.fivepPosition = fivepPosition;
+			this.threepPosition = threepPosition;
 		}
 		
+		@Override
 		public String toString(){
-			return contig + ";" + name + ";" + start + ";" + end + ";" + (isPlusStrand? '+' : '-'); 
+			return contig + ";" + name + ";" + fivepPosition + ";" + threepPosition + ";" + (isPlusStrand? '+' : '-'); 
+		}
+			
+		
+		private boolean matching(boolean isPlusStrand, ArrayList<Integer> coordinates, ArrayList<ArrayList<Integer>> splices){ 
+			if(isPlusStrand != this.isPlusStrand) return false;
+			if(splices == null || splices.isEmpty()) return true;
+			
+			for(ArrayList<Integer> splice : splices){
+				if(isPlusStrand){
+					if(splice.get(0) > this.threepPosition || splice.get(1)<this.fivepPosition) continue;
+				}else{
+					if(splice.get(0) > this.fivepPosition || splice.get(1)<this.threepPosition) continue;
+				}
+				return false;	
+			}
+			
+			return true;
 		}
 	}
 	
 	private HashMap<String, ArrayList<MiRNA>> miRNAMap;
+	private HashMap<String, IntervalTree<ArrayList<Integer>>> miRNAIntervalMap;
 	
 	private void read(String filename){
 		miRNAMap = new HashMap<String, ArrayList<MiRNA>>();
@@ -111,6 +220,34 @@ public class MirGff3FileParser {
 				//System.out.println(mi);
 				if(mi !=null) miRNAMap.get(contig).add(mi);
 			}
+			
+			miRNAIntervalMap = new HashMap<String, IntervalTree<ArrayList<Integer>>>();
+			for(String con : miRNAMap.keySet()){
+				miRNAIntervalMap.put(con, new IntervalTree<ArrayList<Integer>>());
+				IntervalTree<ArrayList<Integer>> tree = miRNAIntervalMap.get(con);
+				
+				for(int i=0;i<miRNAMap.get(con).size();i++){
+					MiRNA miRNA = miRNAMap.get(con).get(i);
+					int start = miRNA.get5p();
+					int end = miRNA.get3p();
+					if(!miRNA.isPlusStrand){
+						int tmp = start;
+						start = end;
+						end = tmp;
+					}
+					Node<ArrayList<Integer>> node = tree.find(start, end);
+					ArrayList<Integer> v;
+					
+					if(node == null)	
+						v = new ArrayList<Integer>();
+					else 
+						v = node.getValue();
+					
+					v.add(i);
+					tree.put(start, end, v);
+				}
+			}
+			
 			in.close();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -129,6 +266,13 @@ public class MirGff3FileParser {
 		return allmiRNAs.iterator();
 	}
 	
+	public Iterator<MiRNA> getMiRNAIterator(String contig){
+		ArrayList<MiRNA> allmiRNAs = miRNAMap.get(contig);
+		if(allmiRNAs != null)
+			return allmiRNAs.iterator();
+		return null;
+	}
+	
 	public static void main(String[] args){
 		new MirGff3FileParser("/media/kyowon/Data1/fCLIP/Genome/hsa.gff3");
 	}
@@ -140,29 +284,40 @@ public class MirGff3FileParser {
 	    * @param position the tx start position
 	    * @return the containing miRNA
 	    */
-	public MiRNA getContainingMiRNA(String contig, boolean isPlusStrand, int position){
-		MiRNA ret = null;
+	public ArrayList<MiRNA> getContainingMiRNAs(String contig, boolean isPlusStrand, int position){
+		ArrayList<MiRNA> ret = new ArrayList<MiRNA>();
 		ArrayList<MiRNA> miRNAs = miRNAMap.get(contig);
-		if(miRNAs == null) ret = null;
-		else{
-			int index = Collections.binarySearch(miRNAs, new MiRNA(position, Integer.MAX_VALUE), new startComparator());
-			if(index < 0) index = -index - 1;
-			if(index - 1 >= miRNAs.size() || index - 1 < 0) ret = null;
-			else{
-				MiRNA miRNA = miRNAs.get(index - 1);
-				if(miRNA.getEnd() > position && miRNA.isPlusStrand() == isPlusStrand) ret = miRNA;
-			}
-			if(ret == null){
-				index = Collections.binarySearch(miRNAs, new MiRNA(0, position + 1), new endComparator());
-				if(index < 0) index = -index - 1;
-				if(index >= miRNAs.size() || index < 0) ret = null;
-				else{
-					MiRNA miRNA = miRNAs.get(index);
-					if(miRNA.getStart() <= position && miRNA.isPlusStrand() == isPlusStrand) ret = miRNA;
+		if(miRNAs != null)// ret = null;
+		{
+			Iterator<Node<ArrayList<Integer>>> it = miRNAIntervalMap.get(contig).overlappers(position, position);
+			while(it.hasNext()){
+				Node<ArrayList<Integer>> is = it.next();
+				for(int i : is.getValue()){
+					MiRNA miRNA = miRNAs.get(i);
+					ret.add(miRNA);
 				}
 			}
 		}
-		return ret;
+		return ret.isEmpty()? null : ret;
 	}
+	
+	public ArrayList<MiRNA> getMatchingMiRNAs(String contig, boolean isPlusStrand, int position, ArrayList<Integer> coordinate){
+		ArrayList<MiRNA> miRNAs = getContainingMiRNAs(contig, isPlusStrand, position);
+		return getMatchingMiRNAs(miRNAs, isPlusStrand, coordinate);
+	}
+	
+	public ArrayList<MiRNA> getMatchingMiRNAs(ArrayList<MiRNA> containingMiRNAs, boolean isPlusStrand, ArrayList<Integer> coordinate){
+		if(containingMiRNAs == null) return null;
+		ArrayList<MiRNA> ret = new ArrayList<MiRNA>();
+		ArrayList<ArrayList<Integer>> splices = Bed12Parser.getSplices(coordinate);
+		
+		for(MiRNA miRNA: containingMiRNAs){
+			if(miRNA.matching(isPlusStrand, coordinate, splices))
+				ret.add(miRNA);
+		}
+		
+		return ret.isEmpty()? null : ret;
+	}
+	
 	
 }

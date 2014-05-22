@@ -125,7 +125,9 @@ public class Codon extends ArrayList<Nucleotide>{
 		StringBuffer aas = new StringBuffer();
 		for(int i=0;i<seq.length()/3;i++){
 			String codon = seq.substring(i*3, i*3+3);
-			String aa = getStandardCodon(codon).getCodingAA();
+			Codon scodon = getStandardCodon(codon);
+			if(scodon == null) break;
+			String aa = scodon.getCodingAA();
 			if(aa.equals("X")) break;
 			aas.append(aa);
 		}

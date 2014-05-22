@@ -27,19 +27,29 @@ public class RunRNAfold {
 			}
 			String result = builder.toString();
 			
-			String st = result.substring(result.indexOf('('), result.lastIndexOf('('));
+			int si = result.indexOf('(');
+			int ei = result.lastIndexOf('(');
 			double max = 0;
-			int d = 0;
-			for(int i=0;i<st.length();i++){
-				char c = st.charAt(i);
-				if(c == '(') d ++;
-				else if(c == ')') d --;
-				max = max > d ? max : d;
+			
+			if(si <0 || ei < 0){
+				
+			}else{
+				String st = result.substring(si, ei);
+				int d = 0;
+				for(int i=0;i<st.length();i++){
+					char c = st.charAt(i);
+					if(c == '(') d ++;
+					else if(c == ')') d --;
+					max = max > d ? max : d;
+				}
 			}
 			
 			ArrayList<Double> ret = new ArrayList<Double>();
 			//System.out.println(result + " " + max);
-			ret.add(Double.parseDouble(result.substring(result.lastIndexOf('(') + 1 , result.lastIndexOf(')'))));
+			int i = result.lastIndexOf(')');
+			if(ei >= 0 && i >= 0)
+				ret.add(Double.parseDouble(result.substring(ei + 1 , i)));
+			else ret.add(0.0);
 			ret.add(max);
 			return ret;
 			//

@@ -3,7 +3,7 @@ package rpf;
 import java.util.ArrayList;
 import java.util.Random;
 
-import parser.MergedFileParser.MergedResult;
+import rpf.parser.MergedFileParser.MergedResult;
 import weka.classifiers.Evaluation;
 import weka.classifiers.trees.RandomForest;
 import weka.core.Instances;
@@ -78,7 +78,8 @@ public class Classifier {
 			if(removeLengthAttribute){
 				String[] options = new String[2];
 				options[0] = "-R";
-				options[1] = "15";
+				options[1] = "5-8,15";
+				//options[1] = "9-10,14-15";
 				Remove rm = new Remove();
 				rm.setOptions(options);
 				rm.setInputFormat(testData);
@@ -188,8 +189,8 @@ public class Classifier {
 	}
 	
 	static public void main(String[] args){
-		String train1 = "/media/kyowon/Data1/RPF_Project/samples/sample3/results/out1_0.3.csv_classification/train_0.arff";
-		String train2 = "/media/kyowon/Data1/RPF_Project/samples/sample3/results/out2_0.3.csv_classification/train_0.arff";
+		String train1 = "/media/kyowon/Data1/RPF_Project/samples/sample3/results/out_0.3.csv_classification/train_0.arff";
+		String train2 = "/media/kyowon/Data1/RPF_Project/samples/sample3/results/out_0.3.csv_classification/train_2.arff";
 		//String test = "/media/kyowon/Data1/RPF_Project/samples/sample3/results/out_0.3.csv_test/test_0.arff";
 		//String output = "/media/kyowon/Data1/RPF_Project/samples/sample3/results/out_0.3.csv_test/test_0_classified.arff";
 		boolean removeLengthAttribute = true;

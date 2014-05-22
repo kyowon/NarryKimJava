@@ -11,7 +11,6 @@ import suffixarray.SuffixArraySequence;
 import msutil.AminoAcidSet;
 import msutil.Composition;
 import msutil.Enzyme;
-import msutil.Peak;
 import msutil.Peptide;
 import net.sf.samtools.util.BufferedLineReader;
 

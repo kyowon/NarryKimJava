@@ -4,125 +4,101 @@ import java.util.ArrayList;
 
 import parser.AnnotationFileParser;
 import parser.AnnotationFileParser.AnnotatedGene;
-import parser.BedCovFileParser;
-import parser.ScoringOutputParser.ScoredPosition;
+import parser.Bed12Parser;
 import parser.ZeroBasedFastaParser;
+import rpf.parser.ScoringOutputParser.ScoredPosition;
 
 public class Quantifier {
 
-	private BedCovFileParser bedCovPlusFileParser;
-	private BedCovFileParser bedCovMinusFileParser;
+	//private BedCovFileParser bedCovPlusFileParser;
+	//private BedCovFileParser bedCovMinusFileParser;
 	//private AnnotationFileParser annotationFileParser = null;
+	private Bed12Parser bedParser;
 	private ZeroBasedFastaParser fastaFileParser;
 	//private double orfQuantity;
 	//private double uorfQuantity;
 	
 	
-	public Quantifier(String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFileParser, ZeroBasedFastaParser fastaFileParser){
-		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFileParser);
-		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFileParser);	
+	public Quantifier(Bed12Parser bedParser, AnnotationFileParser annotationFileParser, ZeroBasedFastaParser fastaFileParser){
+		this.bedParser = bedParser; 
 		this.fastaFileParser = fastaFileParser;
 	}
 	
-	public boolean isAbundant(ScoredPosition position, double RPKM, int maxLength, int offset){
-		return RPKM < getPositionRPKM(position.getContig(), position.getPosition(), position.isPlusStrand(), maxLength, offset);
+	public boolean isAbundant(ScoredPosition position, double RPKM){
+		if(!position.getContig().equals(bedParser.getContig())) return false;
+		return RPKM < getPositionRPKM(position.isPlusStrand(), position.getCoordinate());
 	}
 	
 	
 	public double getCDSRPKM(AnnotatedGene gene){
-		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
-		return (bedCovFileParser.getTotalCDSCoverage(gene, true) * 1e9) / (bedCovFileParser.getTotalReadCount()+1);
+		double sum = 0;
+		for(double c : bedParser.getCDSCoverages(gene)) sum += c;
+		return (sum * 1e9) / (bedParser.getTotalReadCount()+1);
 	}
 	//10^9*C/NL
-	public double getPositionRPKM(String contig, int position, boolean isPlusStrand, int maxLength, int offset){
-		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		return (bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position + (isPlusStrand? -offset : offset), offset, maxLength+offset, fastaFileParser, true) * 1e9) / (bedCovFileParser.getTotalReadCount()+1);
+	public double getPositionRPKM(boolean isPlusStrand, ArrayList<Integer> coordinate){ // coordinate should take care of offset ..
+		double sum = 0;
+		for(double c : bedParser.get5pCoverages(isPlusStrand, coordinate)) sum += c;
+		return (sum * 1e9) / (bedParser.getTotalReadCount()+1);
 	}
 	
-	public double getPositionCount(String contig, int position, boolean isPlusStrand, int maxLength, int offset){
+	/*public double getPositionCount(String contig, int position, boolean isPlusStrand, int maxLength, int offset){
 		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
 		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position + (isPlusStrand? -offset : offset), offset, maxLength+offset, fastaFileParser, false);
+	}*/
+	
+	public double getReleaseScore(AnnotatedGene gene, int stopPosition, int length){
+		ArrayList<Integer> coordinate = gene.getLiftOverPositions(stopPosition, length, length, false);
+		double[] cov = bedParser.get5pCoverages(gene.isPlusStrand(), coordinate);
+		double l = 0;
+		double r = 0;
+		for(int i=0;i<cov.length;i++){
+			if(i < length) l+=cov[i];
+			else r+=cov[i];
+		}
+		
+		return (l+1)/(r+1);
 	}
 	
-	public ArrayList<Double> getNextStopCodonQuantityChangeRatioNStopPosition(String contig, int position, boolean isPlusStrand, int length, int maxLength){
-		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-	//	position = isPlusStrand? position - offset : position + offset;
-		ArrayList<Double>covs = bedCovFileParser.getCoverageBeforeNAfternextStopCodonNStopCodonPosition(contig, isPlusStrand, position, length, 0, maxLength, fastaFileParser, false);
-		ArrayList<Double> ret = null;
-		
-		if(covs != null){
-			ret = new ArrayList<Double>();
-			//if(covs.get(0)+covs.get(1)<2) ret.add(-1.0);
-			//else 
-				ret.add((covs.get(0)+2)/(covs.get(1)+2));
-			ret.add(covs.get(2));
-		}			
-		return ret;
-	}
 	
-	//  /([length of transcript]/1000)/([total reads]/10^6)
-	public double getPositionQuantityChangeRatio(String contig, int position, boolean isPlusStrand, int length, int offset){
-		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		//int position = isPlusStrand? position - offset : position + offset;
-		int prevPosition = isPlusStrand? position - offset - length : position + offset + length;
-		int afterPosition = isPlusStrand? position - offset : position + offset;
-		double qb = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, prevPosition, length, false);
-		double qa = bedCovFileParser.getTotalCoverage(contig, isPlusStrand, afterPosition, length, false); 
+	public double getPositionQuantityChangeRatio(ScoredPosition position, int length, int offset){
 		
+		ArrayList<Integer> coordinate = position.getCoordinate();
+		double[] cov = bedParser.get5pCoverages(position.isPlusStrand(), coordinate);
+		double qa =0, qb = 0;
+		int si = coordinate.indexOf(position.getPosition());
+		for(int i = si - offset - length; i<si - offset; i++){
+			if(i>=0 && i<cov.length)
+				qb += cov[i];
+		}
+		
+		for(int i = si + offset; i<si + offset + length; i++){
+			if(i>=0 && i<cov.length)
+				qa += cov[i];
+		}
 		//if(qa + qb < 10) return -1;
 		
 		return (qa+2)/(qb+2);
 	}
 	
 	// only for NM_ORF T.. 
-	public double getCDSRPKMChangeRatio(AnnotatedGene gene, int position, boolean isPlusStrand, int offset){
+	public double getCDSRPKMChangeRatio(AnnotatedGene gene, int position){
 		if(gene == null) return -1;
-		//BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
+			
+		ArrayList<Integer> coordinatea= gene.getLiftOverPositions(position, 0, Integer.MAX_VALUE, true);
+		double qa = 0;
+		for(double c : bedParser.get5pCoverages(gene.isPlusStrand(), coordinatea)) qa += c;
 		
-		int start1 = isPlusStrand? gene.getCdsStart() : gene.getCdsEnd() - 1;
-		int end1 = position + (isPlusStrand? - offset : offset);
-		
-		int start2 = position + (isPlusStrand? offset : - offset);
-		int end2 = isPlusStrand? gene.getCdsEnd() - 1 : gene.getCdsStart();
-		
-		//int position = isPlusStrand? position - offset : position + offset;
-		double qb = getPositionRPKM(gene.getContig(), start1, isPlusStrand, Math.abs(end1 - start1), 0);
-		double qa = getPositionRPKM(gene.getContig(), start2, isPlusStrand, Math.abs(end2 - start2), 0);
-		//if(qa + qb < 10) return -1;
+		int start = gene.isPlusStrand() ? gene.getCdsStart() : gene.getCdsEnd()-1;
+		int rw = Math.abs(position - start);
+		ArrayList<Integer> coordinateb= gene.getLiftOverPositions(start, 0, rw , false);
+		double qb = 0;
+		for(double c : bedParser.get5pCoverages(gene.isPlusStrand(), coordinateb)) qb += c;
 		
 		return qa/qb;
 	}
 	
-	public double getCDSQuantity(AnnotatedGene gene){
-		BedCovFileParser bedCovFileParser = gene.isPlusStrand()? bedCovPlusFileParser : bedCovMinusFileParser;
-		return bedCovFileParser.getTotalCDSCoverage(gene, false);
-	}
-	
-	/*public double getPositionQuantity(String contig, int position, boolean isPlusStrand, int maxLength){
-		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		return bedCovFileParser.getTotalCoverageTillnextStopCodon(contig, isPlusStrand, position, maxLength, fastaFileParser, false);
-	}*/
-	
-	public BedCovFileParser getBedCovPlusFileParser() {
-		return bedCovPlusFileParser;
-	}
 
-	public BedCovFileParser getBedCovMinusFileParser() {
-		return bedCovMinusFileParser;
-	}
-	
-	public static void main(String[] args) {
-		Quantifier test = new Quantifier("/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/Harr_C-uncollapsed.plus.cov"
-				,"/media/kyowon/Data1/RPF_Project/samples/sample3/coverages/Harr_C-uncollapsed.minus.cov"
-				, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"),
-				new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.fa"));
-		
-		System.out.println(test.getPositionCount("chr7", 6324070, true, 50, 13));
-		System.out.println(test.getPositionRPKM("chr7", 6324070, true, 50, 13));
-		
-		//AnnotatedGene gene = new AnnotatedGene("SRXN1	NM_080725	chr20	-	627267	634014	629357	633829	2	627267,633619,	629561,634014,");
-		
-		
-	}
+
 
 }

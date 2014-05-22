@@ -1,19 +1,7 @@
 package rpf.analysis;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-
-import parser.AnnotationFileParser;
-import parser.AnnotationFileParser.AnnotatedGene;
-import parser.BedCovFileParser;
-import parser.ScoringOutputParser;
-import parser.ScoringOutputParser.ScoredPosition;
-import rpf.Scorer;
-
 public class PrecisionRecall {
-	private static int getTrueSetNumber(AnnotationFileParser annotationParser, BedCovFileParser covPlusParser, BedCovFileParser covMinusParser, int leftWindowSize, int rightWindowSize, int numberOfNonZeroElements){
+	/*private static int getTrueSetNumber(AnnotationFileParser annotationParser, BedCovFileParser covPlusParser, BedCovFileParser covMinusParser, int leftWindowSize, int rightWindowSize, int numberOfNonZeroElements){
 		HashMap<String, HashMap<Boolean, HashSet<Integer>>> map = new HashMap<String, HashMap<Boolean, HashSet<Integer>>>();
 		Iterator<AnnotatedGene> iterator = annotationParser.getAnnotatedGeneIterator();
 		while(iterator.hasNext()){

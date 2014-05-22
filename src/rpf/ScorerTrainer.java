@@ -9,8 +9,8 @@ import java.util.Random;
 
 import parser.AnnotationFileParser;
 import parser.AnnotationFileParser.AnnotatedGene;
-import parser.BedCovFileParser;
-import util.MC;
+import parser.Bed12Parser;
+import util.MatchedFilter;
 
 public class ScorerTrainer {
 
@@ -25,9 +25,10 @@ public class ScorerTrainer {
 	private ArrayList<double[]> startNoise = null;
 	private ArrayList<double[]> stopNoise = null;
 	
-	private BedCovFileParser bedCovPlusFileParser;
-	private BedCovFileParser bedCovMinusFileParser;
-	private AnnotationFileParser annotationFileParser;
+	private AnnotationFileParser annotationFileParser = null;
+	//private BedCovFileParser bedCovPlusFileParser;
+	//private BedCovFileParser bedCovMinusFileParser;
+	private String bedFileName;
 	private double[][] avgedStartSignal;
 	private double[][] avgedStopSignal;
 	
@@ -36,9 +37,8 @@ public class ScorerTrainer {
 	//private double[] likelihoodFunctionCoefficients;
 	private String outParamFile;
 	
-	public ScorerTrainer(String bedCovPlusFile, String bedCovMinusFile, AnnotationFileParser annotationFileParser, String outParamFile){
-		bedCovPlusFileParser = new BedCovFileParser(bedCovPlusFile, annotationFileParser);
-		bedCovMinusFileParser = new BedCovFileParser(bedCovMinusFile, annotationFileParser);
+	public ScorerTrainer(String bedFileName, AnnotationFileParser annotationFileParser, String outParamFile){
+		this.bedFileName = bedFileName;
 		this.annotationFileParser = annotationFileParser;	
 		this.outParamFile = outParamFile;
 	}
@@ -53,62 +53,70 @@ public class ScorerTrainer {
 		startNoise = new ArrayList<double[]>();
 		stopNoise = new ArrayList<double[]>();
 		
-		getSignalNNoise(true);
-		//System.out.println(signal.size());
-		getSignalNNoise(false);
-		avgedStartSignal = getAvg(startSignal);
-		startFilter = getFilter(avgedStartSignal, startNoise);
+		for(String contig : annotationFileParser.getContigs()){
+			getSignalNNoise(true, contig);
+			getSignalNNoise(false, contig);
+		}
+		avgedStartSignal = MatchedFilter.getAvg(startSignal);
+		startFilter = MatchedFilter.getFilter(avgedStartSignal, startNoise);
 		
-		avgedStopSignal = getAvg(stopSignal);
-		stopFilter = getFilter(avgedStopSignal, stopNoise);
+		avgedStopSignal = MatchedFilter.getAvg(stopSignal);
+		stopFilter = MatchedFilter.getFilter(avgedStopSignal, stopNoise);
 		//likelihoodFunctionCoefficients = calculateLikelihoodFunctionCoefficients(filter, signal, noise, numberOfNonZeroElements);
 		write(outParamFile);
 	}
 	
-	private void getSignalNNoise(boolean isPlusStrand){
-		BedCovFileParser bedCovFileParser = isPlusStrand? bedCovPlusFileParser : bedCovMinusFileParser;
-		Iterator<AnnotatedGene> iterator = annotationFileParser.getAnnotatedGeneIterator();
+	private void getSignalNNoise(boolean isPlusStrand, String contig){
+		Iterator<AnnotatedGene> iterator = annotationFileParser.getAnnotatedGeneIterator(contig);
+		Bed12Parser bedParser = new Bed12Parser(bedFileName, annotationFileParser, contig);
+		System.out.print("Training for " + contig + " " + (isPlusStrand? '+' : '-') + " strand");
 		while(iterator.hasNext()){
 			AnnotatedGene gene = iterator.next();
 			if(isPlusStrand != gene.isPlusStrand()) continue;
 			int startPosition = isPlusStrand? gene.getCdsStart() : gene.getCdsEnd() - 1;
 			int stopPosition = isPlusStrand? gene.getCdsEnd() - 1: gene.getCdsStart();
 					
-			double[] startCov = bedCovFileParser.getCoverages(gene.getContig(), startPosition, leftWindowSize, rightWindowSize, isPlusStrand);
-			double[] stopCov = bedCovFileParser.getCoverages(gene.getContig(), stopPosition, leftWindowSize, rightWindowSize, isPlusStrand);
-			
+			ArrayList<Integer> startCoordinate = gene.getLiftOverPositions(startPosition, leftWindowSize, rightWindowSize, false);
+			double[] startCov = bedParser.get5pCoverages(isPlusStrand, startCoordinate);
+			ArrayList<Integer> stopCoordinate = gene.getLiftOverPositions(stopPosition, leftWindowSize, rightWindowSize, false);		
+			double[] stopCov = bedParser.get5pCoverages(isPlusStrand, stopCoordinate);
 			
 			if(Scorer.numberOfNonZeroElements(startCov) >= numberOfNonZeroElements){
 				//double[] sqrtCov = Scorer.getSqrtVector(cov);				
-				Scorer.normalize(startCov);
+				Scorer.addSmallValuesNNormalize(startCov);
 				startSignal.add(startCov);				
 			}
 			
 			if(Scorer.numberOfNonZeroElements(stopCov) >= numberOfNonZeroElements){
 				//double[] sqrtCov = Scorer.getSqrtVector(cov);				
-				Scorer.normalize(stopCov);
+				Scorer.addSmallValuesNNormalize(stopCov);
 				stopSignal.add(stopCov);				
 			}
 			
 			HashSet<Integer> offsets = new HashSet<Integer>();
-			for(int i=0;i<200;i++){
+			for(int i=0;i<50;i++){
 				int offset =  (new Random().nextInt(500)) + 150;
 				if(offsets.contains(offset)) continue;
 				offsets.add(offset);
 				offset = isPlusStrand? offset : - offset;
-				double[] startNoiseCov = bedCovFileParser.getCoverages(gene.getContig(), startPosition + offset, leftWindowSize, rightWindowSize, isPlusStrand);
+				
+				ArrayList<Integer> startNoiseCoordinate = gene.getLiftOverPositions(startPosition + offset, leftWindowSize, rightWindowSize, false);
+				double[] startNoiseCov = bedParser.get5pCoverages(isPlusStrand, startNoiseCoordinate);
+				
 				if(Scorer.numberOfNonZeroElements(startNoiseCov) >= numberOfNonZeroElements){					
-					Scorer.normalize(startNoiseCov);
+					Scorer.addSmallValuesNNormalize(startNoiseCov);
 					startNoise.add(startNoiseCov);	
 				}
 				
-				double[] stopNoiseCov = bedCovFileParser.getCoverages(gene.getContig(), stopPosition + offset, leftWindowSize, rightWindowSize, isPlusStrand);
+				ArrayList<Integer> stopNoiseCoordinate = gene.getLiftOverPositions(startPosition + offset, leftWindowSize, rightWindowSize, false);
+				double[] stopNoiseCov = bedParser.get5pCoverages(isPlusStrand, stopNoiseCoordinate);
 				if(Scorer.numberOfNonZeroElements(stopNoiseCov) >= numberOfNonZeroElements){					
-					Scorer.normalize(stopNoiseCov);
+					Scorer.addSmallValuesNNormalize(stopNoiseCov);
 					stopNoise.add(stopNoiseCov);	
 				}
 			}	
 		}
+		System.out.println("... done");
 	}
 	
 	
@@ -157,58 +165,6 @@ public class ScorerTrainer {
 			}
 	}
 	
-	public static double[][] getAvg(ArrayList<double[]> observations){
-		if(observations.isEmpty()) return null;
-		double[] avg = new double[observations.get(0).length];
-		for(double[] o : observations){
-			for(int i=0;i<avg.length;i++){
-				avg[i] += o[i];
-			}
-		}
-		float sum = 0;
-		for(double v : avg){
-			sum += v;
-		}
-		for(int i=0;i<avg.length;i++){
-			avg[i] /= sum;
-		}
-		
-		double[][] ret = new double[avg.length][1];
-		for(int i=0; i<avg.length;i++){
-			ret[i][0] = avg[i];
-		}
-		
-		return ret;
-	}
-	
-	public static double[] getFilter(double[][] avgedSignal, ArrayList<double[]> noise){		
-		double[][] R = getCovMatrix(noise);
-		double[][] Rinv = MC.invert(R);
-		double[][] Rinvs = MC.multiply(Rinv, avgedSignal);
-		double div = Math.sqrt(MC.multiply(MC.transpose(avgedSignal),Rinvs)[0][0]);
-		double[][] h = MC.multiply(Rinvs, 1/div);
-		double[] filter = new double[h.length];
-		for(int i=0;i<filter.length;i++)
-			filter[i] = h[i][0];
-		return filter;
-	}
-	
-	
-	private static double[][] getCovMatrix(ArrayList<double[]> noise){
-		double num = 0;
-		double[][] cov = new double[noise.get(0).length][noise.get(0).length];
-		for(double[] v : noise){
-			double[][] arg = new double[v.length][1];
-			for(int i=0;i<v.length;i++){
-				arg[i][0] = v[i];
-			}
-			num ++;
-			cov = MC.sum(cov, MC.multiply(arg, MC.transpose(arg)),1);
-		}
-		cov = MC.multiply(cov, 1/num);
-		return cov;
-	}
-	
 	/*private static double[] calculateLikelihoodFunctionCoefficients(double[] filter, ArrayList<double[]> signal, ArrayList<double[]> noise, int numberOfNonZeroElements){
 		double[] likelihoodFunctionCoefficients = new double[4];
 		ArrayList<Double> signalScores = new ArrayList<Double>();
@@ -251,19 +207,15 @@ public class ScorerTrainer {
 			
 		return likelihoodFunctionCoefficients;
 	}
-	
+	*/
 	public static void main(String[] args){
-		String keyword =  "RPF6_NS_RPF_1";
-		String annotationkey = "uORF";
-		String covFileprefix = "/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/" + keyword + "-uncollapsed";
-		String covFilePlus = covFileprefix + ".plus.cov";
-		String covFileMinus = covFileprefix + ".minus.cov";
-		String paramFile = covFileprefix + ".test.param";
-		String annotationFile = "/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/"+keyword.substring(0, keyword.indexOf('_'))+"_"+ annotationkey + "1.5.txt";
-		annotationFile = "/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt";
-		
-		MatchedFilterTrainier test = new MatchedFilterTrainier(covFilePlus, covFileMinus, annotationFile, annotationFile+ keyword + ".param");
-		test.train(30, 50, 7);
-	}*/
+	//public ScorerTrainer(Bed12Parser bedParser, AnnotationFileParser annotationFileParser, String outParamFile){
+	
+		String annotationFile = "/media/kyowon/Data1/RPF_Project/genomes/hg19.refFlat.txt";
+		ScorerTrainer test = new ScorerTrainer(annotationFile, new AnnotationFileParser(annotationFile), "/media/kyowon/Data1/RPF_Project/samples/sample1/bed/Noco_Harr_10mHsum-uncollapsed.bed.param");
+		test.train(90, 300, 30);
+	}
+	
+	
 	
 }

@@ -22,13 +22,13 @@ public class MafParser {
 	private ArrayList<Integer> eps;
 	private HashMap<String, ArrayList<Integer>> indexSPositions;
 	private HashMap<String, String> fileNameMap;
-	private AnnotationFileParser parser;
+//	private Bed12Parser parser;
 	public static int minNumSpecies = 0;
 	
-	public MafParser(String folderName, AnnotationFileParser parser){
+	public MafParser(String folderName){
 		this.folderName = folderName;
 		this.indexFilename = folderName + "mafIndex.txt";		
-		this.parser = parser;
+		//this.parser = parser;
 	}	
 	
 	public void readIndexFile(){
@@ -190,15 +190,31 @@ public class MafParser {
 		return ret;
 	}
 
-	public String[] getSeqs(String contig, int position, boolean isPlusStrand, int length){
+	public String[] getSeqs(String contig, ArrayList<Integer> coordinate, int position, boolean isPlusStrand, int length){
 		ArrayList<ArrayList<StringBuffer>> subSeqs = new ArrayList<ArrayList<StringBuffer>>();
 		int maxNum = 0;
-		for(ArrayList<Integer> subPositions : parser.getLiftOverPositions(contig, isPlusStrand, position, length)){
+		//boolean startFlag = false;
+		for(ArrayList<Integer> subPositions : Bed12Parser.getCoordinateStartsEnds(coordinate, isPlusStrand)){
+			int start = subPositions.get(0);
+			int end = subPositions.get(1);
+			//System.out.println("* " + start + " " + end);
+			if(isPlusStrand){
+				if(position >= end) continue;
+				start = Math.max(position, start);
+			}else{
+				if(position < start) continue;
+				end = Math.min(position + 1, end);
+			}
+			
 			//System.out.println(subPositions.size());//102410577 102410428
-			ArrayList<StringBuffer> subSeq = getSubSeqs(contig, subPositions.get(0), isPlusStrand, subPositions.size());
+			//System.out.println(start + " " + end);
+			length -= (end - start);
+			ArrayList<StringBuffer> subSeq = getSubSeqs(contig, isPlusStrand? start : end - 1, isPlusStrand, end - start + (length<0? length : 0));
+			
 			//System.out.println(subSeq.size());
 			subSeqs.add(subSeq);
 			maxNum = Math.max(maxNum, subSeq.size());
+			if(length <=0) break;
 		}
 		ArrayList<StringBuffer> seqs = new ArrayList<StringBuffer>();
 		for(int j=0;j<maxNum;j++){
@@ -290,10 +306,25 @@ public class MafParser {
 		
 		String file = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/";
 		//MafParser.minNumSpecies
-		MafParser test = new MafParser(file, new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt"));
+		MafParser test = new MafParser(file);
 		test.generateIndexFile();
 		test.readIndexFile();
-		String[] seqs =  test.getSeqs("chr7", 74807232, true, 50); // why not 150???? TODO
+		boolean isPlusStrand = false;
+		ArrayList<Integer> coordinate = new ArrayList<Integer>();
+		coordinate.add(25853545);
+		coordinate.add(25853544);
+		coordinate.add(25853543);
+		coordinate.add(25853542);
+		coordinate.add(25853541);	
+		coordinate.add(25853540);
+		coordinate.add(25853540-1);
+		coordinate.add(25853540-2);
+		coordinate.add(25853540-3);
+		coordinate.add(25853540-4);
+		//coordinate.add(25853540-1);
+		//coordinate.add(25853540-2);
+		//coordinate.add(25853540-3);
+		String[] seqs =  test.getSeqs("chr7", coordinate, 25853540+5, isPlusStrand, 10); // why not 150???? TODO
 		for(String seq : seqs){
 			System.out.println(seq + " " + seq.length());
 		}

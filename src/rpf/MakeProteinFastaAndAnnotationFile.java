@@ -6,8 +6,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 
 import net.sf.samtools.util.BufferedLineReader;
-import parser.ScoringOutputParser;
 import parser.ZeroBasedFastaParser;
+import rpf.parser.ScoringOutputParser;
 
 public class MakeProteinFastaAndAnnotationFile {
 	private static HashMap<String, String> codonTable;

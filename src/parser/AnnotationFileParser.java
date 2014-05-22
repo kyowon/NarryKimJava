@@ -7,7 +7,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Set;
 
+import net.sf.picard.util.IntervalTree;
+import net.sf.picard.util.IntervalTree.Node;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class AnnotationFileParser {
@@ -27,8 +30,8 @@ public class AnnotationFileParser {
 	}
 	
 	public static class AnnotatedGene{
-		private String genomeBrowserGeneName;		
-		private String geneName;
+		private String geneName;		
+		private String accession;
 		private String contig;
 		private boolean isPlusStrand;
 		private int txStart;
@@ -38,12 +41,14 @@ public class AnnotationFileParser {
 		private int exonCount;		
 		private int[] exonStarts;
 		private int[] exonEnds;
-		private int[][] introns;
+		private int[][] introns; // intron inclusive, increasing, so exon exclusive
+		private HashMap<Integer, Integer> fivepSplices = null;
+		private HashMap<Integer, Integer> threepSplices = null;
 		
 		public AnnotatedGene(String s){
 			String[] token = s.split("\t");
-			genomeBrowserGeneName = token[0];
-			geneName = token[1];
+			geneName = token[0];
+			accession = token[1];
 			contig = token[2];
 			isPlusStrand = token[3].equals("+");
 			txStart = Integer.parseInt(token[4]);
@@ -63,7 +68,26 @@ public class AnnotationFileParser {
 				if(t.isEmpty()) continue;
 				exonEnds[i++] = Integer.parseInt(t);
 			}
+			introns = new int[getExonCount()-1][2];
+			if(introns.length > 0){
+				fivepSplices = new HashMap<Integer, Integer>();
+				threepSplices = new HashMap<Integer, Integer>();
+			}
+			for(int j=1;j<exonCount;j++){
+				introns[j-1][0] = getExonEnds()[j-1];
+				introns[j-1][1] = getExonStarts()[j]-1;
+				
+				if(isPlusStrand){
+					threepSplices.put(introns[j-1][0]-1, introns[j-1][1] + 1);
+					fivepSplices.put(introns[j-1][1] + 1, introns[j-1][0]-1);
+				}else{
+					fivepSplices.put(introns[j-1][0]-1, introns[j-1][1] + 1);
+					threepSplices.put(introns[j-1][1] + 1, introns[j-1][0]-1);
+				}
+				
+			}
 		}	
+		
 		
 		/*// construct sudo annotated gene
 		private AnnotatedGene(ScoredPosition position){ 
@@ -80,6 +104,34 @@ public class AnnotationFileParser {
 			exonEnds = new int[exonCount];			
 		}*/
 		
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result
+					+ ((accession == null) ? 0 : accession.hashCode());
+			return result;
+		}
+
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			AnnotatedGene other = (AnnotatedGene) obj;
+			if (accession == null) {
+				if (other.accession != null)
+					return false;
+			} else if (!accession.equals(other.accession))
+				return false;
+			return true;
+		}
+
+
 		private AnnotatedGene(int txStart, int txEnd){ // constructor for comparison
 			this.txStart = txStart;
 			this.txEnd = txEnd;
@@ -88,8 +140,8 @@ public class AnnotationFileParser {
 		@Override
 		public String toString(){
 			StringBuffer sb = new StringBuffer();			
-			sb.append(genomeBrowserGeneName); sb.append('\t');
 			sb.append(geneName); sb.append('\t');
+			sb.append(accession); sb.append('\t');
 			sb.append(contig); sb.append('\t');
 			sb.append(isPlusStrand? '+' : '-'); sb.append('\t');
 			sb.append(txStart); sb.append('\t');
@@ -109,8 +161,8 @@ public class AnnotationFileParser {
 		
 		public String toSimpleString(){
 			StringBuffer sb = new StringBuffer();			
-			sb.append(genomeBrowserGeneName); sb.append('\t');
-			sb.append(geneName); 
+			sb.append(geneName); sb.append('\t');
+			sb.append(accession); 
 			
 			return sb.toString();
 		}
@@ -213,11 +265,11 @@ public class AnnotationFileParser {
 			return sb.toString();
 		}
 		
-		public String getGenomeBrowserGeneName() {
-			return genomeBrowserGeneName;
-		}
 		public String getGeneName() {
 			return geneName;
+		}
+		public String getAccession() {
+			return accession;
 		}
 		public String getContig() {
 			return contig;
@@ -247,20 +299,123 @@ public class AnnotationFileParser {
 			return exonEnds;
 		}
 		public int[][] getIntrons(){
-			if(introns == null){
-				introns = new int[getExonCount()-1][2];
-				for(int i=1;i<getExonCount();i++){
-					introns[i-1][0] = getExonEnds()[i-1];
-					introns[i-1][1] = getExonStarts()[i]-1;
+			return introns;
+		}
+		public boolean isAnnotated(int position){
+			return isPlusStrand? position == this.cdsStart : position == this.cdsEnd - 1;
+		}
+		
+		
+		private boolean matching(boolean isPlusStrand, ArrayList<Integer> coordinates, ArrayList<ArrayList<Integer>> splices){ // TODO
+			if(isPlusStrand != this.isPlusStrand) return false;
+			if(introns == null || introns.length == 0){
+				if(splices == null || splices.isEmpty()) return true;
+			}
+			
+			//System.out.println(splices); 
+			ArrayList<ArrayList<Integer>> intronSet = new ArrayList<ArrayList<Integer>>();
+			if(isPlusStrand){
+				for(int i=0;i<introns.length;i++){
+					int[] intron = introns[i]; // check order.. TODO check inclusive / exclusive
+					if(coordinates.get(0) > intron[1] || coordinates.get(coordinates.size()-1) < intron[0]) continue;  
+					
+					ArrayList<Integer> it = new ArrayList<Integer>();
+					it.add(intron[0]);
+					it.add(intron[1]);
+					intronSet.add(it);
+					//if(!splices.contains(il)) return false;
+				}
+			}else{
+				for(int i=introns.length-1;i>=0;i--){
+					int[] intron = introns[i]; // check order.. TODO check inclusive / exclusive
+					if(coordinates.get(coordinates.size()-1) > intron[1] || coordinates.get(0) < intron[0]) continue;
+
+					ArrayList<Integer> it = new ArrayList<Integer>();
+					it.add(intron[0]);
+					it.add(intron[1]);
+					intronSet.add(it);
+					//if(!splices.contains(il)) return false;
 				}
 			}
-			return introns;
+			
+			ArrayList<ArrayList<Integer>> splicesInGene = new ArrayList<ArrayList<Integer>>();
+			for(ArrayList<Integer> splice : splices){
+				if(splice.get(0) >= this.txEnd || splice.get(1)<this.txStart) continue;
+				splicesInGene.add(splice);	
+			}
+			
+			return intronSet.equals(splicesInGene);
+		}
+		
+		
+		
+		
+		// start : inclusive
+		public ArrayList<Integer> getLiftOverPositions(int position, int leftWindowSize, int rightWindowSize, boolean stopAtCDSEnd){
+			ArrayList<Integer> ret = new ArrayList<Integer>();		
+				// 5p direction
+			int cp = position;
+			int next = cp;
+			while(leftWindowSize-- > 0){
+				if(fivepSplices != null && fivepSplices.containsKey(cp)){
+					next = fivepSplices.get(cp);
+				}else next += isPlusStrand? -1 : 1;
+				cp = next;
+				ret.add(0, cp);	
+			}
+				// 3p direction
+			cp = position;
+			next = cp;
+			while(rightWindowSize-- > 0){
+				if(threepSplices != null && threepSplices.containsKey(cp)){
+					next = threepSplices.get(cp);
+				}else next += isPlusStrand? 1 : -1;
+				ret.add(cp);
+				cp = next;
+				if(stopAtCDSEnd){
+					if(isPlusStrand){
+						if(cp >= this.cdsEnd -1) break;
+					}else{
+						if(cp <= this.cdsStart) break;
+					}
+				}
+			}	
+		
+					
+			return ret;
+		}
+		
+		
+		public ArrayList<Integer> getLiftOverPositionsTillNextStopCodon(int start, int minLength, int maxLength, ZeroBasedFastaParser fastaParser){
+			ArrayList<Integer> positions = getLiftOverPositions(start, 0, maxLength, false);
+			ArrayList<Integer> ret = new ArrayList<Integer>();
+		//	boolean stop = false;
+		//	int len = 0;
+			
+			for(int j=0;j<positions.size()-2;j+=3){				
+				String tc = fastaParser.getSequence(contig, positions.subList(j, j+3));
+				if(!isPlusStrand) tc = ZeroBasedFastaParser.getComplementarySequence(tc, false);
+				tc = tc.toUpperCase();
+				ret.addAll(positions.subList(j, j+3));
+				if(ret.size() < minLength) continue;
+				if(ret.size() > maxLength) break;
+				if(tc.equals("TAG") || tc.equals("TAA") || tc.equals("TGA")){ 					
+					break;
+				}
+			}	
+			
+			return ret;
 		}
 		
 	}
 	
+	public Set<String> getContigs(){
+		return annotatedGeneSetMap.keySet();
+	}
+	
 	private HashMap<String, ArrayList<AnnotatedGene>> annotatedGeneSetMap;
-	private HashMap<String, HashMap<Boolean, HashMap<Integer, AnnotatedGene>>> annotatedGenePositionMap;
+	private HashMap<String, IntervalTree<ArrayList<Integer>>> txIntervalMap;
+	private HashMap<String, HashMap<Boolean, HashMap<Integer, ArrayList<AnnotatedGene>>>> annotatedGenePositionMap;
 	
 //	public static AnnotatedGene getSudoAnnotatedGene(ScoredPosition position){
 //		return new AnnotationFileParser().new AnnotatedGene(position);
@@ -271,24 +426,52 @@ public class AnnotationFileParser {
 		try {
 			BufferedLineReader in = new BufferedLineReader(new FileInputStream(annotationFile));
 			annotatedGeneSetMap = new HashMap<String, ArrayList<AnnotatedGene>>();
-			annotatedGenePositionMap = new HashMap<String, HashMap<Boolean, HashMap<Integer, AnnotatedGene>>>();
+			annotatedGenePositionMap = new HashMap<String, HashMap<Boolean,HashMap<Integer,ArrayList<AnnotatedGene>>>>();
 			String s;
 			while((s=in.readLine())!=null){
 				AnnotatedGene gene = new AnnotatedGene(s);
 				String contig = gene.getContig();
 				if(!annotatedGeneSetMap.containsKey(contig)){
 					annotatedGeneSetMap.put(contig, new ArrayList<AnnotatedGene>());
-					annotatedGenePositionMap.put(contig, new HashMap<Boolean, HashMap<Integer, AnnotatedGene>>());
-					annotatedGenePositionMap.get(contig).put(true, new HashMap<Integer, AnnotatedGene>());
-					annotatedGenePositionMap.get(contig).put(false, new HashMap<Integer, AnnotatedGene>());
+					annotatedGenePositionMap.put(contig, new HashMap<Boolean, HashMap<Integer, ArrayList<AnnotatedGene>>>());
+					annotatedGenePositionMap.get(contig).put(true, new HashMap<Integer, ArrayList<AnnotatedGene>>());
+					annotatedGenePositionMap.get(contig).put(false, new HashMap<Integer, ArrayList<AnnotatedGene>>());
 				}
 				annotatedGeneSetMap.get(contig).add(gene);	
-				annotatedGenePositionMap.get(contig).get(gene.isPlusStrand()).put((gene.isPlusStrand()? gene.getCdsStart() : gene.getCdsEnd()), gene);
+				int position = gene.isPlusStrand()? gene.getCdsStart() : gene.getCdsEnd();
+				if(!annotatedGenePositionMap.get(contig).get(gene.isPlusStrand()).containsKey(position))
+					annotatedGenePositionMap.get(contig).get(gene.isPlusStrand()).put(position, new ArrayList<AnnotatedGene>());
+				annotatedGenePositionMap.get(contig).get(gene.isPlusStrand()).get(position).add(gene);
 			}
 			for(String contig : annotatedGeneSetMap.keySet()){
 				Collections.sort(annotatedGeneSetMap.get(contig), new txStartComparator());
 			}
 			in.close();
+			
+			txIntervalMap = new HashMap<String, IntervalTree<ArrayList<Integer>>>();
+			for(String contig : annotatedGeneSetMap.keySet()){
+				txIntervalMap.put(contig, new IntervalTree<ArrayList<Integer>>());
+				IntervalTree<ArrayList<Integer>> tree = txIntervalMap.get(contig);
+				
+				for(int i=0;i<annotatedGeneSetMap.get(contig).size();i++){
+					AnnotatedGene gene = annotatedGeneSetMap.get(contig).get(i);
+					int start = gene.txStart;
+					int end = gene.txEnd-1;
+					Node<ArrayList<Integer>> node = tree.find(start, end);
+					ArrayList<Integer> v;
+					
+					if(node == null)	
+						v = new ArrayList<Integer>();
+					else 
+						v = node.getValue();
+					
+					v.add(i);
+					tree.put(start, end, v);
+					
+					
+				}
+			}
+			
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}		
@@ -299,7 +482,7 @@ public class AnnotationFileParser {
 	    * @param contig the contig
 	    * @param isPlusStrand is plus strand?
 	    * @param position the coding start position ( see below for the examples)
-	    * @return the annotated gene with the position as the CDS start or as the CDS end.
+	    * @return the annotated genes with the position as the CDS start or as the CDS end.
 	    * For example, 
 	    * 
 	    * Gene1 : chr1   +    cds start 0 cds end 100    will be returned for getAnnotatedGene(chr1, true, 0)
@@ -307,51 +490,87 @@ public class AnnotationFileParser {
 	    * 
 	    * This is because cds end is exclusive in the ref flat file
 	    */
-	public AnnotatedGene getAnnotatedGene(String contig, boolean isPlusStrand, int position){
-		HashMap<Boolean, HashMap<Integer, AnnotatedGene>> sub = annotatedGenePositionMap.get(contig);
+	/*public ArrayList<AnnotatedGene> getAnnotatedGenes(String contig, boolean isPlusStrand, int position){
+		HashMap<Boolean, HashMap<Integer, ArrayList<AnnotatedGene>>> sub = annotatedGenePositionMap.get(contig);
 		if(sub == null) return null;
-		HashMap<Integer, AnnotatedGene> ssub = sub.get(isPlusStrand);
+		HashMap<Integer, ArrayList<AnnotatedGene>> ssub = sub.get(isPlusStrand);
 		if(ssub == null) return null;
 		return ssub.get(position + (isPlusStrand? 0 : 1));
+	}*/
+	
+	/**
+	    * Get the annotated gene
+	    * @param contig the contig
+	    * @param isPlusStrand is plus strand?
+	    * @param position the coding start position ( see below for the examples)
+	    * @param coordianteSet the coordinates (considering read splices)
+	    * @return the annotated genes with the position as the CDS start or as the CDS end.
+	    * For example, 
+	    * 
+	    * Gene1 : chr1   +    cds start 0 cds end 100    will be returned for getAnnotatedGene(chr1, true, 0)
+	    * Gene2:  chr3   -    cds start 10  cds end 123  will be returned for getAnnotatedGene(chr3, false, 122), not for getAnnotatedGene(chr3, false, 123) 
+	    * 
+	    * This is because cds end is exclusive in the ref flat file
+	    */
+	/*public ArrayList<AnnotatedGene> getAnnotatedGenes(String contig, boolean isPlusStrand, int position, HashSet<Integer> coordinateSet){
+		ArrayList<AnnotatedGene> genes = getAnnotatedGenes(contig, isPlusStrand, position);
+		if(genes == null) return null;
+		ArrayList<AnnotatedGene> ret = new ArrayList<AnnotationFileParser.AnnotatedGene>();
+		for(AnnotatedGene gene : genes){
+			if(gene.containing(coordinateSet)) ret.add(gene);
+		}
+		return ret.isEmpty()? null : ret;
+	}*/
+	
+	
+	/**
+	    * Get the matching genes
+	    * @param contig the contig
+	    * @param isPlusStrand is plus strand?
+	    * @param position the genomic position
+	    * @param coordinate the coordiate considering read splices
+	    * @return the matching genes
+	    */
+	public ArrayList<AnnotatedGene> getMatchingGenes(String contig, boolean isPlusStrand, int position, ArrayList<Integer> coordinate){
+		ArrayList<AnnotatedGene> genes = getContainingGenes(contig, isPlusStrand, position);
+		return getMatchingGenes(genes, isPlusStrand, coordinate);
+	}
+	
+	public ArrayList<AnnotatedGene> getMatchingGenes(ArrayList<AnnotatedGene> containingGenes, boolean isPlusStrand, ArrayList<Integer> coordinate){
+		if(containingGenes == null) return null;
+		ArrayList<AnnotatedGene> ret = new ArrayList<AnnotationFileParser.AnnotatedGene>();
+		ArrayList<ArrayList<Integer>> splices = Bed12Parser.getSplices(coordinate);
+		
+		for(AnnotatedGene gene: containingGenes){
+			if(gene.matching(isPlusStrand, coordinate, splices))
+				ret.add(gene);
+		}
+		
+		return ret.isEmpty()? null : ret;
 	}
 	
 	/**
-	    * Get the containing gene
+	    * Get the containing genes
 	    * @param contig the contig
 	    * @param isPlusStrand is plus strand?
-	    * @param position the tx start position
-	    * @return the containing gene
-	     * For example, 
-	    * 
-	    * Gene1 : chr1   +    tx start 0 tx end 100    will be returned for getContainingGene(chr1, true, 50)
-	    * Gene2:  chr3   -    tx start 10  tx end 123  will be returned for getContainingGene(chr3, false, 120), but not for getContainingGene(chr3, false, 123) 
-	    * 
-	    * This is because tx end is exclusive in the ref flat file
+	    * @param position the genomic position
+	    * @return the containing genes
 	    */
-	public AnnotatedGene getContainingGene(String contig, boolean isPlusStrand, int position){
-		AnnotatedGene ret = getAnnotatedGene(contig, isPlusStrand, position);
-		if(ret != null) return ret;
+	public ArrayList<AnnotatedGene> getContainingGenes(String contig, boolean isPlusStrand, int position){
+		ArrayList<AnnotatedGene> ret = new ArrayList<AnnotationFileParser.AnnotatedGene>();
 		ArrayList<AnnotatedGene> genes = annotatedGeneSetMap.get(contig);
-		if(genes == null) ret = null;
-		else{
-			int index = Collections.binarySearch(genes, new AnnotatedGene(position, Integer.MAX_VALUE), new txStartComparator());
-			if(index < 0) index = -index - 1;
-			if(index - 1 >= genes.size() || index - 1 < 0) ret = null;
-			else{
-				AnnotatedGene gene = genes.get(index - 1);
-				if(gene.getTxEnd() > position && gene.isPlusStrand() == isPlusStrand) ret = gene;
-			}
-			if(ret == null){
-				index = Collections.binarySearch(genes, new AnnotatedGene(0, position + 1), new txEndComparator());
-				if(index < 0) index = -index - 1;
-				if(index >= genes.size() || index < 0) ret = null;
-				else{
-					AnnotatedGene gene = genes.get(index);
-					if(gene.getTxStart() <= position && gene.isPlusStrand() == isPlusStrand) ret = gene;
+		if(genes != null)// ret = null;
+		{
+			Iterator<Node<ArrayList<Integer>>> it = txIntervalMap.get(contig).overlappers(position, position+1);
+			while(it.hasNext()){
+				Node<ArrayList<Integer>> is = it.next();
+				for(int i : is.getValue()){
+					AnnotatedGene gene = genes.get(i);
+					ret.add(gene);
 				}
 			}
 		}
-		return ret;
+		return ret.isEmpty()? null : ret;
 	}
 	
 	/**
@@ -359,86 +578,84 @@ public class AnnotationFileParser {
 	    * @param contig the contig
 	    * @param isPlusStrand is plus strand?
 	    * @param position the position
+	     * @param gene the gene not only containing position but matching the coordinate 
 	    * @return ArrayList of String : 0 genomic region, 1 frameshift (0/1/2)
 	    */
-	public ArrayList<String> getGenomicRegionNameAndFrameShift(String contig, boolean isPlusStrand, int position){
+	public ArrayList<String> getGenomicRegionNameAndFrameShift(String contig, boolean isPlusStrand, int position, AnnotatedGene gene, boolean isMatchingGene){ 
 		ArrayList<String> ret = new ArrayList<String>();
-		AnnotatedGene gene = getAnnotatedGene(contig, isPlusStrand, position);
-		if(gene != null){
-			//ret.add("NM_Start"); ret.add("0"); 
-			//return ret;
-		}
-		else gene = getContainingGene(contig, isPlusStrand, position);								
-		
 		String name;
-		String frameShift;
+		String frameShift = "_";
 		
 		if(gene == null){
 			name = "InterGenic";
-			frameShift = "_";
 		}else{
-			if(gene.getGenomeBrowserGeneName().startsWith("LINC")) name = "LINC";
-			else if(gene.getGeneName().startsWith("NR")) name = "NR";
+			if(gene.getGeneName().startsWith("LINC")) name = "LINC";
+			else if(gene.getAccession().startsWith("NR")) name = "NR";
 			else{
 				name = "NM";
 				if(position >= gene.getCdsStart() && position < gene.getCdsEnd()){
-					name += "_ORF";
-					int[][] introns = gene.getIntrons();
-					//System.out.println(introns.length);
-					for(int i=0;i<introns.length;i++){
-						//System.out.println(introns[i][0] + " " + introns[i][1]);
-						if(position >=introns[i][0] && position <= introns[i][1]){
-							name += "_Intron";
-							break;
-						}
-					}				
+					name += "_ORF";			
 				}else{
 					if(isPlusStrand && position < gene.getCdsStart()) name += "_5_UTR";
 					else if(!isPlusStrand && position >= gene.getCdsEnd()) name += "_5_UTR";
 					else name += "_3_UTR";
-				}
+				}				
 			}
-			Integer j = 0;
-			if(isPlusStrand){
-				int i = 0;
-				for(;i<gene.getExonCount()-1;i++){
-					if(position < gene.getExonEnds()[i]) break;
-					j+=gene.getExonEnds()[i] - gene.getExonStarts()[i];
+			
+			if(!isMatchingGene){
+				int[][] introns = gene.getIntrons();
+				if(introns != null){
+					for(int i=0;i<introns.length;i++){//106129273-5
+						if(position >=introns[i][0] && position <= introns[i][1]){
+							name += "_Intron";
+							break;
+						}
+					}	
 				}
-				assert(position >= gene.getExonStarts()[i]);
-				j += position - gene.getExonStarts()[i];
-				
-				i = 0;
-				int startPosition = gene.getCdsStart();
-				for(;i<gene.getExonCount()-1;i++){
-					if(startPosition < gene.getExonEnds()[i]) break;					
-					j-=gene.getExonEnds()[i] - gene.getExonStarts()[i];
-				}
-				assert(startPosition >= gene.getExonStarts()[i]);
-				j -= startPosition - gene.getExonStarts()[i];
-				j = j%3;
-				if(j<0) j+=3;
-			}else{				
-				int i = gene.getExonCount()-1;
-				for(;i>0;i--){
-					if(position >= gene.getExonStarts()[i]) break;
-					j+=gene.getExonEnds()[i] - gene.getExonStarts()[i];
-				}
-				assert(position < gene.getExonEnds()[i]);
-				j += gene.getExonEnds()[i] - position;
-				
-				i = gene.getExonCount()-1;
-				int startPosition = gene.getCdsEnd() - 1;
-				for(;i>0;i--){
-					if(startPosition >= gene.getExonStarts()[i]) break;
-					j-=gene.getExonEnds()[i] - gene.getExonStarts()[i];
-				}
-				assert(startPosition < gene.getExonEnds()[i]);
-				j -= gene.getExonEnds()[i] - startPosition;
-				j = j%3;
-				if(j<0) j+=3;
-			}	
-			frameShift = j.toString();
+				if(!name.endsWith("_Intron")) name += "_ISOFORM";
+			}else if(name.endsWith("_ORF")){
+				Integer j = 0;
+				if(isPlusStrand){
+					int i = 0;
+					for(;i<gene.getExonCount()-1;i++){
+						if(position < gene.getExonEnds()[i]) break;
+						j+=gene.getExonEnds()[i] - gene.getExonStarts()[i];
+					}
+					assert(position >= gene.getExonStarts()[i]);
+					j += position - gene.getExonStarts()[i];
+					
+					i = 0;
+					int startPosition = gene.getCdsStart();
+					for(;i<gene.getExonCount()-1;i++){
+						if(startPosition < gene.getExonEnds()[i]) break;					
+						j-=gene.getExonEnds()[i] - gene.getExonStarts()[i];
+					}
+					assert(startPosition >= gene.getExonStarts()[i]);
+					j -= startPosition - gene.getExonStarts()[i];
+					j = j%3;
+					if(j<0) j+=3;
+				}else{				
+					int i = gene.getExonCount()-1;
+					for(;i>0;i--){
+						if(position >= gene.getExonStarts()[i]) break;
+						j+=gene.getExonEnds()[i] - gene.getExonStarts()[i];
+					}
+					assert(position < gene.getExonEnds()[i]);
+					j += gene.getExonEnds()[i] - position;
+					
+					i = gene.getExonCount()-1;
+					int startPosition = gene.getCdsEnd() - 1;
+					for(;i>0;i--){
+						if(startPosition >= gene.getExonStarts()[i]) break;
+						j-=gene.getExonEnds()[i] - gene.getExonStarts()[i];
+					}
+					assert(startPosition < gene.getExonEnds()[i]);
+					j -= gene.getExonEnds()[i] - startPosition;
+					j = j%3;
+					if(j<0) j+=3;
+				}	
+				frameShift = j.toString();
+			}
 		}
 		
 		ret.add(name); ret.add(frameShift);
@@ -446,10 +663,10 @@ public class AnnotationFileParser {
 	}
 	
 	
-	public ArrayList<ArrayList<Integer>> getLiftOverCDSPositions(AnnotatedGene gene){	
+/*	public ArrayList<ArrayList<Integer>> getLiftOverCDSPositions(AnnotatedGene gene){	
 		return getLiftOverPositions(gene, gene.isPlusStrand(), gene.isPlusStrand()? gene.cdsStart : gene.cdsEnd - 1, gene == null? 0 : Integer.MAX_VALUE, true);
 	}
-	
+	*/
 	//private int pstart = -1;
 	//private int pminLength = 0;
 	private String pcontig = "";
@@ -458,56 +675,9 @@ public class AnnotationFileParser {
 	private HashMap<Integer, HashMap<Integer, HashMap<Boolean, ArrayList<ArrayList<Integer>>>>> pmap = null;
 	
 	// super stupid .. fix later
-	public ArrayList<ArrayList<Integer>> getLiftOverPositionsTillNextStopCodon(String contig, boolean isPlusStrand, int start, int minLength, int maxLength, ZeroBasedFastaParser fastaParser){
-		if(!pcontig.equals(contig)) pmap = new HashMap<Integer, HashMap<Integer, HashMap<Boolean, ArrayList<ArrayList<Integer>>>>>();
-		if(!pmap.containsKey(start)) pmap.put(start, new HashMap<Integer, HashMap<Boolean, ArrayList<ArrayList<Integer>>>>());
-		HashMap<Integer, HashMap<Boolean, ArrayList<ArrayList<Integer>>>> spmap = pmap.get(start);
-		if(!spmap.containsKey(minLength)) spmap.put(minLength, new HashMap<Boolean, ArrayList<ArrayList<Integer>>>());
-		HashMap<Boolean, ArrayList<ArrayList<Integer>>> sspmap = spmap.get(minLength);
-		pcontig = contig;
-		
-		ArrayList<ArrayList<Integer>> pret = sspmap.get(isPlusStrand);
-		if(pret == null){			
-			//if(pstart == start && pminLength == minLength && pcontig.equals(contig) && pIsPlusStrand == isPlusStrand && pPositions != null)  return pPositions;	
-			AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
-			//AnnotatedGene tgene = getAnnotatedGene(contig, isPlusStrand, start);
-			ArrayList<ArrayList<Integer>> positions = getLiftOverPositions(gene, isPlusStrand, start, maxLength, true);
-			ArrayList<ArrayList<Integer>> ret = new ArrayList<ArrayList<Integer>>();
-			boolean stop = false;
-			int len = 0;
-			ArrayList<Integer> tp = new ArrayList<Integer>();
-			for(int j=0;j<positions.size();j++){
-				ArrayList<Integer> subPositions = positions.get(j);
-				ArrayList<Integer> subRet = new ArrayList<Integer>();
-				for(int i=0;i<subPositions.size();i++){				
-					subRet.add(subPositions.get(i));
-					tp.add(subPositions.get(i));
-					if(len++ > minLength && tp.size()%3 ==0 && tp.size()>=3){
-						String tc = fastaParser.getSequence(contig, tp.subList(tp.size()-3, tp.size()));
-						if(!isPlusStrand) tc = ZeroBasedFastaParser.getComplementarySequence(tc, false);
-						tc = tc.toUpperCase();
-						if(tc.equals("TAG") || tc.equals("TAA") || tc.equals("TGA")){ 					
-							ret.add(subRet);
-							stop = true;
-							break;
-						}
-					}
-				}
-				if(stop) break;
-				//Collections.sort(subRet);
-				ret.add(subRet);
-			}
-			
-			//pPositions = ret;
-			//pstart = start;
-			//pminLength = minLength;
-			sspmap.put(isPlusStrand, ret);
-			//pIsPlusStrand = isPlusStrand;
-			return ret;
-		}else return pret;
-	}
+	/**/
 	
-	
+	/*
 	public ArrayList<ArrayList<Integer>> getLiftOverPositions(String contig, boolean isPlusStrand, int start, int length){
 		AnnotatedGene gene = getContainingGene(contig, isPlusStrand, start);
 		//if(gene == null){
@@ -515,75 +685,9 @@ public class AnnotationFileParser {
 		//	else gene = getContainingGene(contig, isPlusStrand, start - length + 1);			
 		//}
 		return getLiftOverPositions(gene, isPlusStrand, start, length, false);
-	}
+	}*/
 	
-	// start : inclusive
-	private ArrayList<ArrayList<Integer>> getLiftOverPositions(AnnotatedGene gene, boolean isPlusStrand, int start, int length, boolean stopAtCDSEnd){
-		ArrayList<ArrayList<Integer>> ret = new ArrayList<ArrayList<Integer>>();
-		int[][] introns = gene==null? new int[0][0] : gene.getIntrons();
-		if(isPlusStrand){
-			int intronIndex = 0;
-			int c = start;
-			for(;intronIndex<introns.length;intronIndex++){
-				if(introns[intronIndex][1] >= c){
-					//if(introns[intronIndex][0] <= c) return null;
-					break;
-				}
-			}	
-			//System.out.println(gene);
-			//System.out.println(start + " " + gene.getCdsEnd());
-			boolean startLift = false;
-			ArrayList<Integer> subPositions = new ArrayList<Integer>();
-			int tlength = 0;
-			while(true){
-				subPositions.add(c++);
-				tlength++;
-				if(stopAtCDSEnd && gene != null && (start >= gene.getCdsEnd() - 3? c >=gene.getTxEnd() : c >= gene.getCdsEnd())) break;
-				else if(tlength >= length) break;
-				
-				if(intronIndex >= 0 && intronIndex < introns.length && c >= introns[intronIndex][0]){ // if c is within intron
-					if(!startLift) continue;
-					c = introns[intronIndex][1] + 1;
-					intronIndex++;
-					if(!subPositions.isEmpty())ret.add(subPositions);
-					subPositions = new ArrayList<Integer>();
-				}else startLift = true;
-			}
-			if(!subPositions.isEmpty())ret.add(subPositions);
-		//	for(ArrayList<Integer> sss : ret)
-		//		System.out.println(sss);
-		}else{
-			int intronIndex = introns.length-1;
-			int c = start;
-			for(;intronIndex>=0;intronIndex--){
-				if(introns[intronIndex][0] <= c){
-					//if(introns[intronIndex][1] >= c) return null;
-					break;
-				}
-			}		
-			boolean startLift = false; 
-			ArrayList<Integer> subPositions = new ArrayList<Integer>();
-			int tlength = 0;
-			while(true){
-				subPositions.add(c--);
-				tlength++;
-				if(stopAtCDSEnd && gene != null && (start < gene.getCdsStart() + 3 ? c < gene.getTxStart() : c < gene.getCdsStart())) break;
-				else if(tlength >= length || c < 0) break;
-							
-				//if(stopAtCDSEnd && gene!=null && c < gene.getCdsStart()) break;
-				if(intronIndex >= 0 && intronIndex < introns.length && c <= introns[intronIndex][1]){					
-					if(!startLift) continue;
-					c = introns[intronIndex][0] - 1;
-					intronIndex--;
-					if(!subPositions.isEmpty())ret.add(subPositions);
-					subPositions = new ArrayList<Integer>();
-				}else startLift = true;
-			}	
-			if(!subPositions.isEmpty())ret.add(subPositions);
-		}		
-		return ret;
-	}
-	
+
 	public Iterator<AnnotatedGene> getAnnotatedGeneIterator(){
 		ArrayList<AnnotatedGene> allGenes = new ArrayList<AnnotatedGene>();
 		for(String contig : annotatedGeneSetMap.keySet())
@@ -598,32 +702,6 @@ public class AnnotationFileParser {
 	
 
 	public static void main(String[] args){
-		AnnotationFileParser test = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt");
-		//System.out.println();
 		
-		
-		ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.fa");
-	//	System.out.println(test.getLiftOverPositions("chr17", false, 28695253+12, 5));
-	//
-		//getLiftOverPositionsTillNextStopCodon(//)//test.getAnnotatedGene("chr5", false, 102410577))
-		
-		//System.out.println(test.getGenomicRegionNameAndFrameShift("chr7", true, 6324070));
-		
-		for(ArrayList<Integer> positions : test.getLiftOverPositionsTillNextStopCodon("chr7", false, 146768438-1, 150, 15000 , fasta)){
-			System.out.println(positions.get(0) + " " + positions.get(positions.size()-1));
-			System.out.println(positions);
-		//	System.out.println(ZeroBasedFastaParser.getComplementarySequence(fasta.getSequence("chr5", positions),false));
-			//break;
-			
-		}
-		//SREK1	NM_001270493	chr5	+	65440045	65453568	65440204	65451900	3	65440045,65449290,65451892,	65440365,65449424,65453568,
-
-		//GATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAA
-		//System.out.println(fasta.getSequence("chr5", 102410577, 102410570));
-	//	System.out.println(fasta.getSequence("chr5", test.getLiftOverPositions("chr5", false, 3648025, 3)));
-	//	System.out.println(fasta.getSequence("chr5", test.getLiftOverPositions("chr5", false, 4086564, 3)));
-	}//4086564
-//GYPE	NM_198682	chr4	-	144792018	144826716	144797907	144826660	4	144792018,144797898,144801563,144826623,	144793405,144798008,144801662,144826716,
-	//PTH	NM_000315	chr11	-	13513600	13517567	13513951	13514402	3	13513600,13514316,13517457,	13514213,13514407,13517567,
-
+	}
 }

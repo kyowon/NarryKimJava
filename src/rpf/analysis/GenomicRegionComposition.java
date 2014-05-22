@@ -5,14 +5,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 
-import parser.AnnotationFileParser;
-import parser.ScoringOutputParser;
-import parser.ScoringOutputParser.ScoredPosition;
+import rpf.parser.ScoringOutputParser.ScoredPosition;
 
 public class GenomicRegionComposition {
 
 	public static void main(String[] args) {
-		double scoreThreshold = 2.0;
+		/*double scoreThreshold = 2.0;
 		ScoringOutputParser scoringOutputParser = new ScoringOutputParser("/media/kyowon/Data1/RPF_Project/samples/sample1/coverages5/Thy_Harr_10mHsum-uncollapsed.plus.cov.score.tsv");
 		AnnotationFileParser annotationFileParser = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/refFlatHuman.txt");
 		HashMap<String, ArrayList<ScoredPosition>> positions = new HashMap<String, ArrayList<ScoredPosition>>();
@@ -32,7 +30,7 @@ public class GenomicRegionComposition {
 		for(String key : keys){
 			System.out.println(key + "\t" + String.format("%.1f", (double)positions.get(key).size()/sum*100));
 			printFreq(getCodonFrequency(positions.get(key)));
-		}		
+		}		*/
 	}
 	
 	private static void printFreq(HashMap<String, Double> freq){
@@ -54,7 +52,7 @@ public class GenomicRegionComposition {
 		HashMap<String, Double> freq = new HashMap<String, Double>();
 		double sum = 0;
 		for(ScoredPosition position : positions){
-			String codon = position.getCodon();
+			String codon = position.getSequence();
 			if(!freq.containsKey(codon)) freq.put(codon, 0.0);
 			freq.put(codon, freq.get(codon)+1);
 			sum++;

@@ -4,8 +4,8 @@ import java.io.FileNotFoundException;
 import java.io.PrintStream;
 import java.util.HashMap;
 
-import parser.ScoringOutputParser;
-import parser.ScoringOutputParser.ScoredPosition;
+import rpf.parser.ScoringOutputParser;
+import rpf.parser.ScoringOutputParser.ScoredPosition;
 
 public class CodonFrequency {
 	
@@ -17,7 +17,7 @@ public class CodonFrequency {
 		int sum = 0;
 		for(ScoredPosition position : parser.getPositions()){
 			if(position.getScore() < scoreThreshold) continue;
-			String codon = position.getCodon();
+			String codon = position.getSequence();
 			if(!freqMap.containsKey(codon)) freqMap.put(codon, 0);
 			freqMap.put(codon, freqMap.get(codon) + 1);
 			sum ++;
