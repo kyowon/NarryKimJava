@@ -9,7 +9,7 @@ public class DnDsCalculator {
 	
 	static private HashMap<String, ArrayList<Double>> nonSynSiteMap = null;
 	static private HashMap<ArrayList<String>, Double> nonSynSubMap = null;
-	static public int numSpecies = 45;
+	static public int numSpecies = 5;
 	static{
 		nonSynSiteMap = new HashMap<String, ArrayList<Double>>();
 		nonSynSubMap = new HashMap<ArrayList<String>, Double>();
@@ -182,30 +182,37 @@ public class DnDsCalculator {
 	}
 	
 	static public float calculate(String[] sequences){
-		//if(sequences.length < 2) return 1;
+		return calculate(sequences, true);
+	}
+	
+	static public float calculate(String[] sequences, boolean fixNumSpecies){
+		if(sequences.length < 1) return 1;
 		
-		String[] seq;
+		String[] seq = null;
+		if(fixNumSpecies){
+			if(sequences.length < numSpecies){
+				StringBuffer emptyString = new StringBuffer();
+				for(int i=0;i<sequences[0].length();i++) emptyString.append("-");
 			
-		if(sequences.length < numSpecies){
-			StringBuffer emptyString = new StringBuffer();
-			for(int i=0;i<sequences[0].length();i++) emptyString.append("-");
-		
-			seq = new String[numSpecies];
-			for(int i=0;i<seq.length;i++){
-				if(sequences.length > i) seq[i] = sequences[i];
-				else{
-					seq[i] = emptyString.toString();
+				seq = new String[numSpecies];
+				for(int i=0;i<seq.length;i++){
+					if(sequences.length > i) seq[i] = sequences[i];
+					else{
+						seq[i] = emptyString.toString();
+					}
+				}
+			}else{
+				seq = new String[numSpecies];
+				for(int i=0;i<seq.length;i++){
+					//if(sequences.length > i) 
+					seq[i] = sequences[i];
+					//else{
+					//	seq[i] = emptyString.toString();
+				//	}
 				}
 			}
 		}else{
-			seq = new String[numSpecies];
-			for(int i=0;i<seq.length;i++){
-				//if(sequences.length > i) 
-				seq[i] = sequences[i];
-				//else{
-				//	seq[i] = emptyString.toString();
-			//	}
-			}
+			seq = sequences;
 		}
 			
 		float[] n = getNonSynSubNSites(seq);

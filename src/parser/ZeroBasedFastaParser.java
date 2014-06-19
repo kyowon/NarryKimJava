@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
+import fCLIP.Scorer;
 import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.picard.reference.ReferenceSequence;
 
@@ -132,12 +133,51 @@ public class ZeroBasedFastaParser {
 		ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/hg19.fa");
 		//chr5	4086564
 
-	//	int off = 0;
-		int s = 136325309;
-		System.out.println(fasta.getSequence("chr9", s, s+2));
+	//	int off = 0;49052545	49052644
+		int f = 10;
+//167987968	167987907
+
+	
+	
+		//CCTTTTCTCCTCTGGCCAAATATCAGCATTCAATCTAATACAAAACACTTGAATTCTCTCTGGCAGAAAATGCAATCCTGAGGGATACGACAAAAAAAAATAAAAGCTATTTTCTGCCTGATTAA
+
+		//System.out.println(fasta.getComplementarySequence(fasta.getSequence("chr5", 84839892, 84839892+10), true));
 		
-		int t = 136328604;
-		System.out.println(fasta.getSequence("chr9", t-2, t));
+		//ACTTAGGCCAATTTTGCCTATAAGCCTATGAGTTAGCATATGTCTTCACAGTATCTTGGAGTGGCTGGAGGTAGAGTGATATATTAGCCAGAACTGGAGTCTGTTATTTGCAACCAAGATACCTA
+
+		
+		
+		System.out.println(fasta.getSequence("chr5", 149112391, 149112450+1));
+		
+		//
+		
+	//	CTCCTGACTCCAGGTCCTGTGTGTTACCTAGAAATAGCACTGGACTTGGAGTCAGAAGGC
+			
+		//System.out.println(fasta.getComplementarySequence(fasta.getSequence("chr5", 128924558,  128924558 + 10), true));
+		
+		//TGTTAAACTCTATATTTACCCTTTAATTCATATCTTGCGAAATAAAGTAAAATATATTAGTAGTCAAATTAGGGTA
+
+
+		//System.out.println(fasta.getSequence("chr2", 176605922 - Scorer.flankingNTNumber + 1,  176605922 + 25));		
+		//System.out.println(fasta.getSequence("chr2", 176605922, 176605922+4));
+		
+		//System.out.println(fasta.getComplementarySequence(fasta.getSequence("chr5", 59890549 - Scorer.flankingNTNumber + 1,  59890549 + 25), true));
+		
+		//System.out.println(fasta.getComplementarySequence(fasta.getSequence("chr5", 59890549,  59890549 + 4), true));
+		
+	//	System.out.println(fasta.getSequence("chr5", 870222-Scorer.flankingNTNumber+1,   870293+Scorer.flankingNTNumber    +1));
+		
+		
+		//System.out.println(fasta.getComplementarySequence(fasta.getSequence("chr17", 54968075-f, 54968188+f+1), true));
+			
+
+	//	System.out.println(fasta.getSequence("chr5", 1318162-Scorer.flankingNTNumber+1,   1318258+Scorer.flankingNTNumber));
+		
+	//	TCAGCCTCCATTGATCAACGGCTGACCTTCTGGCGTCTGGGGCATGGTGAACCCACCTTCATGAATAGCACTGTGTTCCATGTGCCTGATGTGGCTGACATGGACTGCTGGCCTGTGAGC
+	//	TTTCCGGAAGCTCGCAGCTTGGCCTGCACCACACGCCCTCCCCTTTTGGCTTCACGCCATCAGGCCTCAAGTGGGCATGGGGGCAGGGACGGGCCCAGGAACTGTTGTTTTCTCAGGAT
+
+	//	int t = 136328604;
+	//	System.out.println(fasta.getSequence("chr9", t-2, t));
 	//	System.out.println(fasta.getSequence("chr10", 53411805+5000+1, 53411805+1));
 	///	System.out.println(fasta.getSequence("chr10", 53411805+5000-1, 53411805-1));
 	}

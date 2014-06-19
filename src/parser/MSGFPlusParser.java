@@ -15,6 +15,8 @@ import msutil.Peptide;
 import net.sf.samtools.util.BufferedLineReader;
 
 public class MSGFPlusParser {
+	private String header = "";
+	
 	public class MSGFPlusPSM{
 		private String specFile;
 		private String specID;
@@ -35,8 +37,13 @@ public class MSGFPlusParser {
 		private float qvalue = -1; // optional
 		private float pepQvalue = -1; // optional
 		private String misc = "";
+		
 		public String getSpecFile() {
 			return specFile;
+		}
+		
+		public String getMiscString(){
+			return misc;
 		}
 
 		public String getSpecID() {
@@ -104,6 +111,36 @@ public class MSGFPlusParser {
 		public char[] getPostAAs(){
 			return postAAs;
 		}
+		
+		@Override
+		public String toString(){
+			StringBuffer ret = new StringBuffer();
+			ret.append(specFile);ret.append('\t');
+			ret.append(specID);ret.append('\t');
+			ret.append(scanNumber);ret.append('\t');
+			ret.append(fragMethod);ret.append('\t');
+			ret.append(precursor);ret.append('\t');
+			ret.append(isotopeErr);ret.append('\t');
+			ret.append(precursorErr);ret.append('\t');
+			ret.append(charge);ret.append('\t');
+			ret.append(peptide);ret.append('\t');
+			for(int i=0; i<proteins.length;i++){
+				ret.append(proteins[i]);ret.append(i<proteins.length-1 ? ";" : "\t");
+			}
+			
+			ret.append(deNovoScore);ret.append('\t');
+			ret.append(msgfScore);ret.append('\t');
+			ret.append(specEvalue);ret.append('\t');
+			ret.append(evalue);
+			if(qvalue > -1){
+				ret.append('\t'); ret.append(qvalue);
+				ret.append('\t'); ret.append(pepQvalue);
+			}
+			ret.append('\t');
+			ret.append(misc);
+			return ret.toString();
+		}	
+		
 		public MSGFPlusPSM(String s){
 			String[] token = s.split("\t");
 			specFile = token[0];
@@ -182,6 +219,7 @@ public class MSGFPlusParser {
 			
 			String annotation = sequence.getAnnotation(start).split(";")[0];
 			int spaceIndex = annotation.indexOf(' ');
+			if(spaceIndex < 0) spaceIndex = annotation.length();
 			String proteinID = annotation.substring(0, spaceIndex);
 			String proteinName = annotation.substring(spaceIndex);
 			//System.out.println();
@@ -225,29 +263,7 @@ public class MSGFPlusParser {
 		}
 	
 		
-		/*@Override
-		public String toString(){
-			StringBuffer ret = new StringBuffer();
-			ret.append(specFile);ret.append('\t');
-			ret.append(specID);ret.append('\t');
-			ret.append(scanNumber);ret.append('\t');
-			ret.append(fragMethod);ret.append('\t');
-			ret.append(precursor);ret.append('\t');
-			ret.append(isotopeErr);ret.append('\t');
-			ret.append(precursorErr);ret.append('\t');
-			ret.append(charge);ret.append('\t');
-			ret.append(peptide);ret.append('\t');
-			ret.append(protein);ret.append('\t');
-			ret.append(deNovoScore);ret.append('\t');
-			ret.append(msgfScore);ret.append('\t');
-			ret.append(specEvalue);ret.append('\t');
-			ret.append(evalue);
-			if(qvalue > -1){
-				ret.append('\t'); ret.append(qvalue);
-				ret.append('\t'); ret.append(pepQvalue);
-			}
-			return ret.toString();
-		}	*/
+	
 	}
 	
 	private ArrayList<MSGFPlusPSM> psms;
@@ -257,7 +273,10 @@ public class MSGFPlusParser {
 			BufferedLineReader in = new BufferedLineReader(new FileInputStream(fileName));
 			String s;
 			while((s=in.readLine())!=null){
-				if(s.startsWith("#")) continue;
+				if(s.startsWith("#")){
+					header = s;
+					continue;
+				}
 				psms.add(new MSGFPlusPSM(s));
 			}in.close();
 		} catch (FileNotFoundException e) {
@@ -268,6 +287,7 @@ public class MSGFPlusParser {
 	public ArrayList<MSGFPlusPSM> getPsms() {
 		return psms;
 	}
+	public String getHeader(){ return header;}
 	
 	static public void main(String[] args){
 		

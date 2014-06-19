@@ -12,11 +12,12 @@ import parser.AnnotationFileParser;
 import parser.Bed12Parser;
 import rpf.Scorer;
 import util.MatchedFilter;
+import virmid.MC;
 
 public class ScorerTrainer {
 	private int leftWindowSize = 30;
-	private int rightWindowSize = 200;
-	private int readCountThreshold = 1;
+	private int rightWindowSize = 60;
+	private int maxDepthThreshold = 1;
 	//private int coverageThreshold = 1;
 	
 	private ArrayList<double[]> signal3p = null;
@@ -46,7 +47,7 @@ public class ScorerTrainer {
 	public void train(int leftWindowSize, int rightWindowSize, int numberOfNonZeroElements){
 		this.leftWindowSize = leftWindowSize;
 		this.rightWindowSize = rightWindowSize;
-		this.readCountThreshold = numberOfNonZeroElements;
+		this.maxDepthThreshold = numberOfNonZeroElements;
 		//this.coverageThreshold = coverageThreshold;
 		signal5p = new ArrayList<double[]>();
 		noise5p = new ArrayList<double[]>();
@@ -68,10 +69,15 @@ public class ScorerTrainer {
 		write(outParamFile);
 	}
 	
-	private int getMaxCenterOffset(double[] cov, int window){
+	private int getMaxCenterOffset(double[] cov, int window, boolean leftSide){
 		int maxOffset = window;
 		double max = 0;
 		for(int i=0;i<cov.length;i++){
+			if(leftSide){
+				if(i>window) break;
+			}else{
+				if(i<=window) continue;
+			}
 			if(max < cov[i]){
 				max = cov[i];
 				maxOffset = i;
@@ -92,22 +98,25 @@ public class ScorerTrainer {
 	private void getSignalNNoise(String contig){
 		Iterator<MiRNA> iterator = mirParser.getMiRNAIterator(contig);
 		if(iterator == null) return;
-		double valoffset = .0001;
+		double valoffset = .0;
 		Bed12Parser bedParser = new Bed12Parser(bedfileName, annotationParser, contig, true);
 		while(iterator.hasNext()){
 			MiRNA mi = iterator.next();
 			boolean isPlusStrand = mi.isPlusStrand();		
 			double[] cov5p = bedParser.get5pCoverages(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize));
 			
-			int maxOffset5p = getMaxCenterOffset(cov5p, leftWindowSize);
+			int maxOffset5p = getMaxCenterOffset(cov5p, leftWindowSize, true);
 			cov5p = bedParser.get5pCoverages(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p));
-			double[] dep5p = bedParser.getDepths(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p));
+			double[] _cov3p = bedParser.get3pCoverages(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p));
+			
+			double[] dep5p = bedParser.get5pSignalForfCLIP(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p));
 					
 			double[] cov3p = bedParser.get3pCoverages(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize));
-			
-			int maxOffset3p = getMaxCenterOffset(cov3p, rightWindowSize + 1);
+			int maxOffset3p = getMaxCenterOffset(cov3p, rightWindowSize, false) + 1;
 			cov3p = bedParser.get3pCoverages(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, maxOffset3p));
-			double[] dep3p = bedParser.getDepths(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, maxOffset3p));
+			double[] _cov5p = bedParser.get5pCoverages(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, maxOffset3p));
+			
+			double[] dep3p = bedParser.get3pSignalForfCLIP(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, maxOffset3p));
 			
 			//System.out.println(mi.get3pCoordinate(leftWindowSize, rightWindowSize));
 			//System.out.println("*" + mi.get5pCoordinate(rightWindowSize, leftWindowSize));
@@ -120,37 +129,44 @@ public class ScorerTrainer {
 				for(double c : cov3p) System.out.print(c + " ");
 				System.out.println();
 			}
-		*/
+		*/	
 			
-			if(Scorer.sum(cov5p) >= readCountThreshold){		
+			
+			if(Scorer.max(cov5p) >= maxDepthThreshold || Scorer.max(_cov3p) >= maxDepthThreshold){		
 				Scorer.normalize(dep5p, (new Random().nextDouble() - .5) * valoffset);
 				signal5p.add(dep5p);	
 			}
-			if(Scorer.sum(cov3p) >= readCountThreshold){
+			if(Scorer.max(cov3p) >= maxDepthThreshold|| Scorer.max(_cov5p) >= maxDepthThreshold){
 				Scorer.normalize(dep3p, (new Random().nextDouble() - .5) * valoffset);
 				signal3p.add(dep3p);	
 			}
 			
 			HashSet<Integer> offsets = new HashSet<Integer>();
-			for(int i=0;i<50;i++){
-				int offset =  (new Random().nextInt(50000)) + 1500;
+			for(int i=0;i<5000;i++){
+				int offset =  (new Random().nextInt(5000000)) - 5000000/2;
+				if(Math.abs(offset) < 10000) continue;
 				if(offsets.contains(offset)) continue;
 				offsets.add(offset);
-				offset = isPlusStrand? offset : - offset;
+				//offset = isPlusStrand? offset : - offset;
 				double[] noiseCov5p =  bedParser.get5pCoverages(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, offset));
+				double[] _noiseCov3p =  bedParser.get3pCoverages(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, offset));
+				
 				//noiseCov5p = bedCov5PFileParser.getCoverages(mi.getContig(), pos5p + offset + getMaxCenterOffset(noiseCov5p), leftWindowSize, rightWindowSize, isPlusStrand);
-				if(Scorer.sum(noiseCov5p) > readCountThreshold){	
-					double[] noiseDep5p = bedParser.getDepths(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, offset));
+				if(Scorer.max(noiseCov5p) > maxDepthThreshold || Scorer.max(_noiseCov3p) > maxDepthThreshold){	
+					double[] noiseDep5p = bedParser.get5pSignalForfCLIP(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, offset));
 					Scorer.normalize(noiseDep5p, (new Random().nextDouble() - .5) * valoffset);
+					noiseDep5p = MC.multiply(noiseDep5p, 0.5);
 					noise5p.add(noiseDep5p);
 				}
 				
 				double[] noiseCov3p = bedParser.get3pCoverages(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, offset));
+				double[] _noiseCov5p = bedParser.get5pCoverages(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, offset));
 				//noiseCov3p = invert(noiseCov3p);
 				//noiseCov3p = bedCov5PFileParser.getCoverages(mi.getContig(), pos3p + offset + getMaxCenterOffset(noiseCov3p), leftWindowSize, rightWindowSize, !isPlusStrand);
-				if(Scorer.sum(noiseCov3p) > readCountThreshold){	
-					double[] noiseDep3p = bedParser.getDepths(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, offset));
+				if(Scorer.max(noiseCov3p) > maxDepthThreshold || Scorer.max(_noiseCov5p) > maxDepthThreshold){	
+					double[] noiseDep3p = bedParser.get3pSignalForfCLIP(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, offset));
 					Scorer.normalize(noiseDep3p, (new Random().nextDouble() - .5) * valoffset);
+					noiseDep3p = MC.multiply(noiseDep3p, 0.5);
 					noise3p.add(noiseDep3p);
 				}
 			}	
@@ -165,7 +181,7 @@ public class ScorerTrainer {
 			
 			out.println("#LEFT\t"+leftWindowSize);
 			out.println("#RIGHT\t"+rightWindowSize);
-			out.println("#READCOUNTTHRESHOLD\t"+readCountThreshold);
+			out.println("#MAXDEPTHTHRESHOLD\t"+maxDepthThreshold);
 			//out.println("#COVTHRESHOLD\t"+coverageThreshold);
 			
 			out.println("#SIGNAL5P\t"+avgedSignal5p.length);
@@ -212,10 +228,11 @@ public class ScorerTrainer {
 	}
 	
 	public static void main(String[] args){
-		ScorerTrainer test = new ScorerTrainer("/media/kyowon/Data1/fCLIP/samples/sample1/bed/Drosha2.sorted.bed", 
+		String sample = args[0];
+		ScorerTrainer test = new ScorerTrainer("/media/kyowon/Data1/fCLIP/samples/sample2/bed/" + sample + ".sorted.bed", 
 				new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa.gff3"), 
-				new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg19.refFlat.txt"), "/media/kyowon/Data1/fCLIP/samples/sample1/bed/Drosha2.sorted.param");
-		test.train(10, 30, 40);
+				new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg19.refFlat.txt"), "/media/kyowon/Data1/fCLIP/samples/sample2/bed/" + sample + ".sorted.param");
+		test.train(30, 40, 4);
 	}
 	
 }

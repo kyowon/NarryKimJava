@@ -98,6 +98,7 @@ public class MirGff3FileParser {
 			return get5pCoordinate(leftWindowSize, rightWindowSize, 0);
 		}
 		
+		// left window inclusive
 		public ArrayList<Integer> get5pCoordinate(int leftWindowSize, int rightWindowSize, int offset){
 			ArrayList<Integer> coordinate = new ArrayList<Integer>();
 			if(isPlusStrand){

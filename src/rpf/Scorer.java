@@ -358,6 +358,12 @@ public class Scorer {
 		return sum;
 	}
 	
+	public static double max(double[] v){
+		double max = Double.NEGATIVE_INFINITY;
+		for(double s : v) max = max < s? s : max;
+		return max;
+	}
+	
 	public static double getNorm(double[] v){
 		double sum = 0;
 		for(double t : v){
@@ -403,6 +409,30 @@ public class Scorer {
 				v[i] += offset;
 			}
 		}
+		
+		double norm = getNorm(v);
+		if(norm > 0){
+			for(int i=0; i<v.length;i++){
+				v[i] /= norm;
+			}
+		}
+	}
+	
+	public static void normalize(double[][] m){
+		normalize(m, 0);
+	}
+	public static void normalize(double[][] m, double offset){
+		//double sum = 0;
+		//for(int i=0; i<v.length;i++){
+			//v[i] = v[i] * v[i];
+		//	sum += v[i];
+		//}
+		double[] v = new double[m.length];
+		
+		for(int i=0; i<v.length;i++){
+			v[i] = m[i][0] + offset;
+		}
+		
 		
 		double norm = getNorm(v);
 		if(norm > 0){

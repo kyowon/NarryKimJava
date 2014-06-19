@@ -24,6 +24,9 @@ public class MafParser {
 	private HashMap<String, String> fileNameMap;
 //	private Bed12Parser parser;
 	public static int minNumSpecies = 0;
+
+	
+	
 	
 	public MafParser(String folderName){
 		this.folderName = folderName;
@@ -49,6 +52,11 @@ public class MafParser {
 					indexMap.put(contig, new HashMap<Integer, Long>());
 					indexSPositions.put(contig, new ArrayList<Integer>());
 					indexSubMap = indexMap.get(contig);
+					
+					
+					
+					
+					
 					indexSubSPositions = indexSPositions.get(contig);
 					continue;
 				}
@@ -163,11 +171,67 @@ public class MafParser {
 		return;
 	}
 		
+	
+	public String getSeqsInMafFormat(String contig, int position, boolean isPlusStrand, int length){
+		ArrayList<StringBuffer> seqs = getSubSeqs(contig, position, isPlusStrand, length);
+		StringBuffer out = new StringBuffer();
+		out.append("a score=1\n");
+		for(int i=0;i<seqs.size();i++){
+			if(seqs.get(i).length() == 0) continue;
+			out.append("s s " + i + " 1 "); 
+			out.append(isPlusStrand? "+ 1 " : "- 1 ");
+			out.append(seqs.get(i));
+			out.append('\n');
+		}
+		return out.toString();
+	}
+	
+	public String[] getSeqs(String contig, int position, boolean isPlusStrand, int length){
+		ArrayList<StringBuffer> seqs = getSubSeqs(contig, position, isPlusStrand, length);
+		String[] ret = new String[seqs.size()];
+		for(int i=0;i<seqs.size();i++){
+			ret[i] = seqs.get(i).toString();
+		}
+		return ret;
+	}
+	
+	public String getSeqsInMafFormat(String[] contigs, int[] positions, boolean[] strands, int length){
+		ArrayList<ArrayList<StringBuffer>> subSeqs = new ArrayList<ArrayList<StringBuffer>>();
+		for(int i=0;i<contigs.length;i++){
+			ArrayList<StringBuffer> subSeq = getSubSeqs(contigs[i], positions[i], strands[i], length);
+			subSeqs.add(subSeq);
+		}
+		ArrayList<StringBuffer> seqs = mergeSubSeqs(subSeqs);
+		StringBuffer out = new StringBuffer();
+		out.append("a score=1\n");
+		for(int i=0;i<seqs.size();i++){
+			out.append("s s " + i + " 1 "); 
+			out.append(strands[0]? "+ 1 " : "- 1 ");
+			out.append(seqs.get(i));
+			out.append('\n');
+		}
+		return out.toString();
+	}
+	
+	public String[] getSeqs(String[] contigs, int[] positions, boolean[] strands, int length){
+		ArrayList<ArrayList<StringBuffer>> subSeqs = new ArrayList<ArrayList<StringBuffer>>();
+		for(int i=0;i<contigs.length;i++){
+			ArrayList<StringBuffer> subSeq = getSubSeqs(contigs[i], positions[i], strands[i], length);
+			subSeqs.add(subSeq);
+		}
+		ArrayList<StringBuffer> seqs = mergeSubSeqs(subSeqs);
+		String[] ret = new String[seqs.size()];
+		for(int i=0;i<seqs.size();i++){
+			ret[i] = seqs.get(i).toString();
+		}
+		return ret;
+	}
+	
 	private ArrayList<StringBuffer> getSubSeqs(String contig, int position, boolean isPlusStrand, int length){
-		ArrayList<StringBuffer> ret = new ArrayList<StringBuffer>();
+		ArrayList<StringBuffer> tmp = new ArrayList<StringBuffer>();
 		//System.out.println(position + " " + length);
 		if(!isPlusStrand) position -= length-1;
-		if(!indexSPositions.containsKey(contig)) return ret; 
+		if(!indexSPositions.containsKey(contig)) return tmp; 
 		int index = Collections.binarySearch(indexSPositions.get(contig), position);
 		index = index<0? -index-2: index ; 
 		index--;
@@ -181,18 +245,15 @@ public class MafParser {
 			e.printStackTrace();
 		}
 		
-		getSubSeqs(position, length, -1, ret);
-		//String[] seqs = new String[ret.size()];
-		//for(int i=0;i<seqs.length;i++){
-		//	seqs[i] = ret.get(i).toString();
-			//if(!isPlusStrand) seqs[i] = Nucleotide.getComplementarySeq(seqs[i]); 
-		//}
+		getSubSeqs(position, length, -1, tmp);
+		ArrayList<StringBuffer> ret = new ArrayList<StringBuffer>();
+		for(StringBuffer t : tmp) if(t.length()>0) ret.add(t);
 		return ret;
 	}
 
 	public String[] getSeqs(String contig, ArrayList<Integer> coordinate, int position, boolean isPlusStrand, int length){
 		ArrayList<ArrayList<StringBuffer>> subSeqs = new ArrayList<ArrayList<StringBuffer>>();
-		int maxNum = 0;
+		//int maxNum = 0;
 		//boolean startFlag = false;
 		for(ArrayList<Integer> subPositions : Bed12Parser.getCoordinateStartsEnds(coordinate, isPlusStrand)){
 			int start = subPositions.get(0);
@@ -206,24 +267,37 @@ public class MafParser {
 				end = Math.min(position + 1, end);
 			}
 			
-			//System.out.println(subPositions.size());//102410577 102410428
-			//System.out.println(start + " " + end);
 			length -= (end - start);
 			ArrayList<StringBuffer> subSeq = getSubSeqs(contig, isPlusStrand? start : end - 1, isPlusStrand, end - start + (length<0? length : 0));
 			
 			//System.out.println(subSeq.size());
 			subSeqs.add(subSeq);
-			maxNum = Math.max(maxNum, subSeq.size());
+			//maxNum = Math.max(maxNum, subSeq.size());
 			if(length <=0) break;
 		}
+		ArrayList<StringBuffer> seqs = mergeSubSeqs(subSeqs);
+		String[] ret = new String[seqs.size()];
+		for(int i=0;i<ret.length;i++){
+			ret[i] = seqs.get(i).toString();
+			if(!isPlusStrand) ret[i] = Nucleotide.getComplementarySeq(ret[i]);
+		}
+		return ret;
+	}
+	
+	
+	private ArrayList<StringBuffer> mergeSubSeqs(ArrayList<ArrayList<StringBuffer>> subSeqs){
 		ArrayList<StringBuffer> seqs = new ArrayList<StringBuffer>();
-		for(int j=0;j<maxNum;j++){
+		int max = 0;
+		for(ArrayList<StringBuffer> subSeq : subSeqs){
+			max = Math.max(max, subSeq.size());
+		}
+		for(int j=0;j<max;j++){
 			seqs.add(new StringBuffer());
 		}
 		
 		for(int i=0;i<subSeqs.size();i++){
 			ArrayList<StringBuffer> subSeq = subSeqs.get(i);
-			for(int j=0;j<maxNum;j++){
+			for(int j=0;j<max;j++){
 				if(j<subSeq.size()){
 					seqs.get(j).append(subSeq.get(j));
 				}else if(!subSeq.isEmpty()){
@@ -232,12 +306,7 @@ public class MafParser {
 				}
 			}
 		}
-		String[] ret = new String[seqs.size()];
-		for(int i=0;i<ret.length;i++){
-			ret[i] = seqs.get(i).toString();
-			if(!isPlusStrand) ret[i] = Nucleotide.getComplementarySeq(ret[i]);
-		}
-		return ret;
+		return seqs;
 	}
 	
 	private void readChunk(RandomAccessFile accessFile, int lastPosition){
@@ -304,7 +373,7 @@ public class MafParser {
 		}
 		*/
 		
-		String file = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/";
+		String file = "/media/kyowon/Data1/RPF_Project/genomes/hg9/maf/";
 		//MafParser.minNumSpecies
 		MafParser test = new MafParser(file);
 		test.generateIndexFile();
