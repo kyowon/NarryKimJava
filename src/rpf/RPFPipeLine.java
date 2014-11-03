@@ -6,6 +6,7 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 
+import launcher.PhyloPLauncher;
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
 import parser.MafParser;
@@ -122,7 +123,9 @@ public class RPFPipeLine {
 				System.out.print("; ");
 			}
 			System.out.println();
-		}else ret = false;
+		}else if(mode == 19) {
+			PhyloPLauncher.setModFile(s);
+		} else ret = false;
 		
 		
 		
@@ -177,7 +180,11 @@ public class RPFPipeLine {
 				mode = 17;
 			}else if(args[i].equals("-groups")){
 				mode = 18;
+			}else if(args[i].equals("-phyloPModFile")){
+				mode = 19;
 			}
+			
+			
 			//
 			else{
 				s += args[i] + " ";
@@ -315,6 +322,7 @@ public class RPFPipeLine {
 				+ "\n-maf [maf file folder]"
 				+ "\n-fasta [fasta file]"
 				+ "\n-ref [refFlat file]"
+				+ "\n-phyloPModFile [phyloP mod file]"
 				+ "\n-groups [group info (0-based, sample seperated by , and group seperated by space  For example, 0,1,2,3 4,5,6 means 0 1 2 3 are one group and 4 5 6 are the other)]"
 				+ "\n-scoreThreshold [scoreThreshold - default 0.3]"
 				//+ "\n-rpfRPKMThreshold [rpf RPKM threshold - default 0]"

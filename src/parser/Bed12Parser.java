@@ -19,16 +19,16 @@ public class Bed12Parser {
 		//private String contig;
 		private int[] fivePs;// inclusive
 		private int[] threePs; // inclusive
-		private short[] depth = null;
+		private int[] depth = null;
 		
 		//private boolean isPlusStrand;
 		
-		public Bed12Read(String s){
+		public Bed12Read(String s, boolean invertStrand){
 			String[] token = s.split("\t");
 			//this.contig = token[0];
 			int start = Integer.parseInt(token[1]);
 			boolean isPlusStrand = token[5].equals("+");
-			
+			if(invertStrand) isPlusStrand = !isPlusStrand;
 			String[] lenString = token[10].split(",");
 			int[] lens = new int[lenString.length]; 
 			for(int i=0;i<lenString.length;i++){
@@ -51,15 +51,23 @@ public class Bed12Parser {
 					fivePs[fivePs.length - i - 1] = start + starts[i] + lens[i] - 1;
 					threePs[threePs.length - i - 1] = fivePs[fivePs.length - i - 1] - lens[i] + 1;
 				}
-			}			
+			}	
+		//	if(!isPlusStrand) System.out.println(this); //TODO
 		}
 		
 		public boolean isSpliced(){
 			return fivePs.length > 1;
 		}
 		
-		public short get5pDepth() {return depth == null? 1 : depth[0];}
-		public short get3pDepth() {return (depth == null || depth.length < 2) ? 1: depth[1];}
+		public int getLength(){
+			int len = 0;
+			for(int i=0;i<fivePs.length;i++){
+				len += fivePs[i] - threePs[i] + 1;
+			}
+			return len>0? len : -len;
+		}
+		public int get5pDepth() {return depth == null? 1 : depth[0];}
+		public int get3pDepth() {return (depth == null || depth.length < 2) ? 1: depth[1];}
 		
 		public int get5p(){
 			return fivePs[0];
@@ -79,18 +87,18 @@ public class Bed12Parser {
 		
 		private void initDepth(){
 			if(depth != null) return;
-			depth = new short[read3p? 2 : 1];
+			depth = new int[read3p? 2 : 1];
 			for(int i=0;i<depth.length;i++){
 				depth[i] = 1;
 			}
 		}
 		
-		public void set5pDepth(short i){
+		public void set5pDepth(int i){
 			initDepth();
 			depth[0] = i;
 		}
 		
-		public void set3pDepth(short i){
+		public void set3pDepth(int i){
 			initDepth();
 			depth[1] = i;
 		}
@@ -233,7 +241,7 @@ public class Bed12Parser {
 
 	private HashMap<Boolean, HashMap<Integer, ArrayList<Bed12Read>>> read5pMap;
 	private HashMap<Boolean, HashMap<Integer, ArrayList<Bed12Read>>> read3pMap;
-	private HashMap<Boolean, HashMap<Integer, Short>> readDepthMap;
+	private HashMap<Boolean, HashMap<Integer, Integer>> readDepthMap;
 	private HashMap<Boolean, HashMap<Integer, HashSet<Integer>>> splices3pDirection; // inclusive
 	private HashMap<Boolean, HashMap<Integer, HashSet<Integer>>> splices5pDirection; // inclusive
 	private int totalReadCount = 0;
@@ -256,13 +264,17 @@ public class Bed12Parser {
 	}
 	
 	public Bed12Parser(String filename, AnnotationFileParser annotationParser, String contig, boolean read3p){
+		this(filename, annotationParser, contig, read3p, false);
+	}
+	
+	public Bed12Parser(String filename, AnnotationFileParser annotationParser, String contig, boolean read3p, boolean invertStrand){
 		Bed12Read.read3p = read3p;
 		this.filename = filename;
 		this.contig = contig;
 		read5pMap = new HashMap<Boolean, HashMap<Integer,ArrayList<Bed12Read>>>(); 
 		if(read3p){ 
 			read3pMap = new HashMap<Boolean, HashMap<Integer,ArrayList<Bed12Read>>>();
-			readDepthMap = new HashMap<Boolean, HashMap<Integer,Short>>();
+			readDepthMap = new HashMap<Boolean, HashMap<Integer,Integer>>();
 		}
 		splices3pDirection = new HashMap<Boolean, HashMap<Integer,HashSet<Integer>>>();
 		splices5pDirection = new HashMap<Boolean, HashMap<Integer,HashSet<Integer>>>();
@@ -272,19 +284,19 @@ public class Bed12Parser {
 			String s;
 			while((s=in.readLine())!=null){
 				totalReadCount++;
+				if(!s.startsWith(this.contig)) continue;
 				String[] token = s.split("\t");
-				if(!token[0].equals(this.contig)) continue;
-				Bed12Read read = new Bed12Read(s);
+				Bed12Read read = new Bed12Read(s, invertStrand);
 				
 				boolean isPlusStrand = token[5].equals("+");//l//read.isPlusStrand();
-				
+				if(invertStrand) isPlusStrand = !isPlusStrand;
 			//	HashMap<Boolean, ArrayList<Bed12Read>> sreadList = readList.get(contig);
 				
 				if(!read5pMap.containsKey(isPlusStrand)){
 					read5pMap.put(isPlusStrand, new HashMap<Integer,ArrayList<Bed12Read>>());
 					if(read3p){
 						read3pMap.put(isPlusStrand, new HashMap<Integer,ArrayList<Bed12Read>>());
-						readDepthMap.put(isPlusStrand, new HashMap<Integer, Short>());
+						readDepthMap.put(isPlusStrand, new HashMap<Integer, Integer>());
 					}
 					splices3pDirection.put(isPlusStrand, new HashMap<Integer, HashSet<Integer>>());
 					splices5pDirection.put(isPlusStrand, new HashMap<Integer, HashSet<Integer>>());
@@ -299,7 +311,7 @@ public class Bed12Parser {
 				Bed12Read lastRead = null;
 				if(ssreads.size() > 0) lastRead = ssreads.get(ssreads.size()-1);
 				if(lastRead != null &&read.equals(lastRead)){
-					lastRead.set5pDepth((short)(lastRead.get5pDepth()+1));
+					lastRead.set5pDepth((lastRead.get5pDepth()+1));
 				}else
 					ssreads.add(read);
 				
@@ -313,24 +325,28 @@ public class Bed12Parser {
 					Bed12Read lastRead3p = null;
 					if(ssreads3p.size() > 0) lastRead3p = ssreads3p.get(ssreads3p.size()-1);
 					if(lastRead3p != null && read.equals(lastRead3p)){
-						lastRead3p.set3pDepth((short)(lastRead3p.get3pDepth()+1));
+						lastRead3p.set3pDepth((lastRead3p.get3pDepth()+1));
 					}else
 						ssreads3p.add(read);
 					
 				//	if(position3p == 133680428-5) System.out.println(ssreads3p.size());
 					
-					HashMap<Integer, Short> sreadDepth = readDepthMap.get(isPlusStrand);
+					HashMap<Integer, Integer> sreadDepth = readDepthMap.get(isPlusStrand);
 					if(isPlusStrand){
-						for(int p=read.get5p();p<=read.get3p();p++){
-							Short  n = sreadDepth.get(p);
-							n = n==null? 0 : n;
-							sreadDepth.put(p, (short)(n + 1));
+						for(int en =0;en<read.fivePs.length;en++){
+							for(int p=read.get5ps()[en];p<=read.get3ps()[en];p++){
+								Integer  n = sreadDepth.get(p);
+								n = n==null? 0 : n;
+								sreadDepth.put(p, (n + 1));
+							}
 						}
 					}else{
-						for(int p=read.get3p();p<=read.get5p();p++){
-							Short  n = sreadDepth.get(p);
-							n = n==null? 0 : n;
-							sreadDepth.put(p, (short)(n + 1));
+						for(int en =0;en<read.fivePs.length;en++){
+							for(int p=read.get3ps()[en];p<=read.get5ps()[en];p++){
+								Integer  n = sreadDepth.get(p);
+								n = n==null? 0 : n;
+								sreadDepth.put(p, (n + 1));
+							}
 						}
 					}
 				}
@@ -596,7 +612,7 @@ public class Bed12Parser {
 		
 		for(int i=0;i<signal.length;i++){
 		//	if(i%2 == 0){
-				signal[i] = depths[i] -  (covs5p[i] / (Math.max(depths[i] - covs5p[i] + 1, 1)) * (i>0 ? covs3p[i-1] : 0));
+				signal[i] = depths[i]==0? 0 : depths[i]  -  ((covs5p[i]+1) * (covs5p[i]/depths[i]) * (i>0 ? covs3p[i-1] + 1 : 0));
 				signal[i] = Math.sqrt(Math.abs(signal[i])) * Math.signum(signal[i]);
 		//	}else{
 			//	signal[i] = depths[i/2];// +  covs5p[i/2] ;
@@ -615,8 +631,9 @@ public class Bed12Parser {
 		
 		for(int i=0;i<signal.length;i++){
 		//	if(i%2 == 0){
-				signal[i] = depths[i] -  (covs3p[i] / (Math.max(depths[i] - covs3p[i] + 1, 1)) * (i<covs5p.length-1 ? covs5p[i+1] : 0));
-				signal[i] = Math.sqrt(Math.abs(signal[i])) * Math.signum(signal[i]);
+			//System.out.println(depths[i] + " " + covs3p[i] + " " + covs5p[i+1]);
+			signal[i] =  depths[i]==0? 0 : depths[i] - ((covs3p[i]+1) * (covs3p[i]/depths[i]) * (i<covs5p.length-1? covs5p[i+1] + 1: 0));
+			signal[i] = Math.sqrt(Math.abs(signal[i])) * Math.signum(signal[i]);
 		//	}else{
 			//	signal[i] = depths[i/2];// +  covs5p[i/2] ;
 		//	}
@@ -652,11 +669,11 @@ public class Bed12Parser {
 	// do not consider mapped reads to the coordinate...
 	public double[] getDepths(boolean isPlusStrand, ArrayList<Integer> coordinate){
 		double[] covs = new double[coordinate.size()];	
-		HashMap<Integer, Short> sreadDepth = readDepthMap.get(isPlusStrand);
+		HashMap<Integer, Integer> sreadDepth = readDepthMap.get(isPlusStrand);
 		if(sreadDepth == null) return covs;
 		for(int i =0; i<coordinate.size(); i++){
 			int position = coordinate.get(i);
-			Short s = sreadDepth.get(position);
+			Integer s = sreadDepth.get(position);
 			if(s == null) s = 0;
 			
 			covs[i] = s;
@@ -664,6 +681,54 @@ public class Bed12Parser {
 		
 		return covs;
 		//sreadDepth
+	}
+	
+	public ArrayList<Bed12Read> get3pReads(boolean isPlusStrand, int p){
+		if(read3pMap == null) return null;
+		HashMap<Integer, ArrayList<Bed12Read>> ssreads = read3pMap.get(isPlusStrand);
+		if(ssreads == null) return null;
+		return ssreads.get(p);
+	}
+	
+	public int get3pDepth(boolean isPlusStrand, int p){
+		 ArrayList<Bed12Read> reads = get3pReads(isPlusStrand, p);
+		 int d = 0;
+		 if(reads !=null){
+			 for(Bed12Read r : reads){
+				 d += r.get3pDepth();
+			 }
+		 }
+		 return d;
+	}
+	
+	public int get5pDepth(boolean isPlusStrand, int p){
+		 ArrayList<Bed12Read> reads = get5pReads(isPlusStrand, p);
+		 int d = 0;
+		 if(reads !=null){
+			 for(Bed12Read r : reads){
+				 d += r.get5pDepth();
+			 }
+		 }
+		 return d;
+	}
+	
+	public int getReadDepth(boolean isPlusStrand, int p5p, int p3p){ // 5p 3p both inclusive
+		ArrayList<Bed12Read> reads = get5pReads(isPlusStrand, p5p);
+		int d = 0;
+		if(reads !=null){
+			 for(Bed12Read r : reads){
+				 if(r.get3p() != p3p) continue;
+				 d += r.get5pDepth();
+			 }
+		 }
+		 return d;
+	}
+	
+	public ArrayList<Bed12Read> get5pReads(boolean isPlusStrand, int p){
+		if(read5pMap == null) return null;
+		HashMap<Integer, ArrayList<Bed12Read>> ssreads = read5pMap.get(isPlusStrand);
+		if(ssreads == null) return null;
+		return ssreads.get(p);
 	}
 	
 	public double[] get3pCoverages(boolean isPlusStrand, ArrayList<Integer> coordinate){
@@ -701,6 +766,12 @@ public class Bed12Parser {
 		return get5pCoverages(gene.isPlusStrand(), coordinate);
 	}
 	
+	public double[] getCoverages(AnnotatedGene gene){
+		if(!contig.equals(getContig())) return null;
+		ArrayList<Integer> coordinate = gene.getLiftOverPositions(gene.isPlusStrand() ? gene.getTxStart() : gene.getTxEnd() - 1, 0, Math.abs(gene.getTxStart() - gene.getTxEnd()), false);
+		return get5pCoverages(gene.isPlusStrand(), coordinate);
+	}
+	
 	private ArrayList<ArrayList<Integer>> updateCoordinates(ArrayList<ArrayList<Integer>> coordinates, HashMap<Integer,HashSet<Integer>> ss, int len, boolean sign){
 		if(len <= 0) return coordinates;		
 		ArrayList<ArrayList<Integer>> newCoordinates = new ArrayList<ArrayList<Integer>>();
@@ -724,29 +795,28 @@ public class Bed12Parser {
 		return updateCoordinates(newCoordinates, ss, len-1, sign);
 	}
 	
-	static public void main(String[] args){//565858,413662
+	/*static public void main(String[] args){//565858,413662
 		//Bed12Read read = new Bed12Read("chr17	15142909	15165755	0_349741-3	255	-	15142909	15165755	255,0,0	2	19,10	0,22836");
 		//System.out.println(read);
 		
 		//
-		Bed12Parser bedParser = new Bed12Parser("/media/kyowon/Data1/fCLIP/samples/sample2/bed/x2.sorted.bed", new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg19.refFlat.txt"),
-				"chrX", true);
+		Bed12Parser bedParser = new Bed12Parser("/media/kyowon/Data1/fCLIP/samples/sample3/bed/h19x2.sorted.bed", 
+				new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg19.refFlat.txt"),
+				"chr16", true);
 			
-		// chrX: 133680358-133680428 [
-		ArrayList<Integer> coordinate = new ArrayList<Integer>();
-		for(int i= 133680428; i>=133680358; i--) coordinate.add(i);
+		// 14403156
+		
+		System.out.println(bedParser.get3pDepth(false, 180670310));
+		System.out.println(bedParser.get3pReads(false, 180670310));
 		
 		
-		
-		for(double d : bedParser.get5pSignalForfCLIP(false, coordinate))
-			System.out.println(d);
 //		Nkx6-2	NM_183248	chr7	-	146767118	146768696	146767332	146768438	3	146767118,146767779,146768032,	146767587,146767952,146768696,
 //		Zfp78	NM_001112805	chr7	+	6316014	6335315	6324070	6332201	4	6316014,6324012,6325833,6330918,	6316054,6324103,6325960,6335315,
 		
 		//Bed12Parser test = new Bed12Parser("/media/kyowon/Data1/fCLIP/samples/sample1/bed/Drosha2.sorted.bed", parser, "chr5", true);
 	
 	//	Collections.reverse(coordinate);
-	}
+	}*/
 		
 	
 }

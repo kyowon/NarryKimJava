@@ -33,11 +33,11 @@ public class SmORFIntersection {
 		in2.close();
 		
 		System.out.println(seqs1.size());
-		System.out.println(seqs1);
+	//	System.out.println(seqs1);
 		System.out.println(seqs2.size());
-		System.out.println(seqs2);
+	//	System.out.println(seqs2);
 		System.out.println(intersection.size());
-		System.out.println(intersection);
+	//	System.out.println(intersection);
 		
 	}
 

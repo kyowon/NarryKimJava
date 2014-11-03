@@ -5,6 +5,7 @@ import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import parser.AnnotationFileParser;
 import rpf.parser.MergedFileParser;
 import rpf.parser.MergedFileParser.MergedResult;
 import rpf.parser.ScoringOutputParser.ScoredPosition;
@@ -13,16 +14,16 @@ import util.Codon;
 public class SmORFselector {
 
 	public static void main(String[] args) throws FileNotFoundException {
-		String sample = "sample3";
+		String sample = "sample5";
 		MergedFileParser test = new MergedFileParser("/media/kyowon/Data1/RPF_Project/samples/" + sample + "/results/out_0.3.csv");
 		PrintStream out = new PrintStream("/media/kyowon/Data1/RPF_Project/samples/" + sample + "/results/out_0.3_smORF.csv");
 		PrintStream outfasta = new PrintStream("/media/kyowon/Data1/RPF_Project/samples/" + sample + "/results/out_0.3_smORF.fasta");
-		
+		AnnotationFileParser anntationParser = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt");
 		//ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.fa");
 	//	ArrayList<MergedResult> list = new ArrayList<MergedFileParser.MergedResult>();
 		HashSet<ScoredPosition> pp = new HashSet<ScoredPosition>();
 		boolean start = true;
-		int j=0;
+		int j=2;
 		HashMap<String, Double> codonUsage = new HashMap<String, Double>();
 		
 		for(MergedResult result: test.getList()){
@@ -31,13 +32,16 @@ public class SmORFselector {
 				start = false;
 			}
 						
-			String region = result.getGenomicRegion();
+			//if(result.getGene()==null || !result.getGene().getGeneName().contains("LINC")) continue;
+			//String region = result.getGenomicRegion();
 			//if(region.equals("InterGenic")) System.out.println(result.getStopPosition() + " " + result.getLength());
 			
-			if(region.contains("ORF") && !region.contains("Intron")) continue;
+			if(result.getAnnotatedClass().equals("TS") || result.getAnnotatedClass().equals("T")) continue; 
+			//if(region.contains("ORF") && !region.contains("Intron")) continue;
 			String[] predicted = result.getPredictedClasses();
 			double[] predictionScores = result.getPredictedClassesScores();
-			if(result.getStopPosition() < 20 || result.getStopPosition() > 300 && result.getLength() > 300) continue;
+			
+			if(result.getStopPosition() < 20 || result.getStopPosition() > 450 && result.getLength() > 450) continue;
 			boolean keep = true;
 			//if(pp!=null && result.getGene().equals(pp.getGene())) 
 			//	System.out.println(pp.getPosition() + "\n* " + result.getPosition() +"\n " + pp.equals(result.getScoredPosition()));
@@ -60,16 +64,21 @@ public class SmORFselector {
 				//break;
 			}
 			
-			if(n<=2) keep = false;
+			if(n<1) keep = false;
 			//if(((float)n) / predicted.length < .3) keep = false;
 			//if(n != m) keep = false;
 			if(result.getScoredPosition().isPlusStrand()){
-				if(result.getGene() != null && result.getStopPosition() > result.getGene().getCdsStart() ) keep = false;
+			//	if(result.getGene() != null && result.getStopPosition() > result.getGene().getCdsStart() ) 
+					//keep = false;
 			}else{
-				if(result.getGene() != null && result.getStopPosition() <= result.getGene().getCdsEnd()) keep = false;
+			//	if(result.getGene() != null && result.getStopPosition() <= result.getGene().getCdsEnd()) 
+					//keep = false;
 			}
-					
+				
 			if(!keep) continue;
+			
+			String frame = anntationParser.getGenomicRegionNameAndFrameShift(result.getContig(), result.isPlusStrand(), result.getPosition(), result.getGene(), true).get(1);
+			result.setFrameShift(frame);
 			pp.add(result.getScoredPosition());
 			
 		//	list.add(result);
@@ -101,8 +110,9 @@ public class SmORFselector {
 			}
 			
 			out.println("\t" + (gc/seq.length()) + "\t"+ Codon.getAminoAcids(seq));
-			outfasta.println(">" + j++);
+			outfasta.println(">e_" + j++);
 			outfasta.println(Codon.getAminoAcids(seq));
+			if(Codon.getAminoAcids(seq).contains("WDYPE")) System.out.println("seq");
 		}
 		for(String codon : codonUsage.keySet()){
 			System.out.println(codon + "\t" + codonUsage.get(codon));

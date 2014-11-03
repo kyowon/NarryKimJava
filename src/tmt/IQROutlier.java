@@ -7,12 +7,12 @@ import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.HashSet;
 
-import parser.MSGFPlusParser;
-import parser.MSGFPlusParser.MSGFPlusPSM;
+import msgfpipeline.parser.MSGFPlusParser;
+import msgfpipeline.parser.MSGFPlusParser.MSGFPlusPSM;
 import uninovo.MC;
 
 public class IQROutlier{
-	
+	/*
 	private int numChannel = 6;
 	private MSGFPlusParser parser;
 	private HashMap<HashSet<String>, ArrayList<MSGFPlusPSM>> groupedPSMs;
@@ -25,14 +25,7 @@ public class IQROutlier{
 	}
 	
 	
-	 /**
-     * Retrive the quartile value from an array
-     * .
-     * @param values THe array of data
-     * @param lowerPercent The percent cut off. For the lower quartile use 25,
-     *      for the upper-quartile use 75
-     * @return
-     */
+	
     public static double quartile(double[] values, double lowerPercent) {
 
         if (values == null || values.length == 0) {
@@ -104,7 +97,8 @@ public class IQROutlier{
     	for(int i=0;i<ratios.length;i++){
         	indices[i] = new int[ratios[i].length];
         	for(int j=0; j<ratios[i].length; j++){
-        		if(ratios[i][j] > outliers[j]) indices[i][j] = 1;
+        		if(ratios[i][j] <=0 || Double.isNaN(ratios[i][j]) || Double.isInfinite(ratios[i][j]) || Double.isInfinite(-ratios[i][j])) indices[i][j]=2;
+        		else if(ratios[i][j] > outliers[j]) indices[i][j] = 1;
         		else if(ratios[i][j] < outliers[ratios[i].length + j]) indices[i][j] = -1;
         	}
     	}
@@ -229,6 +223,6 @@ public class IQROutlier{
     	}
     	IQROutlier test = new IQROutlier(args[0], args[1]);
     	test.run();
-    }
+    }*/
     
 }

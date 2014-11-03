@@ -52,6 +52,16 @@ public class Nucleotide {
 		return cc.toString();
 	}
 	
+	public static StringBuffer getComplementarySeq(StringBuffer seq){
+		StringBuffer cc = new StringBuffer();
+		char[] nas = seq.toString().toCharArray();
+		for(int i = nas.length-1;i>=0;i--){
+			char na = nas[i];
+			cc.append(getComplementaryNA(na));
+		}
+		return cc;
+	}
+	
 	private static char getComplementaryNA(char na){
 		if(na == '-') return '-';
 		if(na == 'A') return 'T';

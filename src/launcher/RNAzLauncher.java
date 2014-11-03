@@ -1,4 +1,4 @@
-package fCLIP;
+package launcher;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -9,7 +9,7 @@ import java.io.PrintStream;
 public class RNAzLauncher {
 	
 	private double sci = 0;
-	private double zscore = 0;
+	private double zscore = 1;
 	
 	public RNAzLauncher(String maf){
 		run(maf);
@@ -19,6 +19,7 @@ public class RNAzLauncher {
 	public double getZScore() { return zscore; }
 	
 	private void run(String maf){
+		if(maf == null) return;
 		try {
 			String mafFile = System.getProperty("user.dir") + System.getProperty("file.separator") + "Tmp.maf";
 			PrintStream mafStream = new PrintStream(mafFile);

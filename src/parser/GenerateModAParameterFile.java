@@ -14,7 +14,7 @@ public class GenerateModAParameterFile {
 		String mode = args[2];
 		String min = args[3];
 		String max = args[4];
-		
+		//
 		Enzyme enzyme = null;
 		int ei = Integer.parseInt(args[5]);
 		if(ei == 0) enzyme = null;
@@ -25,8 +25,9 @@ public class GenerateModAParameterFile {
 		else if(ei == 5) enzyme = Enzyme.ArgC;
 		else if(ei == 6) enzyme = Enzyme.AspN;
 		//Enzyme.TRYPSIN.getResidues().get(0).getResidue() + " " + Enzyme.TRYPSIN.isCTerm()
-		boolean isCPlus57 = args[6].equals("true");
-		
+		//boolean isCPlus57 = args[6].equals("true");
+		String[] modifications = args[6].split(";");
+				
 		try {
 			PrintStream out = new PrintStream(args[7]);
 			out.println("Spectra=" + specFile);
@@ -34,6 +35,7 @@ public class GenerateModAParameterFile {
 			out.println("BlindMode=" + mode);
 			out.println("MinModSize=" + min);
 			out.println("MaxModSize=" + max);
+			
 			if(enzyme != null){
 				out.print("Enzyme=etc, ");
 				for(msutil.AminoAcid aa : enzyme.getResidues()){
@@ -41,7 +43,12 @@ public class GenerateModAParameterFile {
 				}
 				out.println("/" + (enzyme.isNTerm()? "N" : "C"));
 			}
-			if(isCPlus57) out.println("ADD=C, 57.021464");
+			//if(isCPlus57) out.println("ADD=C, 57.021464");
+			if(modifications != null && modifications.length > 0){
+				for(String mod : modifications){
+					out.println("ADD=" + mod);
+				}
+			}
 			out.println("PeptTolerance=0.5\nAutoPMCorrection=0\nFragTolerance=0.6\nMissedCleavage=0\n");
 			out.close();
 		} catch (FileNotFoundException e) {

@@ -11,29 +11,26 @@ public class tmp2 {
 	public static void main(String[] args) throws IOException {
 		// TODO Auto-generated method stub
 
-		BufferedLineReader in = new BufferedLineReader("/home/kyowon/Desktop/target.csv");
-		BufferedLineReader in2 = new BufferedLineReader("/media/kyowon/Data1/RPF_Project/samples/sample4/results/out1_0.3.csv");
-		PrintStream out = new PrintStream("/home/kyowon/Desktop/DrYou.txt");
+		BufferedLineReader in = new BufferedLineReader("/home/kyowon/Desktop/pair");
+		PrintStream out = new PrintStream("/home/kyowon/Desktop/pair.fa");
 		String s;
-		HashSet<String> targetAcc = new HashSet<String>();
-		HashSet<String> diffAcc = new HashSet<String>();
-		while((s=in.readLine())!=null){
-			targetAcc.add(s);
+		HashSet<String> seqs = new HashSet<String>();
+		int i = 0;
+		while((s=in.readLine()) != null){
+			if(s.isEmpty()) continue;
+			int j = s.indexOf(' ');
+			seqs.add(s.substring(0, j<0 ? 20 : j));
+			
 		}
-		//15
-		while((s=in2.readLine())!=null){
-			String acc = s.split("\t")[5];
-			if(s.split("\t")[10].equals("true")) continue;
-			if(targetAcc.contains(acc)){
-				System.out.println(s);
-				out.println(s);
-				diffAcc.add(acc);
-			}
-		}
-		System.out.println(diffAcc.size());
-		out.close();
-		in2.close();
+		
 		in.close();
+		
+		for(String seq :seqs){
+			out.println(">seq" + i++);
+			out.println(seq);
+		}
+
+		out.close();
 	}
 
 }

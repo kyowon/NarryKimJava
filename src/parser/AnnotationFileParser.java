@@ -414,6 +414,7 @@ public class AnnotationFileParser {
 	}
 	
 	private HashMap<String, ArrayList<AnnotatedGene>> annotatedGeneSetMap;
+	private HashMap<String, AnnotatedGene> accessionMap;
 	private HashMap<String, IntervalTree<ArrayList<Integer>>> txIntervalMap;
 	private HashMap<String, HashMap<Boolean, HashMap<Integer, ArrayList<AnnotatedGene>>>> annotatedGenePositionMap;
 	
@@ -426,10 +427,12 @@ public class AnnotationFileParser {
 		try {
 			BufferedLineReader in = new BufferedLineReader(new FileInputStream(annotationFile));
 			annotatedGeneSetMap = new HashMap<String, ArrayList<AnnotatedGene>>();
+			accessionMap = new HashMap<String, AnnotationFileParser.AnnotatedGene>();
 			annotatedGenePositionMap = new HashMap<String, HashMap<Boolean,HashMap<Integer,ArrayList<AnnotatedGene>>>>();
 			String s;
 			while((s=in.readLine())!=null){
 				AnnotatedGene gene = new AnnotatedGene(s);
+				accessionMap.put(gene.accession, gene);
 				String contig = gene.getContig();
 				if(!annotatedGeneSetMap.containsKey(contig)){
 					annotatedGeneSetMap.put(contig, new ArrayList<AnnotatedGene>());
@@ -566,7 +569,8 @@ public class AnnotationFileParser {
 				Node<ArrayList<Integer>> is = it.next();
 				for(int i : is.getValue()){
 					AnnotatedGene gene = genes.get(i);
-					ret.add(gene);
+					if(gene.isPlusStrand() == isPlusStrand)
+						ret.add(gene);
 				}
 			}
 		}
@@ -601,19 +605,20 @@ public class AnnotationFileParser {
 					else name += "_3_UTR";
 				}				
 			}
-			
-			if(!isMatchingGene){
-				int[][] introns = gene.getIntrons();
-				if(introns != null){
-					for(int i=0;i<introns.length;i++){//106129273-5
-						if(position >=introns[i][0] && position <= introns[i][1]){
-							name += "_Intron";
-							break;
-						}
-					}	
-				}
+			int[][] introns = gene.getIntrons();
+			if(introns != null){
+				for(int i=0;i<introns.length;i++){//106129273-5
+					if(position >=introns[i][0] && position <= introns[i][1]){
+						name += "_Intron";
+						break;
+					}
+				}	
+			}
+			if(!isMatchingGene){				
 				if(!name.endsWith("_Intron")) name += "_ISOFORM";
-			}else if(name.endsWith("_ORF")){
+			}
+			
+			if(name.endsWith("_ORF") || name.endsWith("_UTR")){
 				Integer j = 0;
 				if(isPlusStrand){
 					int i = 0;
@@ -662,6 +667,9 @@ public class AnnotationFileParser {
 		return ret;
 	}
 	
+	public AnnotatedGene getGeneByAccession(String accession){
+		return accessionMap.get(accession);
+	}
 	
 /*	public ArrayList<ArrayList<Integer>> getLiftOverCDSPositions(AnnotatedGene gene){	
 		return getLiftOverPositions(gene, gene.isPlusStrand(), gene.isPlusStrand()? gene.cdsStart : gene.cdsEnd - 1, gene == null? 0 : Integer.MAX_VALUE, true);

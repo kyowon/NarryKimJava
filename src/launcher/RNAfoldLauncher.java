@@ -1,8 +1,11 @@
-package fCLIP;
+package launcher;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.HashMap;
+
+import fCLIP.Scorer;
 import weka.core.DenseInstance;
 import weka.core.Instance;
 import weka.core.Instances;
@@ -10,18 +13,33 @@ import weka.core.Instances;
 public class RNAfoldLauncher {
 	
 	//private String seq;
-	double energy = 0;
-	int flankingNTnumber = 11;
-	int depth = 0;
-	int numberOfHairPins = 0;
-	int overHang = -1000;
-	int leftPaired = 0;
-	int rightPaired = 0;
+	private double energy = 0;
+	private double energyPerNT = 0;
+	
+	private int flankingNTnumber = 11;
+	private int depth = 0;
+	private int numberOfHairPins = 0;
+	private int overHang = -1000;
+	private int leftPaired = 0;
+	private int rightPaired = 0;
+	private double seqEntropy = 0;
+	private double structureEntropy = 0;
+	
+	public double getSeqEntropy() {
+		return seqEntropy;
+	}
+	
+	public double getStructureEntropy(){
+		return structureEntropy;
+	}
 	
 	public double getEnergy() {
 		return energy;
 	}
 
+	public double getEnergyPerNT(){
+		return energyPerNT;
+	}
 
 	public int getDepth() {
 		return depth;
@@ -49,23 +67,7 @@ public class RNAfoldLauncher {
 			run(seq);
 	}
 	
-	public Instance toInstance(Instances insts){
-		Instance inst = new DenseInstance(6);
-		inst.setDataset(insts);
-	//	inst.setValue(0, getDepth());
-		inst.setValue(0, getEnergy());
-		inst.setValue(1, getNumberOfHairPins());
-		
-		inst.setMissing(2);
-		inst.setMissing(3);
-	//	inst.setValue(3, getLeftPaired());
-	//	inst.setValue(4, getRightPaired());
-		inst.setValue(4, getOverHang());
-		inst.setClassMissing();
-		return inst;
-	}
-	
-	private void run(String seq){
+	private void run(String seq){//seq = pre + flanking.
 		try {
 			String[] cmd = {
 					"/bin/sh",
@@ -127,7 +129,37 @@ public class RNAfoldLauncher {
 			
 		//	if(nh == 1){			
 				this.overHang = 0;
-				int td = 0;
+				
+				int[] threePPairedIndices = new int[500];
+				int[] fivePPairedIndices = new int[500];
+				
+				int prev3p = 0;
+				for(int i=0; i<flankingNTnumber;i++){
+					if(st.charAt(i) == '('){
+						threePPairedIndices[prev3p++] = i;
+					}
+				}
+				
+				int prev5p = 0;
+				for(int i=st.length() - 1; i>= st.length() - flankingNTnumber ;i--){
+					if(st.charAt(i) == ')'){
+						fivePPairedIndices[prev5p++] = i;
+					}
+				}
+				
+				int prev = Math.min(prev3p, prev5p);
+				for(int i=threePPairedIndices[prev-1]+1; i<flankingNTnumber;i++){
+					this.overHang ++;
+				}
+				for(int i=fivePPairedIndices[prev-1]-1; i>= st.length() - flankingNTnumber ;i--){
+					this.overHang --;
+				}
+			
+				
+				//for(int i=first-1;  i>= st.length() - flankingNTnumber ;i--){
+				//	this.overHang--;
+			//	}
+				/*int td = 0;
 				boolean startFolding = false;
 				boolean endFolding = false;
 				for(int i=flankingNTnumber;i<st.length() - flankingNTnumber;i++){
@@ -165,7 +197,10 @@ public class RNAfoldLauncher {
 						if(!startFolding) this.overHang++;
 						//System.out.println(this.overHang);
 					}
-				}
+				}*/
+				
+				
+				
 		//	}
 				// this.overHang -= td;
 			/*for(int i=st.length()/2; i<st.length();i++){
@@ -179,7 +214,12 @@ public class RNAfoldLauncher {
 			this.depth = maxDepth;
 			this.numberOfHairPins = nh;
 		//	this.centerDepth = maxCenterDepth;
-			this.energy = Double.parseDouble(re[1].substring(re[1].indexOf(' ')+2, re[1].length()-1).trim()) / seq.length();
+			this.energy = Double.parseDouble(re[1].substring(re[1].indexOf(' ')+2, re[1].length()-1).trim());
+			this.energyPerNT = energy/seq.length();
+			this.seqEntropy = getEntropy(seq.substring(flankingNTnumber, seq.length() - flankingNTnumber), 2);
+			this.structureEntropy = getEntropy(st.substring(flankingNTnumber, st.length() - flankingNTnumber), 4);
+			
+		//	System.out.println(seq.substring(flankingNTnumber, seq.length() - flankingNTnumber));
 			//this.overHang = l-r;
 			leftPaired = l;
 			rightPaired = r;
@@ -194,14 +234,34 @@ public class RNAfoldLauncher {
 	//GUGAUCUCGACAGGAAACGUGCCACAGAGCAGUAGUGCGCAGGCAAGACUUUUCAGUGACGCCUUGUGGAACGCAGUUCAUGAUGUCCUAGCAGCUCUCACUAAGGGAACUGUACAUUCU
 	//(((...((.(((((....(((.(((.(((.(((..(((....)))..))).))).))).)))))))).)).))).......(((((....((((.((((.....)))).)))))))))..
 	 
+	
+	private double getEntropy(String seq, int stepSize){
+		HashMap<String, Double> freqMap = new HashMap<String, Double>();
+		for(int i=0;i<seq.length() - stepSize + 1;i+=stepSize){
+			String s = seq.substring(i, i+stepSize);
+			if(!freqMap.containsKey(s)) freqMap.put(s, .0);
+			freqMap.put(s, freqMap.get(s) + 1);
+		}
+		double e = 0;
+		for(String s : freqMap.keySet()){
+			double freq = freqMap.get(s) / (seq.length() / stepSize);
+			e -= freq * Math.log(freq) / Math.log(2);
+		}
+		return e;
+	}
+	
+	
 	static public void main(String[] args){
-		RNAfoldLauncher test = new RNAfoldLauncher("CCTCCGTGGGGTCTGTCCCCGCTGCTTGCTGTCCTCCGTGGGGTCTCTTCCCCCGGCTCGCTGTCCTCCATGGGGTCTGTCCCCCGGTTTG" , Scorer.flankingNTNumber);
+		RNAfoldLauncher test = new RNAfoldLauncher("GTTTTGAGGTTGCTTCAGTG AACATTCAACGCTGTCGGTGAGTTTGGAATTAAAATCAAAACCATCGACCGTTGATTGTACC CTATGGCTAACCATCATCTA" , 20);
 		//ACCTATCCATTTATCATCCATCTACGAGGTGTCTGGGATGTAATGGATGG
 		//ACCUAUCCAUUUAUCAUCCAUCUACAGGUGGACCAAAAUGUAGGAGAUCU
+		//TGCTCAGGCATAACCCCTCG GAACGGCTGCCCCTGGCCCAGGTCTCAGCCCACCCTTGGGTCCGGGCCAACTCTCGG AGGGTGCTGCCTCCCTCTGC
 		System.out.println(test.energy);
 		System.out.println(test.numberOfHairPins);
 		System.out.println(test.leftPaired);
 		System.out.println(test.rightPaired);
+		System.out.println(test.seqEntropy);
+		System.out.println(test.structureEntropy);
 		
 		//System.out.println(test.centerDepth);
 		System.out.println(test.overHang);

@@ -172,21 +172,6 @@ public class MirGff3FileParser {
 		}
 			
 		
-		private boolean matching(boolean isPlusStrand, ArrayList<Integer> coordinates, ArrayList<ArrayList<Integer>> splices){ 
-			if(isPlusStrand != this.isPlusStrand) return false;
-			if(splices == null || splices.isEmpty()) return true;
-			
-			for(ArrayList<Integer> splice : splices){
-				if(isPlusStrand){
-					if(splice.get(0) > this.threepPosition || splice.get(1)<this.fivepPosition) continue;
-				}else{
-					if(splice.get(0) > this.fivepPosition || splice.get(1)<this.threepPosition) continue;
-				}
-				return false;	
-			}
-			
-			return true;
-		}
 	}
 	
 	private HashMap<String, ArrayList<MiRNA>> miRNAMap;
@@ -295,30 +280,14 @@ public class MirGff3FileParser {
 				Node<ArrayList<Integer>> is = it.next();
 				for(int i : is.getValue()){
 					MiRNA miRNA = miRNAs.get(i);
-					ret.add(miRNA);
+					if(miRNA.isPlusStrand() == isPlusStrand)
+						ret.add(miRNA);
 				}
 			}
 		}
 		return ret.isEmpty()? null : ret;
 	}
-	
-	public ArrayList<MiRNA> getMatchingMiRNAs(String contig, boolean isPlusStrand, int position, ArrayList<Integer> coordinate){
-		ArrayList<MiRNA> miRNAs = getContainingMiRNAs(contig, isPlusStrand, position);
-		return getMatchingMiRNAs(miRNAs, isPlusStrand, coordinate);
-	}
-	
-	public ArrayList<MiRNA> getMatchingMiRNAs(ArrayList<MiRNA> containingMiRNAs, boolean isPlusStrand, ArrayList<Integer> coordinate){
-		if(containingMiRNAs == null) return null;
-		ArrayList<MiRNA> ret = new ArrayList<MiRNA>();
-		ArrayList<ArrayList<Integer>> splices = Bed12Parser.getSplices(coordinate);
-		
-		for(MiRNA miRNA: containingMiRNAs){
-			if(miRNA.matching(isPlusStrand, coordinate, splices))
-				ret.add(miRNA);
-		}
-		
-		return ret.isEmpty()? null : ret;
-	}
+
 	
 	
 }

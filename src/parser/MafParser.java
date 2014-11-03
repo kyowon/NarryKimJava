@@ -8,6 +8,7 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import util.DnDsCalculator;
 import util.Nucleotide;
@@ -17,7 +18,8 @@ public class MafParser {
 	private String folderName;
 	private String indexFilename;
 	private HashMap<String, HashMap<Integer, Long>> indexMap;
-	private HashMap<Integer, ArrayList<String>> map;
+	private HashMap<Integer, HashMap<String, String>> map;
+	private String mainSpecies = null;
 	private ArrayList<Integer> sps;
 	private ArrayList<Integer> eps;
 	private HashMap<String, ArrayList<Integer>> indexSPositions;
@@ -52,10 +54,6 @@ public class MafParser {
 					indexMap.put(contig, new HashMap<Integer, Long>());
 					indexSPositions.put(contig, new ArrayList<Integer>());
 					indexSubMap = indexMap.get(contig);
-					
-					
-					
-					
 					
 					indexSubSPositions = indexSPositions.get(contig);
 					continue;
@@ -122,7 +120,7 @@ public class MafParser {
 	   
 	}
 	
-	private void getSubSeqs(int position, int length, int prevIndex, ArrayList<StringBuffer> ret){
+	private void getSubSeqs(int position, int length, int prevIndex, HashMap<String, StringBuffer> ret){
 		if(length <= 0) return;
 		int index = Collections.binarySearch(sps, position);
 		//
@@ -130,24 +128,36 @@ public class MafParser {
 		//
 		index = Math.max(prevIndex, index);
 		int cposition = 0;
-		ArrayList<String> seqs = map.get(sps.get(index < 0? 0 : index));
-		//System.out.println(seqs);
-		if(ret.isEmpty()) for(int i=0;i<seqs.size();i++) ret.add(new StringBuffer());
-		
+		HashMap<String, String> seqs = map.get(sps.get(index < 0? 0 : index));
+	
+		for(String species : seqs.keySet()){
+			if(!ret.containsKey(species)){ 
+				ret.put(species, new StringBuffer());
+				if(ret.containsKey(mainSpecies)){
+					for(int i=0;i<ret.get(mainSpecies).length();i++)
+						ret.get(species).append('-');
+				}
+			}
+		}
+	
 		if(index >= 0){
 			cposition = sps.get(index);			
-			for(int i=0;i<seqs.get(0).length();i++){
+			for(int i=0;i<seqs.get(mainSpecies).length();i++){
 				boolean isInserted = false;
-				if(seqs.get(0).charAt(i) == '-'){
+				if(seqs.get(mainSpecies).charAt(i) == '-'){
 					isInserted = true;
 					//continue; // TODO 
 				}
 				
 				if(!isInserted) cposition++;
 				if(cposition <= position) continue;
-				for(int j=0;j< ret.size();j++){
-					ret.get(j).append(seqs.size() <= j? '-' : seqs.get(j).charAt(i));
+				
+				
+				for(String species : ret.keySet()){
+					ret.get(species).append(!seqs.containsKey(species)? '-' : seqs.get(species).charAt(i));
 				}
+				
+				
 				if(isInserted) continue;
 				if(--length<=0) break;
 			}	
@@ -157,13 +167,12 @@ public class MafParser {
 		if(length>0 && sps.size() > index + 1){			
 			int bposition = cposition;
 			cposition = sps.get(index + 1);
-			if(bposition < cposition){
-				
+			if(bposition < cposition){				
 				length -= cposition - position;
 				int append = cposition - position;
-				for(int j=0;j< ret.size();j++){
+				for(String species : ret.keySet()){
 					for(int i=0;i<(length > 0 ? append : append + length);i++)
-						ret.get(j).append('-');
+						ret.get(species).append('-');
 				}	
 			}
 			getSubSeqs(cposition, length, index + 1, ret);
@@ -173,62 +182,143 @@ public class MafParser {
 		
 	
 	public String getSeqsInMafFormat(String contig, int position, boolean isPlusStrand, int length){
-		ArrayList<StringBuffer> seqs = getSubSeqs(contig, position, isPlusStrand, length);
+		HashMap<String, StringBuffer> seqs = getSubSeqs(contig, position, isPlusStrand, length);
 		StringBuffer out = new StringBuffer();
-		out.append("a score=1\n");
-		for(int i=0;i<seqs.size();i++){
-			if(seqs.get(i).length() == 0) continue;
-			out.append("s s " + i + " 1 "); 
-			out.append(isPlusStrand? "+ 1 " : "- 1 ");
-			out.append(seqs.get(i));
+		out.append("##maf version=1 scoring=autoMZ.v1\na score=1\n");
+		
+		out.append("s ");out.append(mainSpecies);
+		out.append(".");out.append(contig);
+		out.append(" ");out.append(position);
+		out.append(" ");out.append(length);
+		out.append(" + 1 ");
+		out.append(seqs.get(mainSpecies).toString());
+		out.append('\n');
+		
+		for(String species : seqs.keySet()){
+			if(species.equals(mainSpecies)) continue;
+			out.append("s ");out.append(species);
+			out.append(".");out.append(contig);
+			out.append(" ");out.append(position);
+			out.append(" ");out.append(length);
+			out.append(" + 1 ");
+			out.append(seqs.get(species).toString());
+			out.append('\n');
+		}
+		return out.toString();
+	}
+	
+	public String getSeqsInMafFormat(String contig, ArrayList<Integer> coordinate, int position, boolean isPlusStrand, int length){
+		ArrayList<HashMap<String, StringBuffer>> subSeqs = new ArrayList<HashMap<String, StringBuffer>>();
+		//int maxNum = 0;
+		int tlength = length;
+		//boolean startFlag = false;
+		for(ArrayList<Integer> subPositions : Bed12Parser.getCoordinateStartsEnds(coordinate, isPlusStrand)){
+			int start = subPositions.get(0);
+			int end = subPositions.get(1);
+			//System.out.println("* " + start + " " + end);
+			if(isPlusStrand){
+				if(position >= end) continue;
+				start = Math.max(position, start);
+			}else{
+				if(position < start) continue;
+				end = Math.min(position + 1, end);
+			}
+			
+			tlength -= (end - start);
+			HashMap<String, StringBuffer> subSeq = getSubSeqs(contig, isPlusStrand? start : end - 1, isPlusStrand, end - start + (tlength<0? tlength : 0));
+			
+			//System.out.println(subSeq.size());
+			subSeqs.add(subSeq);
+			//maxNum = Math.max(maxNum, subSeq.size());
+			if(tlength <=0) break;
+		}
+		HashMap<String, StringBuffer> seqs = mergeSubSeqs(subSeqs);
+		StringBuffer out = new StringBuffer();
+		out.append("##maf version=1 scoring=autoMZ.v1\na score=1\n");
+		
+		out.append("s ");out.append(mainSpecies);
+		out.append(".");out.append(contig);
+		out.append(" ");out.append(position);
+		out.append(" ");out.append(length);
+		out.append(" + 1 ");
+		out.append(seqs.get(mainSpecies).toString());
+		out.append('\n');
+		
+		for(String species : seqs.keySet()){
+			if(species.equals(mainSpecies)) continue;
+			out.append("s ");out.append(species);
+			out.append(".");out.append(contig);
+			out.append(" ");out.append(position);
+			out.append(" ");out.append(length);
+			out.append(" + 1 ");
+			out.append(seqs.get(species).toString());
+			out.append('\n');
+		}
+		return out.toString();
+	}
+	
+	public String getSeqsInMafFormat(String[] contigs, int[] positions, boolean[] strands, int length){
+		ArrayList<HashMap<String, StringBuffer>> subSeqs = new ArrayList<HashMap<String, StringBuffer>>();
+		for(int i=0;i<contigs.length;i++){
+			HashMap<String, StringBuffer> subSeq = getSubSeqs(contigs[i], positions[i], strands[i], length); //TODO length should take effect!!!
+			subSeqs.add(subSeq);
+		}
+		HashMap<String, StringBuffer> seqs = mergeSubSeqs(subSeqs);
+		StringBuffer out = new StringBuffer();
+		out.append("##maf version=1 scoring=autoMZ.v1\na score=1\n");
+		
+		out.append("s ");out.append(mainSpecies);
+		out.append(".");out.append(contigs[0]);
+		out.append(" ");out.append(positions[0]);
+		out.append(" ");out.append(length);
+		out.append(" + 1 ");
+		out.append(seqs.get(mainSpecies).toString());
+		out.append('\n');
+		
+		for(String species : seqs.keySet()){
+			if(species.equals(mainSpecies)) continue;
+			out.append("s ");out.append(species);
+			out.append(".");out.append(contigs[0]);
+			out.append(" ");out.append(positions[0]);
+			out.append(" ");out.append(length);
+			out.append(" + 1 ");
+			out.append(seqs.get(species).toString());
 			out.append('\n');
 		}
 		return out.toString();
 	}
 	
 	public String[] getSeqs(String contig, int position, boolean isPlusStrand, int length){
-		ArrayList<StringBuffer> seqs = getSubSeqs(contig, position, isPlusStrand, length);
+		HashMap<String, StringBuffer> seqs = getSubSeqs(contig, position, isPlusStrand, length);
 		String[] ret = new String[seqs.size()];
-		for(int i=0;i<seqs.size();i++){
-			ret[i] = seqs.get(i).toString();
+		int i=0;
+		ret[i++] = seqs.get(mainSpecies).toString();
+		for(String species : seqs.keySet()){
+			if(species.equals(mainSpecies)) continue;
+			ret[i++] = seqs.get(species).toString();
 		}
 		return ret;
-	}
-	
-	public String getSeqsInMafFormat(String[] contigs, int[] positions, boolean[] strands, int length){
-		ArrayList<ArrayList<StringBuffer>> subSeqs = new ArrayList<ArrayList<StringBuffer>>();
-		for(int i=0;i<contigs.length;i++){
-			ArrayList<StringBuffer> subSeq = getSubSeqs(contigs[i], positions[i], strands[i], length);
-			subSeqs.add(subSeq);
-		}
-		ArrayList<StringBuffer> seqs = mergeSubSeqs(subSeqs);
-		StringBuffer out = new StringBuffer();
-		out.append("a score=1\n");
-		for(int i=0;i<seqs.size();i++){
-			out.append("s s " + i + " 1 "); 
-			out.append(strands[0]? "+ 1 " : "- 1 ");
-			out.append(seqs.get(i));
-			out.append('\n');
-		}
-		return out.toString();
 	}
 	
 	public String[] getSeqs(String[] contigs, int[] positions, boolean[] strands, int length){
-		ArrayList<ArrayList<StringBuffer>> subSeqs = new ArrayList<ArrayList<StringBuffer>>();
+		ArrayList<HashMap<String, StringBuffer>> subSeqs = new ArrayList<HashMap<String, StringBuffer>>();
 		for(int i=0;i<contigs.length;i++){
-			ArrayList<StringBuffer> subSeq = getSubSeqs(contigs[i], positions[i], strands[i], length);
+			HashMap<String, StringBuffer> subSeq = getSubSeqs(contigs[i], positions[i], strands[i], length);
 			subSeqs.add(subSeq);
 		}
-		ArrayList<StringBuffer> seqs = mergeSubSeqs(subSeqs);
+		HashMap<String, StringBuffer> seqs = mergeSubSeqs(subSeqs);
 		String[] ret = new String[seqs.size()];
-		for(int i=0;i<seqs.size();i++){
-			ret[i] = seqs.get(i).toString();
+		int i=0;
+		ret[i++] = seqs.get(mainSpecies).toString();
+		for(String species : seqs.keySet()){
+			if(species.equals(mainSpecies)) continue;
+			ret[i++] = seqs.get(species).toString();
 		}
 		return ret;
 	}
 	
-	private ArrayList<StringBuffer> getSubSeqs(String contig, int position, boolean isPlusStrand, int length){
-		ArrayList<StringBuffer> tmp = new ArrayList<StringBuffer>();
+	private HashMap<String, StringBuffer> getSubSeqs(String contig, int position, boolean isPlusStrand, int length){
+		HashMap<String, StringBuffer> tmp = new HashMap<String, StringBuffer>();
 		//System.out.println(position + " " + length);
 		if(!isPlusStrand) position -= length-1;
 		if(!indexSPositions.containsKey(contig)) return tmp; 
@@ -246,13 +336,20 @@ public class MafParser {
 		}
 		
 		getSubSeqs(position, length, -1, tmp);
-		ArrayList<StringBuffer> ret = new ArrayList<StringBuffer>();
-		for(StringBuffer t : tmp) if(t.length()>0) ret.add(t);
+		HashMap<String, StringBuffer> ret = new HashMap<String, StringBuffer>();
+		for(String species : tmp.keySet()){
+			StringBuffer t = tmp.get(species);
+			if(!isPlusStrand) t = Nucleotide.getComplementarySeq(t);
+			if(t.length()>0) 
+				ret.put(species, t);
+			//else
+			//	ret.put(key, value);
+		}
 		return ret;
 	}
 
 	public String[] getSeqs(String contig, ArrayList<Integer> coordinate, int position, boolean isPlusStrand, int length){
-		ArrayList<ArrayList<StringBuffer>> subSeqs = new ArrayList<ArrayList<StringBuffer>>();
+		ArrayList<HashMap<String, StringBuffer>> subSeqs = new ArrayList<HashMap<String, StringBuffer>>();
 		//int maxNum = 0;
 		//boolean startFlag = false;
 		for(ArrayList<Integer> subPositions : Bed12Parser.getCoordinateStartsEnds(coordinate, isPlusStrand)){
@@ -268,54 +365,84 @@ public class MafParser {
 			}
 			
 			length -= (end - start);
-			ArrayList<StringBuffer> subSeq = getSubSeqs(contig, isPlusStrand? start : end - 1, isPlusStrand, end - start + (length<0? length : 0));
+			HashMap<String, StringBuffer> subSeq = getSubSeqs(contig, isPlusStrand? start : end - 1, isPlusStrand, end - start + (length<0? length : 0));
 			
 			//System.out.println(subSeq.size());
 			subSeqs.add(subSeq);
 			//maxNum = Math.max(maxNum, subSeq.size());
 			if(length <=0) break;
 		}
-		ArrayList<StringBuffer> seqs = mergeSubSeqs(subSeqs);
+		HashMap<String, StringBuffer> seqs = mergeSubSeqs(subSeqs);
 		String[] ret = new String[seqs.size()];
-		for(int i=0;i<ret.length;i++){
-			ret[i] = seqs.get(i).toString();
-			if(!isPlusStrand) ret[i] = Nucleotide.getComplementarySeq(ret[i]);
+		
+		int i=0;
+		ret[i++] = seqs.get(mainSpecies).toString();
+
+		for(String species : seqs.keySet()){
+			if(species.equals(mainSpecies)) continue;
+			ret[i++] = seqs.get(species).toString();
 		}
 		return ret;
 	}
 	
 	
-	private ArrayList<StringBuffer> mergeSubSeqs(ArrayList<ArrayList<StringBuffer>> subSeqs){
-		ArrayList<StringBuffer> seqs = new ArrayList<StringBuffer>();
-		int max = 0;
-		for(ArrayList<StringBuffer> subSeq : subSeqs){
-			max = Math.max(max, subSeq.size());
-		}
-		for(int j=0;j<max;j++){
-			seqs.add(new StringBuffer());
+	
+	
+	
+	private HashMap<String, StringBuffer> mergeSubSeqs(ArrayList<HashMap<String, StringBuffer>> subSeqs){
+		HashMap<String, StringBuffer> tseqs = new HashMap<String, StringBuffer>();
+		
+		for(HashMap<String, StringBuffer> subSeq : subSeqs){
+			for(String species : subSeq.keySet())
+				tseqs.put(species, new StringBuffer());
 		}
 		
 		for(int i=0;i<subSeqs.size();i++){
-			ArrayList<StringBuffer> subSeq = subSeqs.get(i);
-			for(int j=0;j<max;j++){
-				if(j<subSeq.size()){
-					seqs.get(j).append(subSeq.get(j));
+			HashMap<String, StringBuffer> subSeq = subSeqs.get(i);
+			for(String species : tseqs.keySet()){
+				if(subSeq.containsKey(species)){
+					tseqs.get(species).append(subSeq.get(species));
 				}else if(!subSeq.isEmpty()){
-					for(int k=0; k<subSeq.get(0).length();k++)
-						seqs.get(j).append('-');
+					for(int k=0; k<subSeq.get(mainSpecies).length();k++)
+						tseqs.get(species).append('-');
 				}
 			}
 		}
+		
+		HashMap<String, StringBuffer> seqs = new HashMap<String, StringBuffer>();
+		
+		int len = 0;
+		for(String k : tseqs.keySet()){
+			len = tseqs.get(k).length();
+			seqs.put(k, new StringBuffer());
+		}
+		
+		for(int i=0;i<len;i++){
+			boolean toWrite = false;
+			for(String k : tseqs.keySet()){
+				if(tseqs.get(k).charAt(i)!='-'){
+					toWrite = true; 
+					break;
+				}
+			}
+			if(toWrite){
+				for(String k : tseqs.keySet()){
+					seqs.get(k).append(tseqs.get(k).charAt(i));
+				}
+			}
+			
+		}
+		
 		return seqs;
 	}
 	
 	private void readChunk(RandomAccessFile accessFile, int lastPosition){
-		map = new HashMap<Integer, ArrayList<String>>();
+		map = new HashMap<Integer, HashMap<String, String>>();
 		sps = new ArrayList<Integer>();
 		eps = new ArrayList<Integer>();
 		
 		String s;
-		ArrayList<String> seqs = new ArrayList<String>();
+		HashMap<String, String> seqs = new HashMap<String, String> ();
 		int sposition = 0;
 		int eposition = 0;
 		long spointer = 0;
@@ -337,20 +464,18 @@ public class MafParser {
 						
 						sposition = Integer.parseInt(token[i++]);
 						eposition = sposition + Integer.parseInt(token[i++]);
-						
-						if(!token[i].equals("+")){
-							isPlusStrand = false;
-						}else isPlusStrand = true;
+						mainSpecies = token[1].substring(0, token[1].indexOf('.'));
+						isPlusStrand = token[i].equals("+");
 					}
-					seqs.add(token[token.length-1]);
+					seqs.put(token[1].substring(0, token[1].indexOf('.')), token[token.length-1]);
 				}				
 				if(s.isEmpty() && isPlusStrand){
-					if(seqs.size() >= minNumSpecies){					
+					if(seqs.size() >= minNumSpecies){							
 						map.put(sposition, seqs);
 						sps.add(sposition);
 						eps.add(eposition);
 					}
-					seqs = new ArrayList<String>();
+					seqs = new HashMap<String, String>();
 				}	
 				
 				if(s.isEmpty() && (eposition > lastPosition || accessFile.getFilePointer() - spointer > 3000000)) break;
@@ -373,40 +498,32 @@ public class MafParser {
 		}
 		*/
 		
-		String file = "/media/kyowon/Data1/RPF_Project/genomes/hg9/maf/";
+		String file = "/media/kyowon/Data1/RPF_Project/genomes/mm9/maf/";
 		//MafParser.minNumSpecies
 		MafParser test = new MafParser(file);
 		test.generateIndexFile();
 		test.readIndexFile();
-		boolean isPlusStrand = false;
+		boolean isPlusStrand = true;
 		ArrayList<Integer> coordinate = new ArrayList<Integer>();
-		coordinate.add(25853545);
-		coordinate.add(25853544);
-		coordinate.add(25853543);
-		coordinate.add(25853542);
-		coordinate.add(25853541);	
-		coordinate.add(25853540);
-		coordinate.add(25853540-1);
-		coordinate.add(25853540-2);
-		coordinate.add(25853540-3);
-		coordinate.add(25853540-4);
-		//coordinate.add(25853540-1);
-		//coordinate.add(25853540-2);
-		//coordinate.add(25853540-3);
-		String[] seqs =  test.getSeqs("chr7", coordinate, 25853540+5, isPlusStrand, 10); // why not 150???? TODO
+		
+		for(int i=0;i<150;i++)
+			coordinate.add(150158242+i);
+		
+	
+		
+		System.out.println(test.getSeqsInMafFormat("chrX", 150158242, isPlusStrand, 120));
+		
+		//System.out.println(test.getSeqsInMafFormat("chr2", 136711414, !isPlusStrand, 150));
+
+		
+		//DnDsCalculator.numSpecies = 12;
+		
+		
+		String[] seqs =  test.getSeqs("chrX", coordinate, 150158242, isPlusStrand, 120); 
 		for(String seq : seqs){
 			System.out.println(seq + " " + seq.length());
 		}
-		//chrX	131254689 chr13	23673470
 	
-/*chr9	120864455	+
-*/
-
-//GATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAA
 		System.out.println(DnDsCalculator.calculate(seqs));
-		//ATGAACATGGTGAAGAGGATCATGGGGCGGCCTCGGCAGGAGGAGTGCAGCCCGCAAGACAACGCCTTAGGCCTGATGCACCTCCGCCGGCTCTTCACCGAGCTGTGCCACCCTCCGAGGCACATGACCCAGAAGGAGCAGGAGGAGAAG
-		
-		//ATTGCACGCTGTGCCGGCCCTGGAGAAATGGCAGATAAATTATTACTCACTACTCCCTCCAAAAAATTTACATGTCAAGGTCCCGTGGATATCACTATTCAAGCCAAGTGTAATCCCTGCTTATCAAATCCATGTAAAAATGATGGCACC 150
-		//ATTGCACGCTGTGCCGGCCCTGGAGAAATGGCAGATAAATTATTACTCACTACTCCCTCCAAAAAATTTACATGTCAAGGTCCCGTGGATATCACTATTCAAGCCAAGTGTAATCCCTGCTTATCAAATCCATGTAAAAATGATGGCACC
 	}
 }
