@@ -2,7 +2,6 @@ package msgfpipeline.parser;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.PrintStream;
 import java.util.ArrayList;
 
 import suffixarray.MatchSet;
@@ -265,6 +264,7 @@ public class MSGFPlusParser {
 		
 		
 		
+		@Override
 		public String toString(){
 		
 			StringBuffer sb = new StringBuffer();

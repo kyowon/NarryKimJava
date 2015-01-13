@@ -1,5 +1,6 @@
 package fCLIP;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -12,9 +13,8 @@ import parser.AnnotationFileParser;
 import parser.Bed12Parser;
 import rpf.Scorer;
 import util.MatchedFilter;
-import virmid.MC;
 
-public class ScorerTrainer {
+public class FCLIP_ScorerTrainer {
 	private int leftWindowSize = 30;
 	private int rightWindowSize = 60;
 	private int maxDepthThreshold = 1;
@@ -37,7 +37,7 @@ public class ScorerTrainer {
 	private  AnnotationFileParser annotationParser;
 	private String outParamFile;
 	
-	public ScorerTrainer(String bedfileName, MirGff3FileParser mirParser, AnnotationFileParser annotationParser, String outParamFile){
+	public FCLIP_ScorerTrainer(String bedfileName, MirGff3FileParser mirParser, AnnotationFileParser annotationParser, String outParamFile){
 		this.bedfileName = bedfileName;
 		this.mirParser = mirParser;	
 		this.annotationParser = annotationParser;
@@ -96,6 +96,7 @@ public class ScorerTrainer {
 	}
 	
 	private void getSignalNNoise(String contig){
+	//	System.out.println(contig);
 		Iterator<MiRNA> iterator = mirParser.getMiRNAIterator(contig);
 		if(iterator == null) return;
 		double valoffset = .0;
@@ -150,8 +151,8 @@ public class ScorerTrainer {
 			
 			//System.out.println("signal found");
 			HashSet<Integer> offsets = new HashSet<Integer>();
-			for(int i=0;i<5;){
-				int offset =  (new Random().nextInt(50)) - 50/2;
+			for(int i=0;i<3;){
+				int offset =  (new Random().nextInt(leftWindowSize)) - leftWindowSize/2;
 				if(offsets.size() >= 50) break;
 				if(offsets.contains(offset)) continue;
 				offsets.add(offset);				
@@ -248,12 +249,47 @@ public class ScorerTrainer {
 			}
 	}
 	
-	public static void main(String[] args){
-		String sample = args[0];
-		ScorerTrainer test = new ScorerTrainer("/media/kyowon/Data1/fCLIP/samples/sample3/bed/" + sample + ".sorted.bed", 
-				new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa.gff3"), 
-				new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg19.refFlat.txt"), "/media/kyowon/Data1/fCLIP/samples/sample3/bed/" + sample + ".sorted.param");
+	public static void train(String outParam, String bed, MirGff3FileParser mirParser, AnnotationFileParser annotationParser){
+		if(new File(outParam).exists()) return;
+		FCLIP_ScorerTrainer test = new FCLIP_ScorerTrainer(bed , mirParser, annotationParser, outParam);
 		test.train(30, 20, 5);
+	}
+	
+	public static void main(String[] args){
+	//	System.out.println(args.length);
+	//	for(String arg : args)
+	//		System.out.println(arg);
+		
+		String outParam;
+		String bed;
+		MirGff3FileParser mirParser;
+		AnnotationFileParser annotationParser;
+		int leftWindow; // 30 
+		int rightWindow; // 20
+		int numNonzero; // 5
+		
+		if(args.length > 0){
+		//	System.out.println(args.length);
+		//		for(String arg : args)
+		//			System.out.println(arg);
+			bed = args[1];
+			mirParser = new MirGff3FileParser(args[2]);
+			annotationParser = new AnnotationFileParser(args[3]);
+			outParam = args[0];
+			leftWindow = Integer.parseInt(args[4]);;
+			rightWindow = Integer.parseInt(args[5]);;
+			numNonzero = Integer.parseInt(args[6]);;
+		}else{
+			bed = "/media/kyowon/Data1/fCLIP/samples/sample4/bed/merged.se.bed";
+			mirParser = new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa_hg38.gff3");
+			annotationParser = new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt");
+			outParam = "/media/kyowon/Data1/fCLIP/samples/sample4/erase.txt";
+			leftWindow = 30;
+			rightWindow = 20;
+			numNonzero = 5;
+		}
+		FCLIP_ScorerTrainer test = new FCLIP_ScorerTrainer(bed , mirParser, annotationParser, outParam);
+		test.train(leftWindow, rightWindow, numNonzero);
 	}
 	
 }

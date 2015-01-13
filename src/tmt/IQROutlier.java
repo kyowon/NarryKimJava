@@ -1,16 +1,5 @@
 package tmt;
 
-import java.io.FileNotFoundException;
-import java.io.PrintStream;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.HashSet;
-
-import msgfpipeline.parser.MSGFPlusParser;
-import msgfpipeline.parser.MSGFPlusParser.MSGFPlusPSM;
-import uninovo.MC;
-
 public class IQROutlier{
 	/*
 	private int numChannel = 6;

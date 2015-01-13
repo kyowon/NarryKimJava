@@ -2,6 +2,8 @@ package parser;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -41,7 +43,7 @@ public class AnnotationFileParser {
 		private int exonCount;		
 		private int[] exonStarts;
 		private int[] exonEnds;
-		private int[][] introns; // intron inclusive, increasing, so exon exclusive
+		private int[][] introns; // intron inclusive, increasing
 		private HashMap<Integer, Integer> fivepSplices = null;
 		private HashMap<Integer, Integer> threepSplices = null;
 		
@@ -131,6 +133,31 @@ public class AnnotationFileParser {
 			return true;
 		}
 
+		public Integer getDistFromClosestExon(int position){ // 0 if within an exon strand matters 
+			if(exonCount==0) return null;		
+			for(int j=0; j<exonCount;j++){
+				if(position < exonStarts[j]){
+					int d1 = exonStarts[j] - position; 
+					int d2 = j>0? position - exonEnds[j-1] + 1: d1 + 1;
+					if(isPlusStrand) d1 = -d1;
+					else d2 = -d2;
+					return Math.abs(d1) < Math.abs(d2)? d1 : d2;
+				}
+				
+				if(position < exonEnds[j]){
+					return 0;
+				}
+			}
+			int d2 = position - exonEnds[exonCount-1] + 1;
+			if(!isPlusStrand) d2 = -d2;
+			//else d1 = -d1;
+			return d2;
+			//int d1 = position - exonStarts[exonCount-1];
+			//int d2 = exonEnds[exonCount-1] - position - 1;
+			//if(isPlusStrand) d2 = -d2;
+			//else d1 = -d1;
+			//return Math.abs(d1) < Math.abs(d2)? d1 : d2;
+		}
 
 		private AnnotatedGene(int txStart, int txEnd){ // constructor for comparison
 			this.txStart = txStart;
@@ -380,7 +407,6 @@ public class AnnotationFileParser {
 					}
 				}
 			}	
-		
 					
 			return ret;
 		}
@@ -708,8 +734,34 @@ public class AnnotationFileParser {
 		return annotatedGeneSetMap.get(contig).iterator();
 	}
 	
+	public ArrayList<AnnotatedGene> getAnnotatedGenes(String contig){
+		if(!annotatedGeneSetMap.containsKey(contig)) return new ArrayList<AnnotatedGene>();
+		return annotatedGeneSetMap.get(contig);
+	}
+	
+	public void toBedFile(String bed){
+		try {
+			PrintStream out = new PrintStream(bed);
+			Iterator<AnnotatedGene> iterator = getAnnotatedGeneIterator();
+			while(iterator.hasNext()){
+				AnnotatedGene gene = iterator.next();
+				StringBuilder sb = new StringBuilder();
+				sb.append(gene.getContig());sb.append('\t');
+				sb.append(gene.getTxStart());sb.append('\t');
+				sb.append(gene.getTxEnd());sb.append('\t');
+				sb.append(gene.getAccession());sb.append('\t');
+				sb.append('0');sb.append('\t');
+				sb.append(gene.isPlusStrand()? '+' : '-');
+				out.println(sb.toString());
+			}
+			out.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
 
 	public static void main(String[] args){
-		
+		new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt").toBedFile("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.bed");
 	}
 }

@@ -8,8 +8,6 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
-
 import util.DnDsCalculator;
 import util.Nucleotide;
 import net.sf.samtools.util.BufferedLineReader;
@@ -345,8 +343,34 @@ public class MafParser {
 			//else
 			//	ret.put(key, value);
 		}
+		removeAllIntertedPositions(ret);
 		return ret;
 	}
+	
+	private void removeAllIntertedPositions(HashMap<String, StringBuffer> map){
+		ArrayList<Integer> indexToRemove = new ArrayList<Integer>();
+		StringBuffer s = map.get(mainSpecies);
+		for(int i=0;i<s.length();i++){
+			boolean toRemove = false;
+			for(StringBuffer t : map.values()){
+				if(t.charAt(i) != '-'){
+					toRemove = false;
+					break;
+				}
+				toRemove = true;
+			}
+			if(toRemove) indexToRemove.add(i);
+		}
+		int off = 0;
+		for(int i : indexToRemove){
+			for(StringBuffer t : map.values()){
+				t.deleteCharAt(i - off);
+			}
+			off++;
+		}
+		
+	}
+	
 
 	public String[] getSeqs(String contig, ArrayList<Integer> coordinate, int position, boolean isPlusStrand, int length){
 		ArrayList<HashMap<String, StringBuffer>> subSeqs = new ArrayList<HashMap<String, StringBuffer>>();

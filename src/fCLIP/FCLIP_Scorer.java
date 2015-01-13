@@ -1,40 +1,27 @@
 package fCLIP;
 
-import java.io.File;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 
-import launcher.BlatLauncher;
-import launcher.PhyloPLauncher;
 import launcher.RNAfoldLauncher;
 
-import org.apache.commons.math3.stat.descriptive.moment.Variance;
-
 import fCLIP.MirGff3FileParser.MiRNA;
-import fCLIP.analysis.GenerateDepthsForEncodeDataSets;
-import fCLIP.parser.BlatParser;
-import fCLIP.parser.BlatParser.BlatResult;
-import fCLIP.parser.ScoringOutputParser;
-import fCLIP.parser.ScoringOutputParser.ScoredPosition;
+import fCLIP.parser.ScoredPositionOutputParser;
+import fCLIP.parser.ScoredPositionOutputParser.ScoredPosition;
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
-import parser.Bed12Parser.Bed12Read;
 import parser.BufferedLineReader;
-import parser.MafParser;
 import parser.ZeroBasedFastaParser;
-import util.DnDsCalculator;
-import util.GenerateMaffileWithSpecificSpecies;
-public class Scorer {
+public class FCLIP_Scorer {
 	
 	static private int leftWindowSize = 40;
 	static private int rightWindowSize = 40;
 	static private int maxDepthThreshold = 0;
-	final static public int flankingNTNumber = 20; // inclusive.. 
+	static public int flankingNTNumber = 15; // inclusive.. 
 	private Bed12Parser bedParser;
 	private double[] filter5p;
 	private double[] filter3p;
@@ -115,9 +102,23 @@ public class Scorer {
 	}
 	
 	
+	private double getScore(ArrayList<Integer> co, int currentPosition, boolean isPlusStrand, boolean is5p){
+		ArrayList<Integer> coordinate = new ArrayList<Integer>(co);
+		for(int i=0;i<leftWindowSize;i++){
+			if(is5p) coordinate.add(0, currentPosition + (isPlusStrand? -i : i));
+			else coordinate.add(currentPosition + (isPlusStrand? i : -i));
+		}
+		
+		double[] depth = is5p ? bedParser.get5pSignalForfCLIP(isPlusStrand, coordinate) :
+			bedParser.get3pSignalForfCLIP(isPlusStrand, coordinate);
+		return getRawScore(is5p? filter5p : filter3p, depth, is5p? filter5pNorm : filter3pNorm);
+		
+	}
+	
+	
 	private HashMap<Integer, ArrayList<ScoredPosition>> getScoredPositionMap(AnnotationFileParser parser, boolean isPlusStrand, boolean is5p, double scoreThreshold){
 		HashMap<Integer, ArrayList<ScoredPosition>> scoredPositionMap = new HashMap<Integer, ArrayList<ScoredPosition>>();
-		ArrayList<ScoredPosition> scoredPositions = new ArrayList<ScoringOutputParser.ScoredPosition>();
+		ArrayList<ScoredPosition> scoredPositions = new ArrayList<ScoredPositionOutputParser.ScoredPosition>();
 		HashSet<Integer> positionsToConsider = new HashSet<Integer>();
 		
 		Iterator<Integer> iterator = is5p ? bedParser.getNonZero5pPositionIterator(isPlusStrand) : bedParser.getNonZero3pPositionIterator(isPlusStrand);
@@ -144,45 +145,17 @@ public class Scorer {
 			
 			for(ArrayList<Integer> co : bedParser.getCoordinates(currentPosition + (isPlusStrand == is5p ? 1 :  -1), rightWindowSize, isPlusStrand, is5p)){ // should be left inclusive..
 				if(!Bed12Parser.getSplices(co).isEmpty()) continue;
-				ArrayList<Integer> coordinate = new ArrayList<Integer>(co);					
-				
-				for(int i=0;i<leftWindowSize;i++){
-					if(is5p) coordinate.add(0, currentPosition + (isPlusStrand? -i : i));
-					else coordinate.add(currentPosition + (isPlusStrand? i : -i));
-				}
-				
-			//	System.out.println(currentPosition + " " + coordinate.indexOf(currentPosition));
-				double score = 0;
-			//	int readCount = 0;
-				double[] depth = is5p ? bedParser.get5pSignalForfCLIP(isPlusStrand, coordinate) :
-					bedParser.get3pSignalForfCLIP(isPlusStrand, coordinate);
-				score = getRawScore(is5p? filter5p : filter3p, depth, is5p? filter5pNorm : filter3pNorm);
-			//		readCount = (int)rpf.Scorer.sum(depth);
-				//if(currentPosition == 129414600)System.out.println(score);
-				
-			//	System.out.println(is5p + " "+currentPosition);
-			//	System.out.println(coordinate.indexOf(currentPosition) + " " + (is5p? filter5p[coordinate.indexOf(currentPosition)] : filter3p[coordinate.indexOf(currentPosition)] ));
-												
+				double score = getScore(co, currentPosition, isPlusStrand, is5p);
 				if(score > scoreThreshold){
 					ScoredPosition scoredPosition = is5p? new ScoredPosition(bedParser.getContig(), isPlusStrand, currentPosition, -1, score, -1, parser):
 						new ScoredPosition(bedParser.getContig(), isPlusStrand, -1, currentPosition, -1, score, parser);
 					scoredPositions.add(scoredPosition);
-		//			scoredPosition.setReadCount(readCount);
-				//	if(!scoredPositionMap.containsKey(currentPosition)) scoredPositionMap.put(currentPosition, new ArrayList<ScoredPosition>());
-				//	scoredPositionMap.get(currentPosition).add(scoredPosition);
-					
-					/*if(!is5p){
-						System.out.println(isPlusStrand + " " + is5p + " " + currentPosition);
-						System.out.println(coordinate);
-						for(double c : cov) System.out.print(c + " ");
-						System.out.println();
-					}*/
 				}					
 			}
 		}			
-		//}
+		
 		Collections.sort(scoredPositions);
-		scoredPositions = windowFilter(scoredPositions, 3, 1, is5p);
+		scoredPositions = windowFilter(scoredPositions, 5, 1, is5p);
 		
 		for(ScoredPosition s: scoredPositions){
 			int position = is5p? s.getFivePposition() : s.getThreePposition();
@@ -196,7 +169,7 @@ public class Scorer {
 	private ArrayList<ScoredPosition> windowFilter(ArrayList<ScoredPosition> s, int window, int top, boolean is5p) {
 	    
 	    // select each peak if it is top n within window (-window,+window) around it
-		ArrayList<ScoredPosition> retPositions = new ArrayList<ScoringOutputParser.ScoredPosition>();
+		ArrayList<ScoredPosition> retPositions = new ArrayList<ScoredPositionOutputParser.ScoredPosition>();
 	   
 	    for(int positionIndex = 0; positionIndex < s.size(); positionIndex++) {
 	      int rank = 1;
@@ -232,7 +205,7 @@ public class Scorer {
 	    return retPositions;
 	  }
 	
-private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int top, boolean isPlusStrand, boolean is5p) {
+	private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int top, boolean isPlusStrand, boolean is5p) {
 	    
 	    // select each peak if it is top n within window (-window,+window) around it
 		ArrayList<Integer> retPositions = new ArrayList<Integer>();
@@ -269,25 +242,30 @@ private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int to
 
 //CGCCGCCGCCGC CGCCCCGG CACCCGCCTCCCGGCGCTGACGGTCTCGTACGAAGCCGGCGAGGGGGAG CCAGCAGC  GGCGGTCGCCGG
 	private void updatePaired(HashSet<ScoredPosition> positionSet, int p3p, int p5p, HashMap<Integer, ArrayList<ScoredPosition>> sp3p, HashMap<Integer, ArrayList<ScoredPosition>> sp5p,
-			double energyThreshold, double depthThreshold,  boolean isPlusStrand, AnnotationFileParser parser, boolean checkOverhang){
+			double unpairedScoreThreshold, boolean isPlusStrand, AnnotationFileParser parser){
 		String seq = isPlusStrand? fastaParser.getSequence(bedParser.getContig(), p3p - flankingNTNumber, p5p + flankingNTNumber + 1)
 		    : ZeroBasedFastaParser.getComplementarySequence(fastaParser.getSequence(bedParser.getContig(), p5p-flankingNTNumber, p3p + flankingNTNumber + 1), true);
 		
 		RNAfoldLauncher fold = new RNAfoldLauncher(seq, flankingNTNumber);
-		if(fold.getEnergyPerNT() > energyThreshold) return;
-		if(fold.getDepth() < depthThreshold) return;
-		if(checkOverhang && (fold.getOverHang() < 0 || fold.getOverHang() > 5)) return;
+	//	if(fold.getEnergyPerNT() > energyThreshold) return;
+	//	if(fold.getDepth() < depthThreshold) return;
+		//if(checkFoldFeasibility && !fold.isFeasibleFold()) return;
 		for(ScoredPosition s3 : sp3p.get(p3p)){
 			for(ScoredPosition s5 : sp5p.get(p5p)){
+				if(s5.getFivePScore() < unpairedScoreThreshold && s3.getThreePScore() < unpairedScoreThreshold) continue;
 				ScoredPosition sp = new ScoredPosition(bedParser.getContig(), isPlusStrand, p5p, p3p, s5.getFivePScore(), s3.getThreePScore(), parser);
 				sp.set(fold).setSeq(seq);
-				sp.addGenes(s5);sp.addGenes(s3);
+				sp.addGenes(s5);
+				sp.addGenes(s3);
+				//sp.se
+				sp.setGeneInfo(parser);
 				positionSet.add(sp);
 			}
 		}
 	}
 	
-	private void updateUnPaired(HashSet<ScoredPosition> positionSet, int p, HashMap<Integer, ArrayList<ScoredPosition>> sp, double unpairedScoreThreshold, double energyThreshold, double depthThreshold, boolean isPlusStrand, boolean is3p, AnnotationFileParser annotationParser){
+	private void updateUnPaired(HashSet<ScoredPosition> positionSet, int p, HashMap<Integer, ArrayList<ScoredPosition>> sp, double unpairedScoreThreshold,
+			boolean isPlusStrand, boolean is3p, AnnotationFileParser annotationParser){
 		boolean isLeft = isPlusStrand == is3p;
 		ArrayList<ScoredPosition> sps = new ArrayList<ScoredPosition>();
 		for(ScoredPosition s: sp.get(p)){
@@ -305,12 +283,13 @@ private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int to
 		double minEnergy = 1000;
 		String maxSeq = null;
 		RNAfoldLauncher maxFold = null;
-		for(int k=2*flankingNTNumber+minReadDiff; k<2*flankingNTNumber+maxReadDiff; k++){
-			String subSeq = is3p? seq.substring(0, k) : seq.substring(2*flankingNTNumber+maxReadDiff - k - 1);
+		//for(int k=2*flankingNTNumber+minReadDiff; k<2*flankingNTNumber+maxReadDiff; k++) // TODO
+		{
+			String subSeq = seq;//is3p? seq.substring(0, k) : seq.substring(2*flankingNTNumber+maxReadDiff - k - 1);
 			RNAfoldLauncher fold = new RNAfoldLauncher(subSeq, flankingNTNumber);
-			if(fold.getOverHang() > 5 || fold.getOverHang() < 0) continue;
-			if(fold.getEnergy() > energyThreshold) continue;
-			if(fold.getDepth() < depthThreshold) continue;
+			//if(!fold.isFeasibleFold()) continue;
+			//if(fold.getEnergy() > energyThreshold) continue;
+			//if(fold.getDepth() < depthThreshold) continue;
 			if(minEnergy > fold.getEnergy()){
 				minEnergy = fold.getEnergy();
 				maxFold = fold;
@@ -326,17 +305,7 @@ private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int to
 				else
 					s.setThreePposition(s.getFivePposition() + (isPlusStrand? - len + 1: len - 1), annotationParser);
 				positionSet.add(s);
-			}
-			/*}else{
-				RNAfoldLauncher fold = new RNAfoldLauncher(seq, flankingNTNumber);
-				for(ScoredPosition s : sps){
-					s.set(fold).setSeq(seq);
-					positionSet.add(s);
-				}
-			}*/
-			
-			
-			
+			}				
 		}else{
 			RNAfoldLauncher fold = new RNAfoldLauncher(seq, flankingNTNumber);
 			for(ScoredPosition s : sps){
@@ -347,13 +316,13 @@ private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int to
 	}
 	
 	private void updateScoredPositions(HashSet<ScoredPosition> positionSet, HashMap<Integer, ArrayList<ScoredPosition>> sp3p, HashMap<Integer, ArrayList<ScoredPosition>> sp5p, 
-			Classifier classifier, MafParser mafParser, double unpairedScoreThreshold, double energyThreshold, double depthThreshold, boolean isPlusStrand, AnnotationFileParser annotationParser){
+			Classifier classifier, double unpairedScoreThreshold, boolean isPlusStrand, AnnotationFileParser annotationParser){
 		ArrayList<Integer> positions5p = new ArrayList<Integer>(sp5p.keySet());
 		ArrayList<Integer> positions3p = new ArrayList<Integer>(sp3p.keySet());
 		Collections.sort(positions5p);
 		Collections.sort(positions3p);
 		
-		HashSet<ScoredPosition> tPositionSet = new HashSet<ScoringOutputParser.ScoredPosition>();
+		HashSet<ScoredPosition> tPositionSet = new HashSet<ScoredPositionOutputParser.ScoredPosition>();
 		
 		for(int p3p : positions3p){
 			int i = Collections.binarySearch(positions5p, p3p + (isPlusStrand? minReadDiff : -maxReadDiff));
@@ -368,8 +337,8 @@ private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int to
 			}
 			
 			if(!paired5pList.isEmpty())
-				updatePaired(tPositionSet, p3p, isPlusStrand? paired5pList.get(0) : paired5pList.get(paired5pList.size()-1), sp3p, sp5p, energyThreshold, depthThreshold, isPlusStrand, annotationParser, classifier!= null);
-			else if(classifier!= null) updateUnPaired(tPositionSet, p3p, sp3p, unpairedScoreThreshold, energyThreshold, depthThreshold, isPlusStrand, true, annotationParser);
+				updatePaired(tPositionSet, p3p, isPlusStrand? paired5pList.get(0) : paired5pList.get(paired5pList.size()-1), sp3p, sp5p, unpairedScoreThreshold, isPlusStrand, annotationParser);
+			else if(classifier!= null) updateUnPaired(tPositionSet, p3p, sp3p, unpairedScoreThreshold, isPlusStrand, true, annotationParser);
 		}
 				
 		for(int p5p : positions5p){
@@ -385,8 +354,8 @@ private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int to
 			}
 			
 			if(!paired3pList.isEmpty())
-				updatePaired(tPositionSet, isPlusStrand? paired3pList.get(paired3pList.size()-1) : paired3pList.get(0), p5p, sp3p, sp5p, energyThreshold, depthThreshold, isPlusStrand, annotationParser, classifier!= null);
-			else if(classifier!= null) updateUnPaired(tPositionSet, p5p, sp5p, unpairedScoreThreshold, energyThreshold, depthThreshold, isPlusStrand, false, annotationParser);
+				updatePaired(tPositionSet, isPlusStrand? paired3pList.get(paired3pList.size()-1) : paired3pList.get(0), p5p, sp3p, sp5p, unpairedScoreThreshold, isPlusStrand, annotationParser);
+			else if(classifier!= null) updateUnPaired(tPositionSet, p5p, sp5p, unpairedScoreThreshold, isPlusStrand, false, annotationParser);
 		}
 		
 		for(ScoredPosition p : tPositionSet){ // set read length variance
@@ -448,13 +417,13 @@ private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int to
 			for(ScoredPosition p : tPositionSet){
 				//classifier.setClassification(p); // 1st classification
 				//if(p.getClassification().toUpperCase().equals("M")){ // 2nd classification
-					p.setRNAzScoresNSeedConservation(mafParser);
-					p.setDnDs(mafParser);
+			//		p.setRNAzScoresNSeedConservation(mafParser);
+			//		p.setDnDs(mafParser);
 					classifier.setClassification(p);
 				//}
 				
 				if(p.isPaired()) continue;
-				if(p.getClassification().toUpperCase().equals("M")){
+				if(p.getClassification().equals("M")){
 					if(p.is3pScored()) mClassified3ps.add(p.getThreePposition());
 					else mClassified5ps.add(p.getFivePposition());
 				}
@@ -482,14 +451,14 @@ private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int to
 		}
 	}
 	
-	private ArrayList<ScoredPosition> getScoredPositions(AnnotationFileParser parser, Classifier classifier, MafParser mafParser, double unpairedScoreThreshold, double pairedScoreThreshold, double depthThreshold, double energyThreshold, boolean isPlusStrand){
+	ArrayList<ScoredPosition> getScoredPositions(AnnotationFileParser parser, Classifier classifier, double unpairedScoreThreshold, double pairedScoreThreshold, boolean isPlusStrand){
 		HashSet<ScoredPosition> positionSet = new HashSet<ScoredPosition>();
 		System.out.println("Scoring for " + bedParser.getContig() + " " + (isPlusStrand? "+" : "-") + " strand");
 		
 		HashMap<Integer, ArrayList<ScoredPosition>> sp5p = getScoredPositionMap(parser, isPlusStrand, true, pairedScoreThreshold);
 		HashMap<Integer, ArrayList<ScoredPosition>> sp3p = getScoredPositionMap(parser, isPlusStrand, false, pairedScoreThreshold);
 		
-		updateScoredPositions(positionSet, sp3p, sp5p, classifier, mafParser, unpairedScoreThreshold, energyThreshold, depthThreshold, isPlusStrand, parser);
+		updateScoredPositions(positionSet, sp3p, sp5p, classifier, unpairedScoreThreshold, isPlusStrand, parser);
 		
 		System.out.println("\t"+positionSet.size()+" points to be scored");
 		for(ScoredPosition sp : positionSet){
@@ -526,144 +495,60 @@ private ArrayList<Integer> windowFilter(ArrayList<Integer> s, int window, int to
 		return positions;
 	}
 	
-	public Scorer(Bed12Parser bedParser, ZeroBasedFastaParser fastaParser, MirGff3FileParser mirParser, String parameterFileName){
+	public FCLIP_Scorer(Bed12Parser bedParser, ZeroBasedFastaParser fastaParser, MirGff3FileParser mirParser, String parameterFileName){
 		this.bedParser = bedParser;
 		this.fastaParser = fastaParser;
 		this.mirParser = mirParser;
 		read(parameterFileName);
 	}
 	
-	static public void main(String[] args) throws IOException{
-		//GenerateMaffileWithSpecificSpecies.main(null);		
-		String sample = "drosha";
-		boolean reverseStrand = false;
-		sample = "h19x2";
-		String dbFasta = "/media/kyowon/Data1/RPF_Project/genomes/hg19.fa";
-		ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser(dbFasta);
-		MirGff3FileParser mirParser = new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa.gff3");
-		AnnotationFileParser annotationParser = new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg19.refFlat.txt");
-		String bedFileName = "/media/kyowon/Data1/fCLIP/samples/sample3/bed/" + sample + ".sorted.bed";
-		String parameterFileName = "/media/kyowon/Data1/fCLIP/samples/sample3/bed/" + sample + ".sorted.param";
-		String outFileName = "/media/kyowon/Data1/Dropbox/" + sample + ".sorted.out.csv";
-		String trainOutFileName = "/media/kyowon/Data1/Dropbox/" + sample + ".sorted.out.train.csv";
+	public static void main(String[] args){
+		Bed12Parser bedParser = new Bed12Parser("/media/kyowon/Data1/fCLIP/samples/sample4/bed/merged.se.bed", 
+				new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt"),
+				"chr19", true);
+		//ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser("/media/kyowon/Data1/fCLIP/genomes/hg38.fa");
+		//MirGff3FileParser mirParser = new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa_hg38.gff3");
+		String parameterFileName = "/media/kyowon/Data1/fCLIP/samples/sample4/results/training/merged.param";
+		FCLIP_Scorer scorer = new FCLIP_Scorer(bedParser, null, null, parameterFileName);
 		
-		String arffTrainOutFileName = "/media/kyowon/Data1/Dropbox/" + sample + ".sorted.out.train.arff";
-		String arffOutFileName = "/media/kyowon/Data1/Dropbox/" + sample + ".sorted.out.arff";
 		
-		String fastaOutFileName = "/media/kyowon/Data1/Dropbox/" + sample + ".sorted.out.fa";
-		String pslOutFileName = "/media/kyowon/Data1/Dropbox/" + sample + ".sorted.out.psl";
-		String mafFolder = "/media/kyowon/Data1/fCLIP/genomes/mafSelected/";
-		
-		MafParser mafParser = new MafParser(mafFolder); 
-		double unpairedScoreThreshold = 0.16; // for dgcr8, multiply * 3
-		double pairedScoreThreshold = unpairedScoreThreshold/4;
-		double energyThreshold = 1000;
-		double depthThreshold = -1;
-		
-		//MafParser.minNumSpecies = 2;
-		//DnDsCalculator.numSpecies = 5;
-		
-		mafParser.generateIndexFile();
-		mafParser.readIndexFile();
-		
-		//String[] args1 = new String[1];
-		//args1[0] = sample;
-		//ScorerTrainer.main(args1); //TODO
-				
-		if(!new File(arffTrainOutFileName).exists()){
-			System.out.println("Training Classifier for " + sample);
-			HashSet<ScoredPosition> trainingPositions = new HashSet<ScoredPosition>();
-			int annotated = 0;
-			for(String contig : fastaParser.getContigs()){
-				if(contig.length() > 5 || contig.equals("chrM")) continue;
-				//if(!contig.equals("chrX")) continue;
-				PhyloPLauncher.setModFile(mafFolder + contig + ".maf.mod");
-				
-				Bed12Parser bedParser = new Bed12Parser(bedFileName, annotationParser, contig, true, reverseStrand);
-				Scorer scorer = new Scorer(bedParser, fastaParser, mirParser, parameterFileName);
-				for(ScoredPosition sp : scorer.getScoredPositions(annotationParser, null, null, unpairedScoreThreshold, pairedScoreThreshold, depthThreshold, energyThreshold, true)){
-					trainingPositions.add(sp);
-				}
-				for(ScoredPosition sp : scorer.getScoredPositions(annotationParser, null, null, unpairedScoreThreshold, pairedScoreThreshold, depthThreshold, energyThreshold, false)){
-					trainingPositions.add(sp);
-				}		
-			}	
-			PrintStream outTrainArff = new PrintStream(arffTrainOutFileName);
-			PrintStream outTrain = new PrintStream(trainOutFileName);
-			outTrainArff.println(ScoringOutputParser.ScoredPosition.getArffHeader());
-			outTrain.println(ScoringOutputParser.ScoredPosition.getHeader());
-			for(ScoredPosition sp : trainingPositions){
-				if(sp.getMiRNAs() != null) 	annotated++;
-			}
-			
-			System.out.println("Training size : " + trainingPositions.size() + " Annotated : " + annotated);
-			int numUnannotated = 300;
-			for(ScoredPosition sp : trainingPositions){
-				if(sp.getMiRNAs() == null) numUnannotated--;
-				if(numUnannotated < 0 && sp.getMiRNAs() == null) continue;
-				
-				sp.setRNAzScoresNSeedConservation(mafParser);
-				outTrainArff.println(sp.toTrainingArffString());
-				outTrain.println(sp);
-			}
-			outTrainArff.close(); // training done		
-			outTrain.close();
-		}		
-		
-		if(!new File(outFileName).exists()){
-			Classifier classifier = new Classifier(arffTrainOutFileName);
-			PrintStream outFasta = new PrintStream(fastaOutFileName);
-			
-			int fastaIndex = 0;
-			ArrayList<ScoredPosition> toWritePositions = new ArrayList<ScoringOutputParser.ScoredPosition>();
-			for(String contig : fastaParser.getContigs()){
-				if(contig.length() > 5 || contig.equals("chrM")) continue;
-				//if(!contig.equals("chrX")) continue;
-				PhyloPLauncher.setModFile(mafFolder + contig + ".maf.mod");
-				Bed12Parser bedParser = new Bed12Parser(bedFileName, annotationParser, contig, true, reverseStrand);
-				Scorer scorer = new Scorer(bedParser, fastaParser, mirParser, parameterFileName);
-				for(ScoredPosition sp : scorer.getScoredPositions(annotationParser, classifier, mafParser, unpairedScoreThreshold, pairedScoreThreshold, depthThreshold, energyThreshold, true)){					
-					toWritePositions.add(sp);
-					outFasta.println(">"+ (fastaIndex++));
-					outFasta.println(sp.getSeq());
-				}
-				for(ScoredPosition sp : scorer.getScoredPositions(annotationParser, classifier, mafParser, unpairedScoreThreshold, pairedScoreThreshold, depthThreshold, energyThreshold, false)){					
-					toWritePositions.add(sp);
-					outFasta.println(">"+ (fastaIndex++));
-					outFasta.println(sp.getSeq());
-				}
-			}
-			
-			outFasta.close();
-			BlatLauncher.run(dbFasta, fastaOutFileName, pslOutFileName, 100);
-			BlatParser blatParser = new BlatParser(pslOutFileName);
-			
-			for(int i=0;i<toWritePositions.size();i++){
-				ArrayList<BlatResult> r = blatParser.getResults(Integer.toString(i));
-				if(r == null) toWritePositions.get(i).setBlatHits(1);
-				else toWritePositions.get(i).setBlatHits(r.size());
-			}
-			
-			
-			PrintStream outArff = new PrintStream(arffOutFileName);
-			PrintStream out = new PrintStream(outFileName);
-			
-			outArff.println(ScoringOutputParser.ScoredPosition.getArffHeader());
-			out.println(ScoredPosition.getHeader());
-			for(ScoredPosition sp : toWritePositions){
-				outArff.println(sp.toArffString()); 
-				out.println(sp);
-			}			
-			outArff.close(); 
-			out.close();
+		for(int o = - 5; o<5; o++){
+			int currentPosition = 58349275 + o;
+			boolean isPlusStrand = true;
+			boolean is5p = true;
+			ArrayList<ArrayList<Integer>> cos = bedParser.getCoordinates(currentPosition + (isPlusStrand == is5p ? 1 :  -1), FCLIP_Scorer.rightWindowSize, isPlusStrand, is5p);			
+			if(cos == null) System.out.println("null");
+			else System.out.println(currentPosition + " " + scorer.getScore(cos.get(0), currentPosition, isPlusStrand, is5p));
 		}
+		System.out.println();
+		for(int o = - 5; o<5; o++){
+			int currentPosition = 58349275 + o;
+			boolean isPlusStrand = true;
+			boolean is5p = false;
+			ArrayList<ArrayList<Integer>> cos = bedParser.getCoordinates(currentPosition + (isPlusStrand == is5p ? 1 :  -1), FCLIP_Scorer.rightWindowSize, isPlusStrand, is5p);			
+			if(cos == null) System.out.println("null");
+			else System.out.println(currentPosition + " " + scorer.getScore(cos.get(0), currentPosition, isPlusStrand, is5p));
+		}
+		System.out.println();
+		for(int o = - 5; o<5; o++){
+			int currentPosition = 58349236 + o;
+			boolean isPlusStrand = true;
+			boolean is5p = true;
+			ArrayList<ArrayList<Integer>> cos = bedParser.getCoordinates(currentPosition + (isPlusStrand == is5p ? 1 :  -1), FCLIP_Scorer.rightWindowSize, isPlusStrand, is5p);			
+			if(cos == null) System.out.println("null");
+			else System.out.println(currentPosition + " " + scorer.getScore(cos.get(0), currentPosition, isPlusStrand, is5p));
+		}
+		System.out.println();
+		for(int o = - 5; o<5; o++){
+			int currentPosition = 58349236 + o;
+			boolean isPlusStrand = true;
+			boolean is5p = false;
+			ArrayList<ArrayList<Integer>> cos = bedParser.getCoordinates(currentPosition + (isPlusStrand == is5p ? 1 :  -1), FCLIP_Scorer.rightWindowSize, isPlusStrand, is5p);			
+			if(cos == null) System.out.println("null");
+			else System.out.println(currentPosition + " " + scorer.getScore(cos.get(0), currentPosition, isPlusStrand, is5p));
+		}
+		System.out.println();
 		
-		ScoringOutputParser sparser = new ScoringOutputParser(outFileName);
-		ScorePairs.run(sample, sparser, mafParser, arffTrainOutFileName,  false);
-		ScorePairs.run(sample, sparser, mafParser, arffTrainOutFileName, true);
-		
-		GenerateDepthsForEncodeDataSets.generate(outFileName, outFileName + ".encode.csv", annotationParser);
-		
-		//coverageBed -S -split -a /media/kyowon/Data1/fCLIP/RNAseq/siControl_R1_Aligned_Sorted.bed -b h19x2.sorted.out.3p.bed > h19x2.sorted.out.siContol.3p.bed
-	}	
+	}
+	
 }

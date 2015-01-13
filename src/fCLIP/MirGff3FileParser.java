@@ -8,7 +8,6 @@ import java.util.Iterator;
 
 import net.sf.picard.util.IntervalTree;
 import net.sf.picard.util.IntervalTree.Node;
-import parser.Bed12Parser;
 import parser.BufferedLineReader;
 
 public class MirGff3FileParser {

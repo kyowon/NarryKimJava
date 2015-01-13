@@ -284,7 +284,7 @@ public class Bed12Parser {
 			String s;
 			while((s=in.readLine())!=null){
 				totalReadCount++;
-				if(!s.startsWith(this.contig)) continue;
+				if(!s.startsWith(this.contig + "\t")) continue;
 				String[] token = s.split("\t");
 				Bed12Read read = new Bed12Read(s, invertStrand);
 				
@@ -609,15 +609,22 @@ public class Bed12Parser {
 		double[] covs3p = get3pCoverages(isPlusStrand, coordinate);
 		double[] depths = getDepths(isPlusStrand, coordinate);
 		double[] signal = new double[depths.length];
+		double alpha = 1;
 		
 		for(int i=0;i<signal.length;i++){
 		//	if(i%2 == 0){
-				signal[i] = depths[i]==0? 0 : depths[i]  -  ((covs5p[i]+1) * (covs5p[i]/depths[i]) * (i>0 ? covs3p[i-1] + 1 : 0));
-				signal[i] = Math.sqrt(Math.abs(signal[i])) * Math.signum(signal[i]);
+			double c5 = covs5p[i] > 2 ? covs5p[i] + 1 : 1;
+			double c3 = i>0? covs3p[i-1] + 1:1;
+			
+			signal[i] = depths[i]==0? 0 : depths[i]  -  alpha * c5 * c3; //  * (c5/depths[i])
+			signal[i] = Math.sqrt(Math.abs(signal[i])) * Math.signum(signal[i]);
+			//System.out.print(signal[i] + " ");
+		
 		//	}else{
 			//	signal[i] = depths[i/2];// +  covs5p[i/2] ;
 		//	}
 		}
+		//System.out.println();
 		return signal;
 		
 	}
@@ -628,16 +635,20 @@ public class Bed12Parser {
 		double[] covs3p = get3pCoverages(isPlusStrand, coordinate);
 		double[] depths = getDepths(isPlusStrand, coordinate);
 		double[] signal = new double[depths.length];
+		double alpha = 1;
 		
 		for(int i=0;i<signal.length;i++){
-		//	if(i%2 == 0){
-			//System.out.println(depths[i] + " " + covs3p[i] + " " + covs5p[i+1]);
-			signal[i] =  depths[i]==0? 0 : depths[i] - ((covs3p[i]+1) * (covs3p[i]/depths[i]) * (i<covs5p.length-1? covs5p[i+1] + 1: 0));
+			double c3 = covs3p[i] > 2 ? covs3p[i] + 1 : 1;
+			double c5 = i<covs5p.length-1? covs5p[i+1] + 1:1;
+			
+			signal[i] =  depths[i]==0? 0 : depths[i] - alpha * c5 * c3;
 			signal[i] = Math.sqrt(Math.abs(signal[i])) * Math.signum(signal[i]);
+			//System.out.print(signal[i] + " ");
 		//	}else{
 			//	signal[i] = depths[i/2];// +  covs5p[i/2] ;
 		//	}
 		}
+		//System.out.println();
 		return signal;
 		
 	}
@@ -795,19 +806,18 @@ public class Bed12Parser {
 		return updateCoordinates(newCoordinates, ss, len-1, sign);
 	}
 	
-	/*static public void main(String[] args){//565858,413662
-		//Bed12Read read = new Bed12Read("chr17	15142909	15165755	0_349741-3	255	-	15142909	15165755	255,0,0	2	19,10	0,22836");
-		//System.out.println(read);
-		
-		//
-		Bed12Parser bedParser = new Bed12Parser("/media/kyowon/Data1/fCLIP/samples/sample3/bed/h19x2.sorted.bed", 
-				new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg19.refFlat.txt"),
-				"chr16", true);
+	/*static public void main(String[] args){
+		Bed12Parser bedParser = new Bed12Parser("/media/kyowon/Data1/fCLIP/samples/sample4/bed/merged.se.bed", 
+				new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt"),
+				"chr2", true);
 			
-		// 14403156
 		
-		System.out.println(bedParser.get3pDepth(false, 180670310));
-		System.out.println(bedParser.get3pReads(false, 180670310));
+	//	System.out.println(bedParser.get3pDepth(true, 813648));
+	//	System.out.println(bedParser.get3pReads(true, 813648));
+		
+		
+	//	System.out.println(bedParser.get3pDepth(true, 813649));
+	//	System.out.println(bedParser.get3pReads(true, 813649));
 		
 		
 //		Nkx6-2	NM_183248	chr7	-	146767118	146768696	146767332	146768438	3	146767118,146767779,146768032,	146767587,146767952,146768696,

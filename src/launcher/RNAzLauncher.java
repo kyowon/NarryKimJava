@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.util.Random;
 
 public class RNAzLauncher {
 	
@@ -21,7 +22,7 @@ public class RNAzLauncher {
 	private void run(String maf){
 		if(maf == null) return;
 		try {
-			String mafFile = System.getProperty("user.dir") + System.getProperty("file.separator") + "Tmp.maf";
+			String mafFile = System.getProperty("user.dir") + System.getProperty("file.separator") + "Tmp." + new Random().nextLong() + ".maf";
 			PrintStream mafStream = new PrintStream(mafFile);
 			mafStream.println(maf);
 			mafStream.close();

@@ -1,7 +1,6 @@
 package fCLIP.analysis;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -10,8 +9,8 @@ import java.util.HashSet;
 
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
-import fCLIP.parser.ScoringOutputParser;
-import fCLIP.parser.ScoringOutputParser.ScoredPosition;
+import fCLIP.parser.ScoredPositionOutputParser;
+import fCLIP.parser.ScoredPositionOutputParser.ScoredPosition;
 
 public class GenerateDepthsForEncodeDataSets {
 
@@ -21,7 +20,7 @@ public class GenerateDepthsForEncodeDataSets {
 		String bedfolder = "/media/kyowon/Data1/fCLIP/genomes/ENCODE";
 	//	AnnotationFileParser annotationParser = new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg19.refFlat.txt");
 		
-		ScoringOutputParser parser = new ScoringOutputParser(infile);
+		ScoredPositionOutputParser parser = new ScoredPositionOutputParser(infile);
 		HashMap<ScoredPosition, int[]> depthMap3p = new HashMap<ScoredPosition, int[]>();
 		HashMap<ScoredPosition, int[]> depthMap5p = new HashMap<ScoredPosition, int[]>();
 		HashMap<ScoredPosition, int[]> depthMapPre = new HashMap<ScoredPosition, int[]>();

@@ -6,15 +6,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
-import fCLIP.Scorer;
 import net.sf.picard.reference.IndexedFastaSequenceFile;
 import net.sf.picard.reference.ReferenceSequence;
 
 public class ZeroBasedFastaParser {
 	private HashMap<String, byte[]> refSeqs;
-	
+	private String fastaFile;
 	
 	public ZeroBasedFastaParser(String fastaFile){
+		this.fastaFile = fastaFile;
 		read(fastaFile);		
 	}
 	
@@ -30,6 +30,7 @@ public class ZeroBasedFastaParser {
 		return getSequence(contig, 0, getLength(contig));
 	}
 	
+	public String getFastaFile(){return fastaFile;}
 	
 	/**
     * Get the sequence
@@ -146,8 +147,8 @@ public class ZeroBasedFastaParser {
 		//ACTTAGGCCAATTTTGCCTATAAGCCTATGAGTTAGCATATGTCTTCACAGTATCTTGGAGTGGCTGGAGGTAGAGTGATATATTAGCCAGAACTGGAGTCTGTTATTTGCAACCAAGATACCTA
 
 		
-		
-		System.out.println(fasta.getSequence("chr5", 149112391, 149112450+1));
+		// chr9:97151888-97152189
+		System.out.println(fasta.getSequence("chr9", 97151888, 97152489));
 		
 		//
 		

@@ -5,8 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
-
-import parser.MafParser;
+import java.util.Random;
 
 public class PhyloPLauncher {
 	
@@ -34,7 +33,7 @@ public class PhyloPLauncher {
 		if(maf == null || modFile == null) return;
 		//System.out.println(modFile + " " + maf);
 		try {
-			String mafFile = System.getProperty("user.dir") + System.getProperty("file.separator") + "Tmp.maf";
+			String mafFile = System.getProperty("user.dir") + System.getProperty("file.separator") + "Tmp" + new Random().nextLong() + ".maf";
 			PrintStream mafStream = new PrintStream(mafFile);
 			mafStream.println(maf);
 			mafStream.close();
@@ -43,7 +42,7 @@ public class PhyloPLauncher {
 					"-c",
 					"phyloP " + modFile + " " + mafFile
 					};
-			ProcessBuilder pr = new ProcessBuilder(cmd);		 
+			ProcessBuilder pr = new ProcessBuilder(cmd);
 			Process p = pr.start();
 			try {
 				p.waitFor();
@@ -63,10 +62,9 @@ public class PhyloPLauncher {
 			
 			//p-value of conservation: 3.957918e-06
 			//p-value of acceleration: 9.999986e-01
-			
+			//System.out.println("phyloP " + modFile + " " + mafFile);
 			for(String r : re){
-				//System.out.println("cc " + r);
-				
+			//	System.out.println(r);
 				if(r.startsWith("p-value of conservation")){
 					pvalConservation = Double.parseDouble(r.split(":")[1]);
 				}else if(r.startsWith("p-value of acceleration")){
@@ -86,7 +84,15 @@ public class PhyloPLauncher {
 		PhyloPLauncher.modFile = mod;
 		mp.readIndexFile();
 		
-		String mafString = "##maf version=1 scoring=autoMZ.v1\na score=1\ns mm9.chr5 3692901 -249 - 1 CTGGAAGAGAATATTCTGGCCAGGGAAGAGTTGTCTCAAGCTGGTGACAGT\ns oryCun1.chr5 3692901 -249 - 1 TCGGGAGGAAGCCTTCCGGCTGAGGAAGCGGCGCCTCCAGCCGGTGACAGT\ns rn4.chr5 3692901 -249 - 1 CTGGAAGAGAACATTCTGGCTGGGGAAGAGTTGTCTCAAGCCGACGACAGT\ns otoGar1.chr5 3692901 -249 - 1 TTGGAAGACAATATTCTGGCTGGGGAAGCAGTGTCTCAAGCTGGTGACAGT\ns cavPor2.chr5 3692901 -249 - 1 TTGGAAGAAAATACTCTGGCTGGAGAGGTGTCATTGCAAGGTAGTGACAGT\ns tupBel1.chr5 3692901 -249 - 1 TTGGAAGAAAATACTGTGGTCGGGGAAGCAGCATCTCAAGTTGGTGACAGT\ns calJac1.chr5 3692901 -249 - 1 TTGGAAGAAAATATTCTAACTGAGGAAGCAGCATCTCAAGCTGGTGACAGT";
+		String mafString = "##maf version=1 scoring=autoMZ.v1\na score=1\ns mm9.chr5 3692901 -249 + 1 "
+				+ "CTGGAAGAGAATATTCTGGCCAGGGAAGAGTTGTCTCAAGCTGGTGACAGT\ns "
+				+ "oryCun1.chr5 3692901 -249 - 1 TCGGGAGGAAGCCTTCCGGCTGAGGAAGCGGCGCCTCCAGCCGGTGACAGT\ns "
+				+ "rn4.chr5 3692901 -249 - 1 CTGGAAGAGAACATTCTGGCTGGGGAAGAGTTGTCTCAAGCCGACGACAGT\ns "
+				+ "otoGar1.chr5 3692901 -249 - 1 TTGGAAGACAATATTCTGGCTGGGGAAGCAGTGTCTCAAGCTGGTGACAGT\ns "
+				+ "cavPor2.chr5 3692901 -249 - 1 TTGGAAGAAAATACTCTGGCTGGAGAGGTGTCATTGCAAGGTAGTGACAGT\ns "
+			//	+ "tupBel1.chr5 3692901 -249 - 1 TTGGAAGAAAATACTGTGGTCGGGGAAGCAGCATCTCAAGTTGGTGACAGT\ns "
+				+ "tupBel1.chr5 3692901 -249 - 1 TGGGTTTTTTATACTTTTTTCTTTTAAGCAGCATCTCAAGAAAATGACAGT\ns "
+				+ "calJac1.chr5 3692901 -249 - 1 TTGGAAGAAAATATTCTAACTGAGGAAGCAGCATCTCAAGCTGGTGACAGT";
 		//System.out.println(mp.getSeqsInMafFormat("chrX", 150158242, true, 69*3));
 		
 		System.out.println(mafString + "\n" + new PhyloPLauncher(mafString).getPvalConservation());

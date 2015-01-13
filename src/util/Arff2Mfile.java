@@ -8,9 +8,7 @@ import parser.BufferedLineReader;
 
 public class Arff2Mfile {
 
-	public static void main(String[] args) {
-		String arff = "/media/kyowon/Data1/Dropbox/h19x2.sorted.out.train.arff";
-		String m = "/media/kyowon/Data1/Dropbox/h19x2.m";
+	public static void generate(String arff, String m) {
 		try {
 			BufferedLineReader in = new BufferedLineReader(arff);
 			PrintStream out = new PrintStream(m);
@@ -26,7 +24,6 @@ public class Arff2Mfile {
 					out.println("value = [");
 					classes = new ArrayList<String>();
 				}else if(classes != null){
-				//	if(!s.endsWith("P")) continue; //TODO
 					String[] vals = s.split(",");
 					if(vals[vals.length-1].equals("?")) continue;
 					for(int i=0;i<vals.length-1;i++){

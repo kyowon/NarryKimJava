@@ -5,9 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 
-public class RNAfoldLauncher {
-	
-	//private String seq;
+public class RNAcofoldLauncher {
 	private double energy = 0;
 	private double energyPerNT = 0;
 	
@@ -19,8 +17,6 @@ public class RNAfoldLauncher {
 	private int rightPaired = 0;
 	private double seqEntropy = 0;
 	private double structureEntropy = 0;
-	public final static int[] overhanglimit = {0,5};
-	public final static int[] pairedNumberlimit = {8,6};
 	
 	public double getSeqEntropy() {
 		return seqEntropy;
@@ -53,42 +49,47 @@ public class RNAfoldLauncher {
 	public int getOverHang() {
 		return overHang;
 	}
-	
-	public boolean isFeasibleFold(){
-		if(overHang < overhanglimit[0] || overHang > overhanglimit[1]) return false;
-		if(leftPaired < pairedNumberlimit[0] || rightPaired < pairedNumberlimit[1]) return false;
-		return true;
-	}
-			
 
 	public int getNumberOfHairPins(){
 		return numberOfHairPins;
 	}
 	
-	public RNAfoldLauncher(String seq, int flankingNTnumber){
+	public RNAcofoldLauncher(String seq, int flankingNTnumber){
 		this.flankingNTnumber = flankingNTnumber;
 		if(seq != null && !seq.isEmpty())
 			run(seq);
 	}
 	
+	public boolean isFeasibleFold(){
+		if(overHang < RNAfoldLauncher.overhanglimit[0] || overHang > RNAfoldLauncher.overhanglimit[1]) return false;
+		if(leftPaired < RNAfoldLauncher.pairedNumberlimit[0] || rightPaired < RNAfoldLauncher.pairedNumberlimit[1]) return false;
+		return true;
+	}
+	
 	private void run(String seq){//seq = pre + flanking.
 		try {
-			String pseq = seq;//.replace(' ', '\0');
-			
+			StringBuilder pseqb = new StringBuilder();//
+			pseqb.append(seq.replace(' ', '\0').substring(0, seq.length()/2));
+			pseqb.append("\\&");
+			pseqb.append(seq.substring(seq.length()/2));
+			String pseq = pseqb.toString();
+			//.replace("&", "\\&");
+			//System.out.println(pseq);
 			String[] cmd = {
 					"/bin/sh",
 					"-c",
-					"echo "+ pseq + " | RNAfold --noPS"
+					"echo "+ pseq + " | RNAcofold --noPS"
 					};
 			ProcessBuilder pr = new ProcessBuilder(cmd);		 
 			Process p = pr.start();
 			
 			BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
 			StringBuilder builder = new StringBuilder();
+			
 			String line = null;
 			while ( (line = br.readLine()) != null) {
-			//	System.out.println(line);
 			   builder.append(line);
+			   //System.out.println(line);
 			   builder.append(System.getProperty("line.separator"));
 			}
 			String[] re = builder.toString().split("\n");
@@ -222,6 +223,8 @@ public class RNAfoldLauncher {
 			this.numberOfHairPins = nh;
 		//	this.centerDepth = maxCenterDepth;
 			this.energy = Double.parseDouble(re[1].substring(re[1].indexOf(' ')+2, re[1].length()-1).trim());
+			
+			pseq = pseq.replace("\\&", "");
 			this.energyPerNT = energy/pseq.length();
 			this.seqEntropy = getEntropy(pseq.substring(flankingNTnumber, pseq.length() - flankingNTnumber), 2);
 			this.structureEntropy = getEntropy(st.substring(flankingNTnumber, st.length() - flankingNTnumber), 4);
@@ -238,9 +241,6 @@ public class RNAfoldLauncher {
 			e.printStackTrace();
 		}
 	}
-	//GUGAUCUCGACAGGAAACGUGCCACAGAGCAGUAGUGCGCAGGCAAGACUUUUCAGUGACGCCUUGUGGAACGCAGUUCAUGAUGUCCUAGCAGCUCUCACUAAGGGAACUGUACAUUCU
-	//(((...((.(((((....(((.(((.(((.(((..(((....)))..))).))).))).)))))))).)).))).......(((((....((((.((((.....)))).)))))))))..
-	 
 	
 	private double getEntropy(String seq, int stepSize){
 		HashMap<String, Double> freqMap = new HashMap<String, Double>();
@@ -259,7 +259,8 @@ public class RNAfoldLauncher {
 	
 	
 	static public void main(String[] args){
-		String seq = "ACTTTCTTCCTCTTCCTCCT CCAGCCCACTTTCTCTTCTCTGTGTCGTCAGAGCTCCAGGGAGGGACCTGGGTAGAAG GAGAAGCCGGAAACAGCGGG";
+		String seq = "TTCTCCTGCCTCAGCCTCCC AAGTAGCTGGGATTACAGGCGTGCGCCACCCTGGAGACAGAGTTGCCCAGGCTGGAGTGC AGTGGTGTGATCCTGGCTCG";
+		//System.out.println(seq);
 		seq = seq.replaceAll(" ", "");
 		String seqw = "";
 		for(char s : seq.toCharArray()){
@@ -267,7 +268,7 @@ public class RNAfoldLauncher {
 		}
 //		System.out.println(seq);
 //		System.out.println(seqw);
-		RNAfoldLauncher test = new RNAfoldLauncher(seq , 20);
+		RNAcofoldLauncher test = new RNAcofoldLauncher(seq , 20);
 		//ACCTATCCATTTATCATCCATCTACGAGGTGTCTGGGATGTAATGGATGG
 		//ACCUAUCCAUUUAUCAUCCAUCUACAGGUGGACCAAAAUGUAGGAGAUCU
 		//TGCTCAGGCATAACCCCTCG GAACGGCTGCCCCTGGCCCAGGTCTCAGCCCACCCTTGGGTCCGGGCCAACTCTCGG AGGGTGCTGCCTCCCTCTGC
@@ -281,5 +282,4 @@ public class RNAfoldLauncher {
 		//System.out.println(test.centerDepth);
 		System.out.println(test.overHang);
 	}
-	
 }

@@ -1,15 +1,10 @@
 package util;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 
-import fCLIP.parser.ScoringOutputParser;
-import fCLIP.parser.ScoringOutputParser.ScoredPosition;
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
 import parser.AnnotationFileParser.AnnotatedGene;
