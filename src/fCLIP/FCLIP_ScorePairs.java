@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.Hashtable;
 import java.util.HashSet;
 import java.util.Random;
+import java.util.Vector;
 
 import launcher.RNAfoldLauncher;
 import fCLIP.parser.ScoredPairOutputParser;
@@ -18,19 +19,19 @@ import fCLIP.parser.ScoredPositionOutputParser.ScoredPosition;
 public class FCLIP_ScorePairs {
 		
 	public static class ScorePairRunner implements Runnable{
-		private ArrayList<ScoredPosition> allPositions;
-		private ArrayList<ScoredPosition> compairngPositions;
+		private Vector<ScoredPosition> allPositions;
+		private Vector<ScoredPosition> compairngPositions;
 		private boolean sameDirection;
 		private int seqLength;
-		private String uf, mf;
+		private String mf;
 		private Classifier classifier;
 		
-		ScorePairRunner(String uf, String mf, ArrayList<ScoredPosition> compairngPositions, ArrayList<ScoredPosition> allPositions, 
+		ScorePairRunner(String mf, ArrayList<ScoredPosition> compairngPositions, ArrayList<ScoredPosition> allPositions, 
 				int seqLength, Classifier classifier, boolean sameDirection){
-			this.uf = uf;
+	//		this.uf = uf;
 			this.mf = mf;
-			this.compairngPositions = compairngPositions;
-			this.allPositions = allPositions;
+			this.compairngPositions = new Vector<ScoredPosition>(compairngPositions);
+			this.allPositions = new Vector<ScoredPosition>(allPositions);
 			this.seqLength = seqLength;
 			this.classifier = classifier;
 			this.sameDirection = sameDirection;
@@ -38,7 +39,7 @@ public class FCLIP_ScorePairs {
 		
 		public void run() {
 			try {
-				PrintStream outU = new PrintStream(uf);
+				//PrintStream outU = new PrintStream(uf);
 				PrintStream outM = new PrintStream(mf);
 				//HashSet<String> mergedSeqs = new HashSet<String>();
 				int n = 0;
@@ -47,7 +48,7 @@ public class FCLIP_ScorePairs {
 					ScoredPosition p1 = compairngPositions.get(i);
 					boolean is3pScored = p1.is3pScored();
 					if(!is3pScored) continue;  // p1 is 3pscored
-					System.out.println(n++ + " " + compairngPositions.size() + " 3p");
+					//System.out.println(n++ + " " + compairngPositions.size() + " 3p");
 					
 					for(int j=0;j<allPositions.size();j++){
 						if(i == j) continue;
@@ -59,19 +60,19 @@ public class FCLIP_ScorePairs {
 						}
 						
 						if(!sameDirection){
-							if(p1.getContig().equals(p2.getContig()) && Math.abs(p1.getThreePposition() - p2.getFivePposition())<=150) continue;
+							if(p1.getContig().equals(p2.getContig()) && Math.abs(p1.getThreePPosition() - p2.getFivePPosition())<=150) continue;
 						}else{
-							if(p1.getContig().equals(p2.getContig()) && Math.abs(p1.getThreePposition() - p2.getThreePposition())<=150) continue;
+							if(p1.getContig().equals(p2.getContig()) && Math.abs(p1.getThreePPosition() - p2.getThreePPosition())<=150) continue;
 						}
 						
-						ScoredPair pair = new ScoredPair(p1, sameDirection? ScoredPosition.get3p5pSwappedPosition(p2, FCLIP_Scorer.flankingNTNumber) : p2, seqLength);
+						ScoredPair pair = new ScoredPair(p1, sameDirection? ScoredPosition.get3p5pSwappedPosition(p2, FCLIP_Scorer.getFlankingNTNumber()) : p2, seqLength);
 						//if(!pair.isFeasibleFold()) continue;
 						//if(pair.getOverHang() < 0 || pair.getOverHang() > 5) continue;
 						//if(mergedSeqs.contains(pair.getSeq())) continue;	
 						
 						classifier.setClassification(pair);
 						if(pair.getClassification().equals("M")) outM.println(pair);
-						else outU.println(pair);
+						//else outU.println(pair);
 						//mergedSeqs.add(pair.getSeq());
 					}	
 				}				
@@ -80,7 +81,7 @@ public class FCLIP_ScorePairs {
 					ScoredPosition p1 = compairngPositions.get(i);
 					boolean is5pScored = p1.is5pScored();
 					if(!is5pScored) continue;  // p1 is 5pscored
-					System.out.println(n++ + " " + compairngPositions.size() + " 5p");
+					//System.out.println(n++ + " " + compairngPositions.size() + " 5p");
 					
 					for(int j=0;j<allPositions.size();j++){
 						if(i == j) continue;
@@ -92,22 +93,22 @@ public class FCLIP_ScorePairs {
 						}
 						
 						if(!sameDirection){
-							if(p1.getContig().equals(p2.getContig()) && Math.abs(p2.getThreePposition() - p1.getFivePposition())<1000) continue;
+							if(p1.getContig().equals(p2.getContig()) && Math.abs(p2.getThreePPosition() - p1.getFivePPosition())<1000) continue;
 						}else{
-							if(p1.getContig().equals(p2.getContig()) && Math.abs(p1.getFivePposition() - p2.getFivePposition())<1000) continue;
+							if(p1.getContig().equals(p2.getContig()) && Math.abs(p1.getFivePPosition() - p2.getFivePPosition())<1000) continue;
 						}
 						
-						ScoredPair pair = new ScoredPair(p2, sameDirection? ScoredPosition.get3p5pSwappedPosition(p1, FCLIP_Scorer.flankingNTNumber) : p1, seqLength);
+						ScoredPair pair = new ScoredPair(p2, sameDirection? ScoredPosition.get3p5pSwappedPosition(p1, FCLIP_Scorer.getFlankingNTNumber()) : p1, seqLength);
 						if(pair.getOverHang() < RNAfoldLauncher.overhanglimit[0] || pair.getOverHang() > RNAfoldLauncher.overhanglimit[1]) continue;
 						//if(mergedSeqs.contains(pair.getSeq())) continue;	
 						
 						classifier.setClassification(pair);
 						if(pair.getClassification().equals("M")) outM.println(pair);
-						else outU.println(pair);
+						//else outU.println(pair);
 						//mergedSeqs.add(pair.getSeq());
 					}	
 				}
-				outU.close();
+			//	outU.close();
 				outM.close();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
@@ -151,15 +152,15 @@ public class FCLIP_ScorePairs {
 		try{
 			PrintStream out = new PrintStream(outFile);
 			out.println(ScoredPair.getHeader());
-			Hashtable<ScoredPosition, ArrayList<ScoredPair>> threePMap = new Hashtable<ScoredPosition, ArrayList<ScoredPair>>();
-			Hashtable<ScoredPosition, ArrayList<ScoredPair>> fivePMap = new Hashtable<ScoredPosition, ArrayList<ScoredPair>>();
+			Hashtable<String, ArrayList<ScoredPair>> threePMap = new Hashtable<String, ArrayList<ScoredPair>>();
 			for(ScoredPair pair : parser.getPairs()){
 				ScoredPosition tp = pair.getPairedScoredPositions()[0];
-				ScoredPosition fp = pair.getPairedScoredPositions()[1];
-				if(!threePMap.containsKey(tp)) threePMap.put(tp, new ArrayList<ScoredPair>());
-				threePMap.get(tp).add(pair);
-				if(!fivePMap.containsKey(fp)) fivePMap.put(fp, new ArrayList<ScoredPair>());
-				fivePMap.get(fp).add(pair);
+			//	ScoredPosition fp = pair.getPairedScoredPositions()[1];
+				String key = tp.getContig()+tp.getThreePPosition()+tp.isPlusStrand();
+				if(!threePMap.containsKey(key)) threePMap.put(key, new ArrayList<ScoredPair>());
+				threePMap.get(key).add(pair);
+				//if(!fivePMap.containsKey(fp)) fivePMap.put(fp, new ArrayList<ScoredPair>());
+				//f//ivePMap.get(fp).add(pair);
 			}
 			
 			for(ArrayList<ScoredPair> pairs : threePMap.values()){
@@ -169,6 +170,19 @@ public class FCLIP_ScorePairs {
 				}
 			}
 			
+			threePMap = null;
+			
+			Hashtable<String, ArrayList<ScoredPair>> fivePMap = new Hashtable<String, ArrayList<ScoredPair>>();
+			for(ScoredPair pair : parser.getPairs()){
+				//ScoredPosition tp = pair.getPairedScoredPositions()[0];
+				ScoredPosition fp = pair.getPairedScoredPositions()[1];
+				//if(!threePMap.containsKey(tp)) threePMap.put(tp, new ArrayList<ScoredPair>());
+				//threePMap.get(tp).add(pair);
+				String key = fp.getContig()+fp.getThreePPosition()+fp.isPlusStrand();
+				if(!fivePMap.containsKey(key)) fivePMap.put(key, new ArrayList<ScoredPair>());
+				fivePMap.get(key).add(pair);
+			}
+			
 			for(ArrayList<ScoredPair> pairs : fivePMap.values()){
 				int n = pairs.size();
 				for(ScoredPair pair : pairs){
@@ -176,7 +190,7 @@ public class FCLIP_ScorePairs {
 				}
 			}
 			
-			for(ArrayList<ScoredPair> pairs : threePMap.values()){
+			for(ArrayList<ScoredPair> pairs : fivePMap.values()){
 				for(ScoredPair pair : pairs){
 					out.println(pair);
 				}
@@ -190,7 +204,7 @@ public class FCLIP_ScorePairs {
 	
 	
 	static void getScoredPairs(ScoredPositionOutputParser sparser, Classifier classifier, int blatHitThreshold, int seqLength, boolean sameDirection, 
-			String outMfileName, String outUfileName, int positionNumber, int numberThreads){
+			String outMfileName, int readThreshold, int numberThreads){
 		try{
 			ArrayList<ScoredPosition> allPositions = new ArrayList<ScoredPosition>();
 			
@@ -206,10 +220,16 @@ public class FCLIP_ScorePairs {
 				if(sp.isPaired()) continue;
 				if(sp.hasMatchingMiRNA()) continue;
 				if(sp.getBlatHits() > blatHitThreshold) continue;
-				if(sp.getSeq() == null || sp.getSeq().length() < FCLIP_Scorer.flankingNTNumber) continue;
-				
+				if(sp.getSeq() == null || sp.getSeq().length() < FCLIP_Scorer.getFlankingNTNumber()) continue;
 				if(seqs.contains(sp.getSeq())) continue;
 			
+				if(sp.is3pScored()){
+					if(sp.getThreePReads()[0] < readThreshold || sp.getThreePReads()[1] < readThreshold) continue;// TODO
+				}
+				if(sp.is5pScored()){
+					if(sp.getFivePReads()[0] < readThreshold || sp.getFivePReads()[1] < readThreshold) continue;// TODO
+				}
+				
 				allPositions.add(sp);
 				seqs.add(sp.getSeq());
 				
@@ -226,7 +246,7 @@ public class FCLIP_ScorePairs {
 			Collections.sort(tscores);
 			Collections.sort(fscores);
 			
-			if(positionNumber > 0){
+		/*	if(positionNumber > 0){
 				ArrayList<ScoredPosition> filteredPositions = new ArrayList<ScoredPosition>();
 				
 				double threshold3p = tscores.size() > positionNumber? tscores.get(tscores.size() - positionNumber - 1) : 0;
@@ -248,7 +268,7 @@ public class FCLIP_ScorePairs {
 				}
 			
 				allPositions = filteredPositions;
-			}
+			}*/
 			
 			//
 			/*if(tscores.size() > fscores.size()){
@@ -268,7 +288,7 @@ public class FCLIP_ScorePairs {
 			System.out.println(sparser.getPositions().size() + " " + allPositions.size());
 			
 			ArrayList<Thread> threads = new ArrayList<Thread>();
-			ArrayList<String> tmpU = new ArrayList<String>();
+			//ArrayList<String> tmpU = new ArrayList<String>();
 			ArrayList<String> tmpM = new ArrayList<String>();
 			
 			for(int nt = 0; nt<numberThreads; nt++){
@@ -277,9 +297,9 @@ public class FCLIP_ScorePairs {
 				for(int j=0;j<allPositions.size();j++){
 					if(j%numberThreads == nt) compairngPositions.add(allPositions.get(j));
 				}
-				ScorePairRunner runner = new ScorePairRunner(outUfileName + nt, outMfileName + nt, 
+				ScorePairRunner runner = new ScorePairRunner(outMfileName + nt, 
 						compairngPositions, allPositions, seqLength, classifier, sameDirection);
-				tmpU.add(outUfileName + nt);
+				//tmpU.add(outUfileName + nt);
 				tmpM.add(outMfileName + nt);
 				
 				Thread thread = new Thread(runner, "Batch " + nt); //Thread created       
@@ -296,10 +316,10 @@ public class FCLIP_ScorePairs {
 			}
 			
 			PrintStream outM = new PrintStream(outMfileName);
-			PrintStream outU = new PrintStream(outUfileName);
+		//	PrintStream outU = new PrintStream(outUfileName);
 			
 			outM.println(ScoredPair.getHeader());
-			outU.println(ScoredPair.getHeader());
+			//outU.println(ScoredPair.getHeader());
 			
 			HashSet<String> mergedSeqs = new HashSet<String>();
 			for(String tm : tmpM){
@@ -313,7 +333,7 @@ public class FCLIP_ScorePairs {
 			outM.close();
 			
 			
-			 mergedSeqs = new HashSet<String>();
+		/*	 mergedSeqs = new HashSet<String>();
 			for(String tu : tmpU){
 				for(ScoredPair pair : new ScoredPairOutputParser(tu).getPairs()){
 					if(mergedSeqs.contains(pair.getSeq())) continue;
@@ -322,7 +342,7 @@ public class FCLIP_ScorePairs {
 				}
 				new File(tu).delete();				
 			}
-			outU.close();
+			outU.close();*/
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -338,7 +358,7 @@ public class FCLIP_ScorePairs {
 				if(cntr++ > 50000) break;
 				String rs = permutate(sp.getSeq());
 				rs = randomSubstitute(rs, 8);
-				RNAfoldLauncher rnafold = new RNAfoldLauncher(rs, FCLIP_Scorer.flankingNTNumber);
+				RNAfoldLauncher rnafold = new RNAfoldLauncher(rs, FCLIP_Scorer.getFlankingNTNumber());
 				if(rnafold.getNumberOfHairPins() > hairpinThreshold) continue;
 				if(Math.abs(rnafold.getEnergyPerNT() - originalEnergy) > 0.1) continue;
 				if(rnafold.getDepth() > depthThreshold) continue;

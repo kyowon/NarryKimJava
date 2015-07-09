@@ -14,10 +14,18 @@ import fCLIP.parser.ScoredPositionOutputParser.ScoredPosition;
 
 public class GenerateDepthsForEncodeDataSets {
 
-	public static void generate(String infile, String outfile, AnnotationFileParser annotationParser ) {
+	public static void main(String[] args){
+		//AnnotationFileParser annotationParser = new AnnotationFileParser(annotationFile);
+		String infile = "";
+		String outfile = "";
+		String bedfolder = "";
+		//GenerateDepthsForEncodeDataSets();
+	}
+	
+	public static void generate(String infile, String outfile, String bedfolder, AnnotationFileParser annotationParser ) {
 		//String infile = args[0];//"/media/kyowon/Data1/Dropbox/h19x2.sorted.out.csv";
 		//String outfile = args[1];//"/media/kyowon/Data1/Dropbox/h19x2.sorted.out.encode.csv";
-		String bedfolder = "/media/kyowon/Data1/fCLIP/genomes/ENCODE";
+	//	String bedfolder = "/media/kyowon/Data1/fCLIP/genomes/ENCODE";
 	//	AnnotationFileParser annotationParser = new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg19.refFlat.txt");
 		
 		ScoredPositionOutputParser parser = new ScoredPositionOutputParser(infile);
@@ -57,19 +65,19 @@ public class GenerateDepthsForEncodeDataSets {
 				for(ScoredPosition position : positions){
 					if(!position.getContig().equals(contig)) continue;
 					int sign = position.isPlusStrand()? 1 : -1;
-					int d3 = bedparser.get5pDepth(position.isPlusStrand(), position.getThreePposition()); // TODO test
-					d3 += bedparser.get5pDepth(position.isPlusStrand(), position.getThreePposition() + sign); // TODO test
-					d3 += bedparser.get5pDepth(position.isPlusStrand(), position.getThreePposition() + sign * 2); // TODO test
+					int d3 = bedparser.get5pDepth(position.isPlusStrand(), position.getThreePPosition()); // TODO test
+					d3 += bedparser.get5pDepth(position.isPlusStrand(), position.getThreePPosition() + sign); // TODO test
+					d3 += bedparser.get5pDepth(position.isPlusStrand(), position.getThreePPosition() + sign * 2); // TODO test
 					
-					int d5 = bedparser.get3pDepth(position.isPlusStrand(), position.getFivePposition()); // TODO test
-					d5 += bedparser.get3pDepth(position.isPlusStrand(), position.getFivePposition() - sign); // TODO test
-					d5 += bedparser.get3pDepth(position.isPlusStrand(), position.getFivePposition() - sign * 2); // TODO test
+					int d5 = bedparser.get3pDepth(position.isPlusStrand(), position.getFivePPosition()); // TODO test
+					d5 += bedparser.get3pDepth(position.isPlusStrand(), position.getFivePPosition() - sign); // TODO test
+					d5 += bedparser.get3pDepth(position.isPlusStrand(), position.getFivePPosition() - sign * 2); // TODO test
 					
-					int dp = bedparser.getReadDepth(position.isPlusStrand(), position.getThreePposition(), position.getFivePposition());
-					dp += bedparser.getReadDepth(position.isPlusStrand(), position.getThreePposition() + sign, position.getFivePposition() - sign);
-					dp += bedparser.getReadDepth(position.isPlusStrand(), position.getThreePposition() + sign * 2, position.getFivePposition() - sign);
-					dp += bedparser.getReadDepth(position.isPlusStrand(), position.getThreePposition() + sign, position.getFivePposition() - sign * 2);
-					dp += bedparser.getReadDepth(position.isPlusStrand(), position.getThreePposition() + sign * 2, position.getFivePposition() - sign * 2);
+					int dp = bedparser.getReadDepth(position.isPlusStrand(), position.getThreePPosition(), position.getFivePPosition());
+					dp += bedparser.getReadDepth(position.isPlusStrand(), position.getThreePPosition() + sign, position.getFivePPosition() - sign);
+					dp += bedparser.getReadDepth(position.isPlusStrand(), position.getThreePPosition() + sign * 2, position.getFivePPosition() - sign);
+					dp += bedparser.getReadDepth(position.isPlusStrand(), position.getThreePPosition() + sign, position.getFivePPosition() - sign * 2);
+					dp += bedparser.getReadDepth(position.isPlusStrand(), position.getThreePPosition() + sign * 2, position.getFivePPosition() - sign * 2);
 					
 					depthMap3p.get(position)[i] += d3;
 					depthMap5p.get(position)[i] += d5;

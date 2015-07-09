@@ -5,7 +5,8 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.HashMap;
 
-import net.sf.samtools.util.BufferedLineReader;
+import parser.BufferedLineReader;
+
 
 public class MergeMASICnMSGFPlus {
 
@@ -17,7 +18,7 @@ public class MergeMASICnMSGFPlus {
 		BufferedLineReader inMasic;
 		BufferedLineReader inMsgf;
 		try {
-			inMasic = new BufferedLineReader(new FileInputStream(masic));
+			inMasic = new BufferedLineReader((masic));
 			String s;
 			HashMap<Integer, String> masicStringMap = new HashMap<Integer, String>();
 			while((s=inMasic.readLine())!=null){
@@ -35,7 +36,7 @@ public class MergeMASICnMSGFPlus {
 			
 			inMasic.close();
 			
-			inMsgf = new BufferedLineReader(new FileInputStream(msgf));
+			inMsgf = new BufferedLineReader((msgf));
 			PrintStream op = new PrintStream(out);
 			while((s=inMsgf.readLine())!=null){
 				int sn = -1;

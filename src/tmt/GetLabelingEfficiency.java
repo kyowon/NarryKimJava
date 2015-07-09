@@ -4,12 +4,13 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 
-import net.sf.samtools.util.BufferedLineReader;
+import parser.BufferedLineReader;
+
 
 public class GetLabelingEfficiency {
 	public static void main(String[] args) {
 		try {
-			BufferedLineReader in = new BufferedLineReader(new FileInputStream(args[0]));
+			BufferedLineReader in = new BufferedLineReader((args[0]));
 			PrintStream out = new PrintStream(args[1]);
 			String massShift = args[2];
 			String s;

@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 
-import net.sf.samtools.util.BufferedLineReader;
+import parser.BufferedLineReader;
 import parser.ZeroBasedFastaParser;
 
 public class GetCodonComposition {
@@ -15,7 +15,7 @@ public class GetCodonComposition {
 		String merged ="/media/kyowon/Data1/RPF_Project/samples/sample1/results/RPF1_2.1.csv";
 		ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/hg19.fa");
 		PrintStream outFasta = new PrintStream("/media/kyowon/Data1/RPF_Project/genomes/hg19_ATG_Annotated.fa");
-		BufferedLineReader in = new BufferedLineReader(new FileInputStream(merged));
+		BufferedLineReader in = new BufferedLineReader((merged));
 		String s;
 		HashMap<String, Double> codonCounter = new HashMap<String, Double>();
 		

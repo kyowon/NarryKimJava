@@ -4,8 +4,10 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.HashSet;
 
+import launcher.RNAcofoldLauncher;
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
+import parser.MirGff3FileParser;
 import parser.ZeroBasedFastaParser;
 import fCLIP.parser.ScoredPositionOutputParser;
 import fCLIP.parser.ScoredPositionOutputParser.ScoredPosition;
@@ -21,7 +23,13 @@ public class AttributeTrainer {
 		String parameterFileName = args[6];
 		double unpairedScoreThreshold = Double.parseDouble(args[7]);
 		double pairedScoreThreshold = Double.parseDouble(args[8]);
-		FCLIP_Scorer.flankingNTNumber = Integer.parseInt(args[9]);
+		FCLIP_Scorer.setFlankingNTNumber(Integer.parseInt(args[9]));
+		int minpre =  Integer.parseInt(args[10]);
+		int maxpre =  Integer.parseInt(args[11]);
+		RNAcofoldLauncher.setSeqLength(minpre);
+		
+		FCLIP_Scorer.setMaxReadDiff(maxpre);
+		FCLIP_Scorer.setMinReadDiff(minpre);
 		
 		System.out.println("Training Classifier for " + bedFileName);
 		HashSet<ScoredPosition> trainingPositions = new HashSet<ScoredPosition>();

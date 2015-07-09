@@ -9,8 +9,8 @@ import java.util.HashSet;
 import launcher.BlatLauncher;
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
+import parser.MirGff3FileParser;
 import parser.ZeroBasedFastaParser;
-import fCLIP.analysis.CheckCoverage;
 import fCLIP.analysis.CheckRepeat;
 import fCLIP.parser.BlatParser;
 import fCLIP.parser.ScoredPairOutputParser;
@@ -40,8 +40,7 @@ public class PipeLine {
 			for(ScoredPosition sp : scorer.getScoredPositions(annotationParser, null, unpairedScoreThreshold, pairedScoreThreshold, false)){
 				trainingPositions.add(sp);
 			}		
-		}	
-		
+		}		
 		try {
 			PrintStream outTrainArff = new PrintStream(arffTrainOutFileName);
 			PrintStream outTrain = new PrintStream(outFileName);
@@ -128,14 +127,14 @@ public class PipeLine {
 		System.out.println("Scoring " + outFileNameM + " pairs");	
 		Classifier classifier = new Classifier(arffTrainFileName);
 		String tmpM = outFileNameM + ".tmp.csv";
-		String tmpU = outFileNameU + ".tmp.csv";
-		if(!new File(tmpM).exists() || !new File(tmpU).exists() )
-			FCLIP_ScorePairs.getScoredPairs(sparser, classifier, blatHitThreshold, seqLength, sameDirection, tmpM, tmpU, -1, 7);
+	//	String tmpU = outFileNameU + ".tmp.csv";
+		if(!new File(tmpM).exists() )
+			FCLIP_ScorePairs.getScoredPairs(sparser, classifier, blatHitThreshold, seqLength, sameDirection, tmpM, -1, 7);
 		FCLIP_ScorePairs.setMatchedNumPositions(tmpM, outFileNameM);
-		FCLIP_ScorePairs.setMatchedNumPositions(tmpU, outFileNameU);
+	//	FCLIP_ScorePairs.setMatchedNumPositions(tmpU, outFileNameU);
 		
 		new File(tmpM).delete();
-		new File(tmpU).delete();
+		//new File(tmpU).delete();
 	}
 	
 	static public void filterTransPairs(String pairCsv, String outCsv, int num3pPaired, int num5pPaired){
@@ -198,7 +197,7 @@ public class PipeLine {
 		String filteredTransOutFileName = transOutFileNameM + ".filtered.csv";
 		
 		int blatHitThreshold = 100000000;
-		int transPairSeqLength = FCLIP_Scorer.flankingNTNumber *2 + 80;
+		int transPairSeqLength = FCLIP_Scorer.getFlankingNTNumber() *2 + 80;
 		
 		ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser(dbFasta);
 		MirGff3FileParser mirParser = new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa_hg19.gff3");
@@ -216,23 +215,23 @@ public class PipeLine {
 		CheckRepeat.generate(cisOutFileName, transOutFileNameU, cisBed5pFileName, cisBed3pFileName, rmskBed);
 		ScoredPairOutputParser.generateFastaForMotif(transOutFileNameM, transOutFileNameM + ".5p.motif.fa", transOutFileNameM + ".3p.motif.fa");
 		//GenerateCircosLinkFiles.run(transOutFileNameM + ".rmsk.csv", transOutFileNameM + ".link.txt");
-		CheckCoverage.generate(cisOutFileName, transOutFileNameM, cisBed5pFileName, cisBed3pFileName, siKDDroshaBed, siControlBed);
-		CheckCoverage.generate(cisOutFileName, transOutFileNameM, cisBed5pFileName, cisBed3pFileName, siKDDicerBed, siControlBed);
+	//	CheckCoverage.generate(cisOutFileName, transOutFileNameM, cisBed5pFileName, cisBed3pFileName, siKDDroshaBed, siControlBed);
+	///	CheckCoverage.generate(cisOutFileName, transOutFileNameM, cisBed5pFileName, cisBed3pFileName, siKDDicerBed, siControlBed);
 		
 		runTrans(transControlOutFileNameM, transControlOutFileNameU, cisOutFileName, arffTrainOutFileName, blatHitThreshold, transPairSeqLength, true);		
 		CheckRepeat.generate(cisOutFileName, transControlOutFileNameM, cisBed5pFileName, cisBed3pFileName, rmskBed);
 		CheckRepeat.generate(cisOutFileName, transControlOutFileNameU, cisBed5pFileName, cisBed3pFileName, rmskBed);
 		ScoredPairOutputParser.generateFastaForMotif(transControlOutFileNameM, transControlOutFileNameM + ".5p.motif.fa", transControlOutFileNameM + ".3p.motif.fa");
 	//	GenerateCircosLinkFiles.run(transControlOutFileNameM + ".rmsk.csv", transControlOutFileNameM + ".link.txt");
-		CheckCoverage.generate(cisOutFileName, transControlOutFileNameM, cisBed5pFileName, cisBed3pFileName, siKDDroshaBed, siControlBed);
-		CheckCoverage.generate(cisOutFileName, transControlOutFileNameM, cisBed5pFileName, cisBed3pFileName, siKDDicerBed, siControlBed);
+		//CheckCoverage.generate(cisOutFileName, transControlOutFileNameM, cisBed5pFileName, cisBed3pFileName, siKDDroshaBed, siControlBed);
+	//	CheckCoverage.generate(cisOutFileName, transControlOutFileNameM, cisBed5pFileName, cisBed3pFileName, siKDDicerBed, siControlBed);
 		
 		filterTransPairs(transOutFileNameM, filteredTransOutFileName, num3pPaired, num5pPaired);
 		CheckRepeat.generate(cisOutFileName, filteredTransOutFileName, cisBed5pFileName, cisBed3pFileName, rmskBed);
 		ScoredPairOutputParser.generateFastaForMotif(filteredTransOutFileName, filteredTransOutFileName + ".5p.motif.fa", filteredTransOutFileName + ".3p.motif.fa");
 		//GenerateCircosLinkFiles.run(filteredTransOutFileName + ".rmsk.csv", filteredTransOutFileName + ".link.txt");
-		CheckCoverage.generate(cisOutFileName, filteredTransOutFileName, cisBed5pFileName, cisBed3pFileName, siKDDroshaBed, siControlBed);
-		CheckCoverage.generate(cisOutFileName, filteredTransOutFileName, cisBed5pFileName, cisBed3pFileName, siKDDicerBed, siControlBed);
+	///	CheckCoverage.generate(cisOutFileName, filteredTransOutFileName, cisBed5pFileName, cisBed3pFileName, siKDDroshaBed, siControlBed);
+	//	CheckCoverage.generate(cisOutFileName, filteredTransOutFileName, cisBed5pFileName, cisBed3pFileName, siKDDicerBed, siControlBed);
 		
 		
 		// generate background for drosha and dicer..

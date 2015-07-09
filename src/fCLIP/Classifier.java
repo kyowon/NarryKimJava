@@ -22,7 +22,7 @@ public class Classifier {
 			
 			rf.setNumTrees(30);
 
-			//dt.setMinNumObj(5);
+			//rf.setMinNumObj(5);
 			rf.buildClassifier(trainData);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -52,7 +52,8 @@ public class Classifier {
 		//if(!p.isPaired() && (p.getOverHang() < 0 || p.getOverHang() > 5)) p.setClassification("T", 1);
 		//else{
 			double prediction = classify(toInstance(p));
-			String classificaition = prediction>=0? "M" : "U";
+			String classificaition = prediction>=0.0? (prediction >= 0.7?"M" : "m") : "U";
+			
 			//if(p.getSCI()<0) 
 			//	classificaition = classificaition.toLowerCase();
 			p.setClassification(classificaition, Math.abs(prediction));
@@ -64,7 +65,7 @@ public class Classifier {
 		//if(p.getOverHang() < 0 || p.getOverHang() > 4) p.setClassification("u", 1);
 		else{
 			double prediction = classify(toInstance(p));
-			p.setClassification(prediction>=0? "M" : "U", Math.abs(prediction));
+			p.setClassification(prediction>=0.0? (prediction >= 0.7?"M" : "m") : "U", Math.abs(prediction));
 		}
 	}
 	

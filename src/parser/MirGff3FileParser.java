@@ -1,4 +1,7 @@
-package fCLIP;
+package parser;
+
+import htsjdk.samtools.util.IntervalTree;
+import htsjdk.samtools.util.IntervalTree.Node;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -6,8 +9,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 
-import net.sf.picard.util.IntervalTree;
-import net.sf.picard.util.IntervalTree.Node;
 import parser.BufferedLineReader;
 
 public class MirGff3FileParser {
@@ -30,8 +31,11 @@ public class MirGff3FileParser {
 	public static class MiRNA{
 		private String contig;
 		private String name;
-		private int fivepPosition; // inclusive
-		private int threepPosition;
+		
+		private int prifp;
+		private int pritp;
+		private Integer fivepPosition = null; // inclusive, pre position
+		private Integer threepPosition = null;
 		private boolean isPlusStrand;
 		//private int[][] pres;
 		public String getContig() {
@@ -42,11 +46,19 @@ public class MirGff3FileParser {
 			return name;
 		}
 
-		public int get5p() {
+		public Integer getPri5p(){
+			return prifp;
+		}
+		
+		public Integer getPri3p(){
+			return pritp;
+		}
+				
+		public Integer get5p() {
 			return fivepPosition;
 		}
 
-		public int get3p() {
+		public Integer get3p() {
 			return threepPosition;
 		}
 		
@@ -144,20 +156,63 @@ public class MirGff3FileParser {
 		
 		MiRNA(String s){
 			String[] lines = s.split("\n");
+			
+			
 			String[] token = lines[0].split("\t");
 			this.contig = token[0];
 			this.name = token[token.length-1].substring(token[token.length-1].lastIndexOf("Name=")+5);
 			this.isPlusStrand = token[6].equals("+");
-			if(this.isPlusStrand){
-				this.fivepPosition = Integer.parseInt(token[3]);
-				this.threepPosition = Integer.parseInt(token[4]);
+		//	int prifivepPosition = ;
+			this.pritp = Integer.parseInt(token[isPlusStrand? 4:3]);
+			this.prifp = Integer.parseInt(token[isPlusStrand? 3:4]);
+			
+			
+			if(lines.length > 2){
+				String[] stoken1 = lines[1].split("\t");
+				String[] stoken2 = lines[2].split("\t");
+				
+				if(stoken1[stoken1.length-1].split(";")[2].endsWith("-5p")){
+					this.fivepPosition = Integer.parseInt(stoken1[isPlusStrand? 3:4]) - 1;
+					this.threepPosition = Integer.parseInt(stoken2[isPlusStrand? 4:3]) - 1;
+				}else{
+					this.fivepPosition = Integer.parseInt(stoken2[isPlusStrand? 3:4]) - 1;
+					this.threepPosition = Integer.parseInt(stoken1[isPlusStrand? 4:3]) - 1;
+				}				
 			}else{
-				this.fivepPosition = Integer.parseInt(token[4]);
-				this.threepPosition = Integer.parseInt(token[3]);
+				String[] stoken = lines[1].split("\t");
+				String name = stoken[stoken.length-1].split(";")[2];
+				if(name.endsWith("-5p")){
+					this.fivepPosition = Integer.parseInt(stoken[isPlusStrand? 3:4]) - 1;
+				}else if(name.endsWith("-3p")){
+					this.threepPosition = Integer.parseInt(stoken[isPlusStrand? 4:3]) - 1;
+				}else{
+					int n1 = Integer.parseInt(stoken[3]) - 1;
+					int n2 = Integer.parseInt(stoken[4]) - 1;
+					int p1 = Integer.parseInt(token[3]) - 1;
+					int p2 = Integer.parseInt(token[4]) - 1;
+					
+					if(this.isPlusStrand == n1 - p1 > p2 - n2){
+						this.threepPosition = isPlusStrand? n2 : n1;
+					}else{
+						this.fivepPosition = isPlusStrand? n1 : n2;
+					}
+				}
 			}
+			
+			/*if(isPlusStrand){
+				if(this.fivepPosition != null) this.fivepPosition--;
+			}else{
+				if(this.threepPosition != null) this.threepPosition--;
+			}*/
+			
+				
 			//if(lines.length > 1){
 				//TODO if necessary..
 			//}
+			//System.out.println(s);
+		//	System.out.println(this);
+		//	System.exit(0);
+			
 		}
 		
 		private MiRNA(int fivepPosition, int threepPosition){ // constructor for comparison
@@ -213,8 +268,9 @@ public class MirGff3FileParser {
 				
 				for(int i=0;i<miRNAMap.get(con).size();i++){
 					MiRNA miRNA = miRNAMap.get(con).get(i);
-					int start = miRNA.get5p();
-					int end = miRNA.get3p();
+					//if(miRNA.get3p() == null || miRNA.get5p() == null) continue;
+					int start = miRNA.prifp;
+					int end = miRNA.pritp;
 					if(!miRNA.isPlusStrand){
 						int tmp = start;
 						start = end;
@@ -244,12 +300,6 @@ public class MirGff3FileParser {
 		read(filename);
 	}
 	
-	public Iterator<MiRNA> getMiRNAIterator(){
-		ArrayList<MiRNA> allmiRNAs = new ArrayList<MiRNA>();
-		for(String contig : miRNAMap.keySet())
-			allmiRNAs.addAll(miRNAMap.get(contig));
-		return allmiRNAs.iterator();
-	}
 	
 	public Iterator<MiRNA> getMiRNAIterator(String contig){
 		ArrayList<MiRNA> allmiRNAs = miRNAMap.get(contig);
@@ -258,8 +308,20 @@ public class MirGff3FileParser {
 		return null;
 	}
 	
+	public Iterator<MiRNA> getMiRNAIterator(){
+		ArrayList<MiRNA> allmiRNAs = new ArrayList<MiRNA>();
+		
+		for(String contig : miRNAMap.keySet()){
+			for(MiRNA mi : miRNAMap.get(contig)){
+				allmiRNAs.add(mi);
+			}
+		}
+		return allmiRNAs.iterator();
+	}
+	
+	
 	public static void main(String[] args){
-		new MirGff3FileParser("/media/kyowon/Data1/fCLIP/Genome/hsa.gff3");
+		new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa_hg38.gff3");
 	}
 	
 	/**

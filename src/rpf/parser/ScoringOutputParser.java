@@ -2,6 +2,7 @@ package rpf.parser;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -12,8 +13,8 @@ import java.util.Set;
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
 import parser.AnnotationFileParser.AnnotatedGene;
+import parser.BufferedLineReader;
 import rpf.Quantifier;
-import net.sf.samtools.util.BufferedLineReader;
 
 public class ScoringOutputParser {
 	//private HashMap<String, HashMap<Integer, >>
@@ -225,7 +226,7 @@ public class ScoringOutputParser {
 	private void read(String outFile){
 		positionMap = new HashMap<String, ArrayList<ScoredPosition>>();
 		try {
-			BufferedLineReader in  = new BufferedLineReader(new FileInputStream(outFile));
+			BufferedLineReader in  = new BufferedLineReader((outFile));
 			String s;
 			while((s=in.readLine())!=null){
 				ScoredPosition position = new ScoredPosition(s);				
@@ -234,7 +235,7 @@ public class ScoringOutputParser {
 				positionMap.get(position.getContig()).add(position);
 			}
 			in.close();
-		} catch (FileNotFoundException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}	
 	}

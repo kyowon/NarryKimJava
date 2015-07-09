@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 
+import launcher.RNAcofoldLauncher;
 import fCLIP.parser.ScoredPairOutputParser;
 import fCLIP.parser.ScoredPositionOutputParser;
 import fCLIP.parser.ScoredPairOutputParser.ScoredPair;
@@ -11,29 +12,40 @@ import fCLIP.parser.ScoredPairOutputParser.ScoredPair;
 public class TransDuplexFinder {
 	
 	public static void main(String[] args) { // give options for num 5p 3p paired... then analyze ... 
-		if(args.length == 9){
+		if(args.length == 10){
 			String outFileNameM = args[0];
-			String outFileNameU = args[1];
-			String cisOutFileName = args[2];
-			String arffTrainFileName = args[3];
-			int blatHitThreshold = Integer.parseInt(args[4]);
-			int seqLength = Integer.parseInt(args[5]);
-			boolean sameDirection = Boolean.parseBoolean(args[6]);
-			int numPositions = Integer.parseInt(args[7]);
-			int numThreads = Integer.parseInt(args[8]);
+			//String outFileNameU = args[1];
+			String cisOutFileName = args[1];
+			String arffTrainFileName = args[2];
+			int blatHitThreshold = Integer.parseInt(args[3]);
+			
+			int flankingLength = Integer.parseInt(args[4]);
+			int minpre = Integer.parseInt(args[5]);
+			int maxpre = Integer.parseInt(args[6]);
+			
+			FCLIP_Scorer.setFlankingNTNumber(flankingLength);
+			FCLIP_Scorer.setMaxReadDiff(maxpre);
+			FCLIP_Scorer.setMinReadDiff(minpre);
+			RNAcofoldLauncher.setSeqLength(minpre);			
+			
+			int seqLength = (minpre + flankingLength * 2); 
+			
+			boolean sameDirection = Boolean.parseBoolean(args[7]);
+			int numPositions = Integer.parseInt(args[8]);
+			int numThreads = Integer.parseInt(args[9]);
 			
 			ScoredPositionOutputParser sparser = new ScoredPositionOutputParser(cisOutFileName);
 			System.out.println("Scoring " + outFileNameM + " pairs");	
 			Classifier classifier = new Classifier(arffTrainFileName);
 			String tmpM = outFileNameM + ".tmp.csv";
-			String tmpU = outFileNameU + ".tmp.csv";
-			//if(!new File(tmpM).exists() || !new File(tmpU).exists() )
-			FCLIP_ScorePairs.getScoredPairs(sparser, classifier, blatHitThreshold, seqLength, sameDirection, tmpM, tmpU, numPositions, numThreads);
+			//String tmpU = outFileNameU + ".tmp.csv";
+			if(!new File(tmpM).exists())
+				FCLIP_ScorePairs.getScoredPairs(sparser, classifier, blatHitThreshold, seqLength, sameDirection, tmpM, numPositions, numThreads);
 			FCLIP_ScorePairs.setMatchedNumPositions(tmpM, outFileNameM);
-			FCLIP_ScorePairs.setMatchedNumPositions(tmpU, outFileNameU);
+			//FCLIP_ScorePairs.setMatchedNumPositions(tmpU, outFileNameU);
 			
 			new File(tmpM).delete();
-			new File(tmpU).delete();
+			//new File(tmpU).delete();
 		}else if(args.length == 4){
 			String outCsv = args[0];
 			String pairCsv = args[1];

@@ -2,8 +2,10 @@ package msgfpipeline.parser;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.ArrayList;
 
+import parser.BufferedLineReader;
 import suffixarray.MatchSet;
 import suffixarray.SuffixArray;
 import suffixarray.SuffixArraySequence;
@@ -11,7 +13,6 @@ import msutil.AminoAcidSet;
 import msutil.Composition;
 import msutil.Enzyme;
 import msutil.Peptide;
-import net.sf.samtools.util.BufferedLineReader;
 
 public class MSGFPlusParser {
 	
@@ -281,7 +282,7 @@ public class MSGFPlusParser {
 			sb.append(charge);sb.append('\t');
 			
 			int n = proteinID.length;
-			if(listAllProteins) n = Math.min(1, n);
+			if(!listAllProteins) n = Math.min(1, n);
 			
 			for(int i=0;i<n;i++){
 				sb.append(preAAs[i]);
@@ -369,7 +370,7 @@ public class MSGFPlusParser {
 		SuffixArraySequence sequence = new SuffixArraySequence(fasta);
 		SuffixArray sa = new SuffixArray(sequence);
 		try {
-			BufferedLineReader in = new BufferedLineReader(new FileInputStream(fileName));
+			BufferedLineReader in = new BufferedLineReader((fileName));
 			String s;
 			while((s=in.readLine())!=null){
 				if(s.startsWith("#") || s.startsWith("ID")){
@@ -377,7 +378,7 @@ public class MSGFPlusParser {
 				}
 				psms.add(new MSGFPlusPSM(s, sa));
 			}in.close();
-		} catch (FileNotFoundException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}	

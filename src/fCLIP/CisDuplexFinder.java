@@ -5,9 +5,11 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 
+import launcher.RNAcofoldLauncher;
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
 import parser.BufferedLineReader;
+import parser.MirGff3FileParser;
 import parser.ZeroBasedFastaParser;
 import fCLIP.parser.BlatParser;
 import fCLIP.parser.ScoredPositionOutputParser;
@@ -20,7 +22,7 @@ public class CisDuplexFinder {
 		private Bed12Parser bedParser;
 		private FCLIP_Scorer scorer;
 		private boolean isPlusStrand;
-		private ArrayList<ScoredPosition> positions;
+		//private ArrayList<ScoredPosition> positions;
 		private Classifier classifier;
 		double unpairedScoreThreshold, pairedScoreThreshold;
 		private AnnotationFileParser annotationParser;
@@ -54,12 +56,12 @@ public class CisDuplexFinder {
 			}			
 		}
 		
-		public ArrayList<ScoredPosition> getPositions() {return positions; }
+		//public ArrayList<ScoredPosition> getPositions() {return positions; }
 		
 	}
 	
 	public static void main(String[] args) {
-		if(args.length == 10){
+		if(args.length == 13){
 			String outFileName = args[0];
 			String arffTrainOutFileName = args[1];
 			String bedFileName = args[2];
@@ -70,6 +72,14 @@ public class CisDuplexFinder {
 			double unpairedScoreThreshold = Double.parseDouble(args[7]);
 			double pairedScoreThreshold = Double.parseDouble(args[8]);
 			int maxThreads = Integer.parseInt(args[9]);
+			int flankingLength = Integer.parseInt(args[10]);
+			int minpre = Integer.parseInt(args[11]);
+			int maxpre = Integer.parseInt(args[12]);
+			RNAcofoldLauncher.setSeqLength(minpre);
+			
+			FCLIP_Scorer.setFlankingNTNumber(flankingLength);
+			FCLIP_Scorer.setMaxReadDiff(maxpre);
+			FCLIP_Scorer.setMinReadDiff(minpre);
 			//String pslOutFileName = outFileName + ".psl";
 			//
 			Classifier classifier = new Classifier(arffTrainOutFileName);
@@ -78,6 +88,7 @@ public class CisDuplexFinder {
 				ArrayList<Thread> threads = new ArrayList<Thread>();
 				
 				for(String contig : fastaParser.getContigs()){
+					//if(!contig.equals("chr17")) continue; // TODO remove
 					if(contig.length() > 5 || contig.equals("chrM")) continue;
 					for(int i=0;i<2;i++){
 						String t = outFileName + contig + i;
@@ -101,18 +112,17 @@ public class CisDuplexFinder {
 							threads.clear();
 						}
 						
-					}
-					/*Bed12Parser bedParser = new Bed12Parser(bedFileName, annotationParser, contig, true);
-					FCLIP_Scorer scorer = new FCLIP_Scorer(bedParser, fastaParser, mirParser, parameterFileName);
-					for(ScoredPosition sp : scorer.getScoredPositions(annotationParser, classifier, unpairedScoreThreshold, pairedScoreThreshold, true)){					
-						out.println(sp);					
-					}
-					for(ScoredPosition sp : scorer.getScoredPositions(annotationParser, classifier, unpairedScoreThreshold, pairedScoreThreshold, false)){					
-						out.println(sp);						
-					}*/
+					}				
 				}
 				
-				
+				for(Thread rt : threads){
+					try {
+						rt.join();
+					} catch (InterruptedException e) {						
+						e.printStackTrace();
+					}
+				}
+				threads.clear();
 				
 				
 				PrintStream out = new PrintStream(outFileName);

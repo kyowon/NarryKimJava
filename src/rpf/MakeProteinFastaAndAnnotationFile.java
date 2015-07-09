@@ -2,10 +2,11 @@ package rpf;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 
-import net.sf.samtools.util.BufferedLineReader;
+import parser.BufferedLineReader;
 import parser.ZeroBasedFastaParser;
 import rpf.parser.ScoringOutputParser;
 
@@ -118,7 +119,7 @@ public class MakeProteinFastaAndAnnotationFile {
 	private void getExcludingKeywords(String blastFile){
 		excludingKeywords = new HashSet<String>();
 		try {
-			BufferedLineReader in = new BufferedLineReader(new FileInputStream(blastFile));
+			BufferedLineReader in = new BufferedLineReader((blastFile));
 			String s;
 			while((s=in.readLine())!=null){
 				if(s.startsWith("Query= ")){
@@ -127,7 +128,7 @@ public class MakeProteinFastaAndAnnotationFile {
 			}
 			
 			in.close();
-		} catch (FileNotFoundException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}

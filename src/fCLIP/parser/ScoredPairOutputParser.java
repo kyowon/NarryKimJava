@@ -1,4 +1,10 @@
 package fCLIP.parser;
+import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SAMRecordIterator;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
+
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -45,6 +51,19 @@ public class ScoredPairOutputParser {
 		private double hetero = 0;
 		private int[] matchedNum = new int[2];
 		private String misc = "";
+		private boolean isRepeat3p = false;
+		private boolean isRepeat5p = false;		
+		
+		static int rmsk3pHeaderColumnNumber = -1;
+		static int rmsk5pHeaderColumnNumber = -1;
+		
+		public boolean isRepeat3p() {
+			return isRepeat3p;
+		}
+
+		public boolean isRepeat5p() {
+			return isRepeat5p;
+		}
 		
 		public int compareTo(ScoredPair o) {
 			return Double.compare(getEnergy(), o.getEnergy());
@@ -127,11 +146,11 @@ public class ScoredPairOutputParser {
 		}
 		
 		public int getThreePPosition(){
-			return sps[0].getThreePposition();
+			return sps[0].getThreePPosition();
 		}
 		
 		public int getFivePPosition(){
-			return sps[1].getFivePposition();
+			return sps[1].getFivePPosition();
 		}
 		
 		public double getThreePEnergy(){
@@ -145,10 +164,10 @@ public class ScoredPairOutputParser {
 		public String getMisc(){
 			return misc;
 		}
-		
+		//\tPreLength
 		static public String getHeader(){
-			return "Contig1\tStrand1\t5pPosition1\t3pPosition1\t5p5preads1\t5p3preads1\t3p5preads1\t3p3preads1\tAccession1\tGeneName1\tGenomicRegion5p1\tGenomicRegion3p1\tDistFromExon5p1\tDistFromExon3p1\tDepth1\tEnergy1\tHairpinNumber1\tOverhang1\t"
-					+ "Contig2\tStrand2\t5pPosition2\t3pPosition2\t5p5preads2\t5p3preads2\t3p5preads2\t3p3preads2\tAccession2\tGeneName2\tGenomicRegion5p2\tGenomicRegion3p2\tDistFromExon5p2\tDistFromExon3p2\tDepth2\tEnergy2\tHairpinNumber2\tOverhang2\t"
+			return "Contig1\t5pPosition1\t3pPosition1\tStrand1\tPreLength1\t5p5preads1\t5p3preads1\t3p5preads1\t3p3preads1\tAccession1\tGeneName1\tGenomicRegion5p1\tGenomicRegion3p1\tDistFromExon5p1\tDistFromExon3p1\tDepth1\tEnergy1\tHairpinNumber1\tOverhang1\t"
+					+ "Contig2\t5pPosition2\t3pPosition2\tStrand2\tPreLength2\t5p5preads2\t5p3preads2\t3p5preads2\t3p3preads2\tAccession2\tGeneName2\tGenomicRegion5p2\tGenomicRegion3p2\tDistFromExon5p2\tDistFromExon3p2\tDepth2\tEnergy2\tHairpinNumber2\tOverhang2\t"
 					+ "Class\tPredictionScore\tNumMatched3p\tNumMatched5p\tDepth\tEnergy\tHairpinNumber\tLeftPaired\tRightPaired\tOverhang\t5pScore\t3pScore\tblastHit1\tblastHit2"
 					+ "\tSeqEntropy\tStructureEntropy\tHetero\tSeq1\tSeq2\tSeq";
 		}
@@ -160,7 +179,7 @@ public class ScoredPairOutputParser {
 			String seq1 = getTruncatedSequence(p1, seqLength, true);
 			String seq2 = getTruncatedSequence(p2, seqLength, false);
 			seq = seq1 + seq2;
-			RNAcofoldLauncher fold = new RNAcofoldLauncher(seq, FCLIP_Scorer.flankingNTNumber);
+			RNAcofoldLauncher fold = new RNAcofoldLauncher(seq, FCLIP_Scorer.getFlankingNTNumber());
 			isFeasibleFold = fold.isFeasibleFold();
 			this.depth = fold.getDepth();
 			this.energy = fold.getEnergyPerNT();
@@ -193,10 +212,10 @@ public class ScoredPairOutputParser {
 			ps[0] = new String();
 			ps[1] = new String();
 			int i = 0;
-			for(;i<18;i++){
+			for(;i<19;i++){ //TODO
 				ps[0] += token[i] + "\t";
 			}
-			for(;i<36;i++){
+			for(;i<38;i++){
 				ps[1] += token[i] + "\t";
 			}
 			this.sps = new ScoredPosition[2];
@@ -239,6 +258,13 @@ public class ScoredPairOutputParser {
 			
 			for(;i<token.length;i++){
 				this.misc += token[i] + (i<token.length-1 ? "\t" : "");
+			}
+			if(rmsk3pHeaderColumnNumber> 0){
+				this.isRepeat3p = !token[rmsk3pHeaderColumnNumber].equals("_");
+			}
+			
+			if(rmsk5pHeaderColumnNumber> 0){
+				this.isRepeat5p = !token[rmsk5pHeaderColumnNumber].equals("_");
 			}
 		}
 		
@@ -327,10 +353,10 @@ public class ScoredPairOutputParser {
 			sb.append(structureEntropy); sb.append('\t');
 			sb.append(hetero); sb.append('\t');
 			//sb.append(fivePhetero); sb.append('\t');
-			sb.append(ScoredPosition.getCleavedSequence(seqs[0], FCLIP_Scorer.flankingNTNumber));  sb.append('\t');
-			sb.append(ScoredPosition.getCleavedSequence(seqs[1], FCLIP_Scorer.flankingNTNumber));  sb.append('\t');
+			sb.append(ScoredPosition.getCleavedSequence(seqs[0], FCLIP_Scorer.getFlankingNTNumber()));  sb.append('\t');
+			sb.append(ScoredPosition.getCleavedSequence(seqs[1], FCLIP_Scorer.getFlankingNTNumber()));  sb.append('\t');
 			
-			sb.append(ScoredPosition.getCleavedSequence(seq, FCLIP_Scorer.flankingNTNumber)); 
+			sb.append(ScoredPosition.getCleavedSequence(seq, FCLIP_Scorer.getFlankingNTNumber())); 
 			
 			if(!misc.isEmpty()){
 				sb.append('\t');
@@ -427,14 +453,14 @@ public class ScoredPairOutputParser {
 			int[] positions = new int[2];
 			boolean[] strands = new boolean[2];
 			
-			int length = seq.length() / 2 - FCLIP_Scorer.flankingNTNumber;
+			int length = seq.length() / 2 - FCLIP_Scorer.getFlankingNTNumber();
 			
 			for(int i=0;i<2;i++){
 				contigs[i] = sps[i].getContig();
 				strands[i] = sps[i].isPlusStrand();
 				positions[i] = 
-						i == 0 ? sps[i].getThreePposition()// + (strands[i]? -Scorer.flankingNTNumber + 1 : Scorer.flankingNTNumber - 1) 
-								: sps[i].getFivePposition() + (strands[i]?  - length + 1: length - 1);			
+						i == 0 ? sps[i].getThreePPosition()// + (strands[i]? -Scorer.flankingNTNumber + 1 : Scorer.flankingNTNumber - 1) 
+								: sps[i].getFivePPosition() + (strands[i]?  - length + 1: length - 1);			
 						
 			}			
 		//	System.out.println(ScoredPosition.getCleavedSequence(this.seq, Scorer.flankingNTNumber));
@@ -463,6 +489,11 @@ public class ScoredPairOutputParser {
 			while((s=in.readLine())!=null){
 				if(s.startsWith("Contig")){
 					header = s;
+					String[] token = header.split("\t");
+					for(int i=0;i<token.length;i++){
+						if(token[i].equals("5p rmsk")) ScoredPair.rmsk3pHeaderColumnNumber = i;
+						if(token[i].equals("3p rmsk")) ScoredPair.rmsk5pHeaderColumnNumber = i;
+					}
 					continue;
 				}
 				ScoredPair position = new ScoredPair(s);				
@@ -491,7 +522,14 @@ public class ScoredPairOutputParser {
 			HashSet<String> tseqs = new HashSet<String>();
 			//int k = 0;
 			for(ScoredPair pair : parser.getPairs()){
-				String seq = ScoredPosition.getCleavedSequence(pair.getSeq(), FCLIP_Scorer.flankingNTNumber);
+				if(pair.getOverHang() != 2) continue;
+			//	if(pair.getPairedScoredPositions()[0].getThreePReads()[0] < readth || pair.getPairedScoredPositions()[0].getThreePReads()[1] < readth ) continue;
+			//	if(pair.getPairedScoredPositions()[1].getFivePReads()[0] < readth || pair.getPairedScoredPositions()[1].getFivePReads()[1] < readth ) continue;
+				//if(pair.getMisc().contains("SINE")) continue;
+				//if(pair.getThreePScore() < 0.4 || pair.getFivePScore() < 0.4) continue;
+				//if(pair.getPredictionScore() < 0.8) continue;
+				
+				String seq = ScoredPosition.getCleavedSequence(pair.getSeq(), FCLIP_Scorer.getFlankingNTNumber());
 				//if(pair.getClassification().equals("M")){
 					String fseq = seq.substring(0, seq.indexOf(' '));
 					if(!fseqs.contains(pair.getOriginalSeqs()[0])){
@@ -540,15 +578,70 @@ public class ScoredPairOutputParser {
 		}	
 	}
 	
+	static public void intersectWithBam(String csvOut, String csv, String bamfile, boolean contained){
+		SamReader reader = SamReaderFactory.makeDefault().open(new File(bamfile));
+		ScoredPairOutputParser parser = new ScoredPairOutputParser(csv);		
+		
+		try {	
+			PrintStream out = new PrintStream(csvOut);
+			out.println(parser.getHeader()+"\t" + new File(bamfile).getName() + (contained? "_containedReads":"_overlappingReads"));
+			for(ScoredPair p :parser.getPairs()){
+				String contig1 = p.getFivePContig();
+				String contig2 = p.getThreePContig();
+				int p1 = p.getFivePPosition();
+				int p12 = p1 + (p.getFivePStrand()? - FCLIP_Scorer.getMinReadDiff() : FCLIP_Scorer.getMinReadDiff());
+				int p2 = p.getThreePPosition();
+				int p22 = p2 - (p.getThreePStrand()? - FCLIP_Scorer.getMinReadDiff() : FCLIP_Scorer.getMinReadDiff());
+				
+				
+				SAMRecordIterator iterator = null;
+				int n = 0;
+				try{
+					iterator = reader.query(contig1, p1+1, p12+1, contained);
+					while(iterator.hasNext()){
+						SAMRecord r = iterator.next();
+						n++;
+					}
+				}finally{
+					iterator.close();
+				}
+				
+				try{
+					iterator = reader.query(contig2, p2+1, p22+1, contained);
+					while(iterator.hasNext()){
+						SAMRecord r = iterator.next();
+						n++;
+					}
+				}finally{
+					iterator.close();
+				}			
+				
+				out.println(p+"\t"+n);
+				
+			}
+			out.close();	
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
 	public static void main(String[] args){
-		String file = "/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/merged.trans.control.M.csv";
-		ScoredPairOutputParser parser = new ScoredPairOutputParser(file);
-		HashMap<ScoredPosition, Integer> map = new HashMap<ScoredPosition, Integer>();
-		for(ScoredPair pair : parser.getPairs()){
-			map.put(pair.getPairedScoredPositions()[0], pair.getMatched3pNum());
-		}
-		for(int v : map.values()){
-			System.out.println(v);
-		}
+		ScoredPairOutputParser.intersectWithBam("/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/trans/merged.trans.complete.M.agoIntersected.csv",
+				"/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/trans/merged.trans.complete.M.csv", 
+				"/media/kyowon/Data1/fCLIP/Data/FLAG_AGO_small_RNA_20_RvBcd_Aligned_Sorted.bam", true);
+		ScoredPairOutputParser.intersectWithBam("/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/trans/merged.trans.complete.M.agodicerIntersected.csv",
+				"/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/trans/merged.trans.complete.M.agoIntersected.csv", 
+				"/media/kyowon/Data1/fCLIP/Data/Dicer_PAR-CLIP_Aligned_Sorted.bam", true);
+		
+		
+	//	ScoredPairOutputParser parser = new ScoredPairOutputParser(file);
+	//	HashMap<ScoredPosition, Integer> map = new HashMap<ScoredPosition, Integer>();
+	//	for(ScoredPair pair : parser.getPairs()){
+	//		map.put(pair.getPairedScoredPositions()[0], pair.getMatched3pNum());
+	//	}
+	//	for(int v : map.values()){
+	//		System.out.println(v);
+	//	}
 	}
 }

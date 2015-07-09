@@ -7,21 +7,25 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 
-import launcher.RNAfoldLauncher;
-
-import fCLIP.MirGff3FileParser.MiRNA;
+import launcher.RNAcofoldLauncher;
 import fCLIP.parser.ScoredPositionOutputParser;
 import fCLIP.parser.ScoredPositionOutputParser.ScoredPosition;
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
 import parser.BufferedLineReader;
+import parser.MirGff3FileParser;
 import parser.ZeroBasedFastaParser;
+import parser.MirGff3FileParser.MiRNA;
 public class FCLIP_Scorer {
 	
 	static private int leftWindowSize = 40;
 	static private int rightWindowSize = 40;
 	static private int maxDepthThreshold = 0;
-	static public int flankingNTNumber = 15; // inclusive.. 
+	static private int flankingNTNumber = 25; // inclusive.. 
+	static private int minReadDiff = 50;
+	static private int maxReadDiff = 350;
+	
+	
 	private Bed12Parser bedParser;
 	private double[] filter5p;
 	private double[] filter3p;
@@ -29,9 +33,31 @@ public class FCLIP_Scorer {
 	private double filter3pNorm;
 	private ZeroBasedFastaParser fastaParser;
 	private MirGff3FileParser mirParser;
-	final static private int minReadDiff = 40;
-	final static private int maxReadDiff = 150;
 	
+	public static int getFlankingNTNumber() {
+		return flankingNTNumber;
+	}
+
+	public static void setFlankingNTNumber(int flankingNTNumber) {
+		FCLIP_Scorer.flankingNTNumber = flankingNTNumber;
+	}
+
+	public static int getMinReadDiff() {
+		return minReadDiff;
+	}
+
+	public static void setMinReadDiff(int minReadDiff) {
+		FCLIP_Scorer.minReadDiff = minReadDiff;
+	}
+
+	public static int getMaxReadDiff() {
+		return maxReadDiff;
+	}
+
+	public static void setMaxReadDiff(int maxReadDiff) {
+		FCLIP_Scorer.maxReadDiff = maxReadDiff;
+	}
+
 	
 	private void read(String filename){
 		BufferedLineReader in;
@@ -89,14 +115,14 @@ public class FCLIP_Scorer {
 	}
 	
 	private static double getRawScore(double[] filter, double[] cov, double filterNorm){
-		if(rpf.Scorer.sum(cov) < maxDepthThreshold) return 0;
+	//	if(rpf.Scorer.sum(cov) < maxDepthThreshold) return 0;
 		double norm = rpf.Scorer.getNorm(cov);
 		//System.out.println(norm);
 		if(norm <= 0) return 0;
 				
 		double ip = rpf.Scorer.getInnerProduct(filter, cov);
 		
-	//	System.out.println("hh " + ip + " " + filterNorm + " " + norm);
+		//System.out.println("hh " + ip + " " + filterNorm + " " + norm);
 		
 		return ip / filterNorm / norm;
 	}
@@ -111,8 +137,26 @@ public class FCLIP_Scorer {
 		
 		double[] depth = is5p ? bedParser.get5pSignalForfCLIP(isPlusStrand, coordinate) :
 			bedParser.get3pSignalForfCLIP(isPlusStrand, coordinate);
+		
+		//System.out.println(maxDepthThreshold);
 		return getRawScore(is5p? filter5p : filter3p, depth, is5p? filter5pNorm : filter3pNorm);
 		
+	}
+	
+	public double getScore(int currentPosition, boolean isPlusStrand, boolean is5p){
+		double maxScore = -1;
+		for(ArrayList<Integer> co : bedParser.getCoordinates(currentPosition + (isPlusStrand == is5p ? 1 :  -1), rightWindowSize, isPlusStrand, is5p)){ // should be left inclusive..
+			if(!Bed12Parser.getSplices(co).isEmpty()) continue;
+			double score = getScore(co, currentPosition, isPlusStrand, is5p);
+			
+			maxScore = maxScore < score? score : maxScore;
+			//if(score > scoreThreshold){
+			//	ScoredPosition scoredPosition = is5p? new ScoredPosition(bedParser.getContig(), isPlusStrand, currentPosition, -1, score, -1, parser):
+			//		new ScoredPosition(bedParser.getContig(), isPlusStrand, -1, currentPosition, -1, score, parser);
+				//scoredPositions.add(scoredPosition);
+			//}					
+		}
+		return maxScore;
 	}
 	
 	
@@ -155,10 +199,10 @@ public class FCLIP_Scorer {
 		}			
 		
 		Collections.sort(scoredPositions);
-		scoredPositions = windowFilter(scoredPositions, 5, 1, is5p);
+		//scoredPositions = windowFilter(scoredPositions, 3, 1, is5p);
 		
 		for(ScoredPosition s: scoredPositions){
-			int position = is5p? s.getFivePposition() : s.getThreePposition();
+			int position = is5p? s.getFivePPosition() : s.getThreePPosition();
 			if(!scoredPositionMap.containsKey(position)) scoredPositionMap.put(position, new ArrayList<ScoredPosition>());
 			scoredPositionMap.get(position).add(s);
 		}
@@ -175,14 +219,14 @@ public class FCLIP_Scorer {
 	      int rank = 1;
 	      
 	      ScoredPosition thisPeak = s.get(positionIndex);
-	      int thisPosition = is5p? thisPeak.getFivePposition() : thisPeak.getThreePposition() ;
+	      int thisPosition = is5p? thisPeak.getFivePPosition() : thisPeak.getThreePPosition() ;
 	      double thisScore = is5p? thisPeak.getFivePScore() : thisPeak.getThreePScore();
 	      
 	      // move left
 	      int prevIndex = positionIndex-1;
 	      while(prevIndex >= 0) {
 	    	ScoredPosition prevPeak = s.get(prevIndex);
-	    	int prevPosition = is5p? prevPeak.getFivePposition() : prevPeak.getThreePposition();
+	    	int prevPosition = is5p? prevPeak.getFivePPosition() : prevPeak.getThreePPosition();
 	    	double prevScore = is5p? prevPeak.getFivePScore() : prevPeak.getThreePScore();
 	        if(thisPosition - prevPosition > window)    break;
 	        if(prevScore > thisScore)            rank++;
@@ -193,7 +237,7 @@ public class FCLIP_Scorer {
 	      int nextIndex = positionIndex+1;
 	      while(nextIndex < s.size()) {
 	    	ScoredPosition nextPeak = s.get(nextIndex);
-	    	int nextPosition = is5p? nextPeak.getFivePposition() : nextPeak.getThreePposition();
+	    	int nextPosition = is5p? nextPeak.getFivePPosition() : nextPeak.getThreePPosition();
 	    	double nextScore = is5p? nextPeak.getFivePScore() : nextPeak.getThreePScore();
 	    	 if(nextPosition - thisPosition > window)    break;
 		     if(nextScore > thisScore)            rank++;   
@@ -246,13 +290,10 @@ public class FCLIP_Scorer {
 		String seq = isPlusStrand? fastaParser.getSequence(bedParser.getContig(), p3p - flankingNTNumber, p5p + flankingNTNumber + 1)
 		    : ZeroBasedFastaParser.getComplementarySequence(fastaParser.getSequence(bedParser.getContig(), p5p-flankingNTNumber, p3p + flankingNTNumber + 1), true);
 		
-		RNAfoldLauncher fold = new RNAfoldLauncher(seq, flankingNTNumber);
-	//	if(fold.getEnergyPerNT() > energyThreshold) return;
-	//	if(fold.getDepth() < depthThreshold) return;
-		//if(checkFoldFeasibility && !fold.isFeasibleFold()) return;
-		for(ScoredPosition s3 : sp3p.get(p3p)){
+		RNAcofoldLauncher fold = new RNAcofoldLauncher(seq, flankingNTNumber);
+			for(ScoredPosition s3 : sp3p.get(p3p)){
 			for(ScoredPosition s5 : sp5p.get(p5p)){
-				if(s5.getFivePScore() < unpairedScoreThreshold && s3.getThreePScore() < unpairedScoreThreshold) continue;
+				//if(s5.getFivePScore() < unpairedScoreThreshold && s3.getThreePScore() < unpairedScoreThreshold) continue;
 				ScoredPosition sp = new ScoredPosition(bedParser.getContig(), isPlusStrand, p5p, p3p, s5.getFivePScore(), s3.getThreePScore(), parser);
 				sp.set(fold).setSeq(seq);
 				sp.addGenes(s5);
@@ -282,11 +323,11 @@ public class FCLIP_Scorer {
 		if(seq.length() < 2 * flankingNTNumber + maxReadDiff - 1) return;
 		double minEnergy = 1000;
 		String maxSeq = null;
-		RNAfoldLauncher maxFold = null;
+		RNAcofoldLauncher maxFold = null;
 		//for(int k=2*flankingNTNumber+minReadDiff; k<2*flankingNTNumber+maxReadDiff; k++) // TODO
 		{
 			String subSeq = seq;//is3p? seq.substring(0, k) : seq.substring(2*flankingNTNumber+maxReadDiff - k - 1);
-			RNAfoldLauncher fold = new RNAfoldLauncher(subSeq, flankingNTNumber);
+			RNAcofoldLauncher fold = new RNAcofoldLauncher(subSeq, flankingNTNumber);
 			//if(!fold.isFeasibleFold()) continue;
 			//if(fold.getEnergy() > energyThreshold) continue;
 			//if(fold.getDepth() < depthThreshold) continue;
@@ -301,13 +342,13 @@ public class FCLIP_Scorer {
 			for(ScoredPosition s : sps){
 				s.set(maxFold).setSeq(maxSeq);
 				if(is3p)
-					s.setFivePposition(s.getThreePposition() + (isPlusStrand? len - 1: - len + 1), annotationParser);
+					s.setFivePposition(s.getThreePPosition() + (isPlusStrand? len - 1: - len + 1), annotationParser);
 				else
-					s.setThreePposition(s.getFivePposition() + (isPlusStrand? - len + 1: len - 1), annotationParser);
+					s.setThreePposition(s.getFivePPosition() + (isPlusStrand? - len + 1: len - 1), annotationParser);
 				positionSet.add(s);
 			}				
 		}else{
-			RNAfoldLauncher fold = new RNAfoldLauncher(seq, flankingNTNumber);
+			RNAcofoldLauncher fold = new RNAcofoldLauncher(seq, flankingNTNumber);
 			for(ScoredPosition s : sps){
 				s.set(fold).setSeq(seq);
 				positionSet.add(s);
@@ -336,9 +377,26 @@ public class FCLIP_Scorer {
 				i++;
 			}
 			
-			if(!paired5pList.isEmpty())
-				updatePaired(tPositionSet, p3p, isPlusStrand? paired5pList.get(0) : paired5pList.get(paired5pList.size()-1), sp3p, sp5p, unpairedScoreThreshold, isPlusStrand, annotationParser);
-			else if(classifier!= null) updateUnPaired(tPositionSet, p3p, sp3p, unpairedScoreThreshold, isPlusStrand, true, annotationParser);
+			if(classifier == null){
+				int minDist = 100000;
+				int minP = -1;
+				for(int p : paired5pList){
+					int dist = Math.abs(p3p - p);
+					if(minDist > dist){
+						minDist = dist;
+						minP = p;
+					}
+				}
+				if(minP > 0){
+					paired5pList.clear();
+					paired5pList.add(minP);
+				}				
+			}
+			for(int p : paired5pList){
+				updatePaired(tPositionSet, p3p, p, sp3p, sp5p, unpairedScoreThreshold, isPlusStrand, annotationParser);
+					
+			}
+			if(paired5pList.isEmpty() && classifier!= null) updateUnPaired(tPositionSet, p3p, sp3p, unpairedScoreThreshold, isPlusStrand, true, annotationParser);
 		}
 				
 		for(int p5p : positions5p){
@@ -353,19 +411,36 @@ public class FCLIP_Scorer {
 				i++;							
 			}
 			
-			if(!paired3pList.isEmpty())
-				updatePaired(tPositionSet, isPlusStrand? paired3pList.get(paired3pList.size()-1) : paired3pList.get(0), p5p, sp3p, sp5p, unpairedScoreThreshold, isPlusStrand, annotationParser);
-			else if(classifier!= null) updateUnPaired(tPositionSet, p5p, sp5p, unpairedScoreThreshold, isPlusStrand, false, annotationParser);
+			if(classifier == null){
+				int minDist = 100000;
+				int minP = -1;
+				for(int p : paired3pList){
+					int dist = Math.abs(p5p - p);
+					if(minDist > dist){
+						minDist = dist;
+						minP = p;
+					}
+				}
+				if(minP > 0){
+					paired3pList.clear();
+					paired3pList.add(minP);
+				}				
+			}
+			for(int p : paired3pList){
+				updatePaired(tPositionSet, p, p5p, sp3p, sp5p, unpairedScoreThreshold, isPlusStrand, annotationParser);
+			}
+			
+			if(paired3pList.isEmpty() && classifier!= null) updateUnPaired(tPositionSet, p5p, sp5p, unpairedScoreThreshold, isPlusStrand, false, annotationParser);
 		}
 		
 		for(ScoredPosition p : tPositionSet){ // set read length variance
 		
 			int offset = isPlusStrand ? 1 : -1;
 						
-			int ft = bedParser.get3pDepth(isPlusStrand, p.getFivePposition());
-			int ff = bedParser.get5pDepth(isPlusStrand, p.getFivePposition() + offset);
-			int tf = bedParser.get5pDepth(isPlusStrand, p.getThreePposition());
-			int tt = bedParser.get3pDepth(isPlusStrand, p.getThreePposition() - offset);
+			int ft = bedParser.get3pDepth(isPlusStrand, p.getFivePPosition());
+			int ff = bedParser.get5pDepth(isPlusStrand, p.getFivePPosition() + offset);
+			int tf = bedParser.get5pDepth(isPlusStrand, p.getThreePPosition());
+			int tt = bedParser.get3pDepth(isPlusStrand, p.getThreePPosition() - offset);
 		
 			p.set5pReads(ft, ff);
 			p.set3pReads(tt, tf);
@@ -373,82 +448,117 @@ public class FCLIP_Scorer {
 			double sum = 0;
 			
 			if(isPlusStrand){
-				for(int i=p.getThreePposition() + 1;i<=p.getFivePposition() - 1;i++){
-					sum += bedParser.get5pDepth(isPlusStrand, i);
-					sum += bedParser.get3pDepth(isPlusStrand, i);
-				}				
-			}else{
-				for(int i=p.getFivePposition() + 1;i<=p.getThreePposition() - 1;i++){
+				for(int i=p.getThreePPosition() + 1;i<=p.getThreePPosition() + RNAcofoldLauncher.getSeqLength()/2 - 1;i++){
 					sum += bedParser.get5pDepth(isPlusStrand, i);
 					sum += bedParser.get3pDepth(isPlusStrand, i);
 				}
+				for(int i=p.getFivePPosition() - RNAcofoldLauncher.getSeqLength()/2;i<=p.getFivePPosition() - 2;i++){
+					sum += bedParser.get5pDepth(isPlusStrand, i);
+					sum += bedParser.get3pDepth(isPlusStrand, i);
+				}
+			}else{
+				for(int i=p.getFivePPosition() + 1;i<=p.getFivePPosition() + RNAcofoldLauncher.getSeqLength()/2 - 1;i++){
+					sum += bedParser.get5pDepth(isPlusStrand, i);
+					sum += bedParser.get3pDepth(isPlusStrand, i);
+				}
+				for(int i=p.getThreePPosition() - RNAcofoldLauncher.getSeqLength()/2;i<=p.getThreePPosition() - 2;i++){
+					sum += bedParser.get5pDepth(isPlusStrand, i);
+					sum += bedParser.get3pDepth(isPlusStrand, i);
+				}			
 			}
 			
 			p.setHetero(Math.log10(sum / (ft + ff + tf + tt) + .01));
 			
 		}
 		
-		HashMap<Integer, Double> fivePScores = new HashMap<Integer, Double>();
-		HashMap<Integer, Double> threePScores = new HashMap<Integer, Double>();
+		//HashMap<Integer, Double> fivePScores = new HashMap<Integer, Double>();
+		//HashMap<Integer, Double> threePScores = new HashMap<Integer, Double>();
 		HashSet<Integer> paired3ps = new HashSet<Integer>();
 		HashSet<Integer> paired5ps = new HashSet<Integer>();
 		
-		
+		HashMap<Integer, ScoredPosition> paired3pMap = new HashMap<Integer, ScoredPositionOutputParser.ScoredPosition>();
+		HashMap<Integer, ScoredPosition> paired5pMap = new HashMap<Integer, ScoredPositionOutputParser.ScoredPosition>();
+					
 		for(ScoredPosition p : tPositionSet){
 			if(!p.isPaired()){
-				if(p.is5pScored()) fivePScores.put(p.getFivePposition(), p.getFivePScore());
-				else if(p.is3pScored()) threePScores.put(p.getThreePposition(), p.getThreePScore());
+			//	if(p.is5pScored()) fivePScores.put(p.getFivePPosition(), p.getFivePScore());
+			//	else if(p.is3pScored()) threePScores.put(p.getThreePPosition(), p.getThreePScore());
 				continue;
 			}
-			paired3ps.add(p.getThreePposition());// 91
-			paired5ps.add(p.getFivePposition());
-			positionSet.add(p);
-		}
-		
-		HashSet<Integer> mClassified3ps = new HashSet<Integer>();
-		HashSet<Integer> mClassified5ps = new HashSet<Integer>();
-		
-		
-		//String mafString = mafParser.getSeqsInMafFormat(contig, position.getCoordinate(), position.getPosition(), isPlusStrand, positionQuantityChangeLength);
-		//this.phyloP = new PhyloPLauncher(mafString).getPvalConservation();
-		
-		
-		if(classifier != null){
-			for(ScoredPosition p : tPositionSet){
-				//classifier.setClassification(p); // 1st classification
-				//if(p.getClassification().toUpperCase().equals("M")){ // 2nd classification
-			//		p.setRNAzScoresNSeedConservation(mafParser);
-			//		p.setDnDs(mafParser);
-					classifier.setClassification(p);
-				//}
-				
-				if(p.isPaired()) continue;
-				if(p.getClassification().equals("M")){
-					if(p.is3pScored()) mClassified3ps.add(p.getThreePposition());
-					else mClassified5ps.add(p.getFivePposition());
+			
+			int off = p.isPlusStrand()? 1 : -1;
+			int preLength = p.getPreLength();
+		//	boolean toPut = true;
+			
+			paired3ps.add(p.getThreePPosition());
+			paired5ps.add(p.getFivePPosition());
+			
+			if(classifier != null){
+				classifier.setClassification(p);
+				if(!p.getClassification().equals("M")) continue;
+			}			
+			
+			if(paired3pMap.containsKey(p.getThreePPosition())){
+				ScoredPosition bp = paired3pMap.get(p.getThreePPosition());
+				if(preLength < bp.getPreLength()){
+					paired3pMap.put(p.getThreePPosition(), p);
+				}//else toPut = false;
+			}else paired3pMap.put(p.getThreePPosition(), p);
+			
+			if(paired5pMap.containsKey(p.getFivePPosition())){
+				ScoredPosition bp = paired5pMap.get(p.getFivePPosition());
+				if(preLength < bp.getPreLength()){
+					paired5pMap.put(p.getFivePPosition(), p);
+				}//else toPut = false;
+			}else paired5pMap.put(p.getFivePPosition(), p);
+			
+			/*
+			if(paired5pMap.containsKey(p.getThreePPosition() - off)){
+				ScoredPosition bp = paired5pMap.get(p.getThreePPosition() - off);
+				if(preLength < bp.getPreLength()){
+					paired5pMap.remove(p.getThreePPosition() - off);
+				}else{
+					paired5pMap.remove(p.getFivePPosition());
+					paired3pMap.remove(p.getThreePPosition());
 				}
 			}
+			
+			if(paired3pMap.containsKey(p.getFivePPosition() + off)){
+				ScoredPosition bp = paired3pMap.get(p.getFivePPosition() + off);
+				if(preLength < bp.getPreLength()) paired3pMap.remove(p.getFivePPosition() + off);
+				else{
+					paired5pMap.remove(p.getFivePPosition());
+					paired3pMap.remove(p.getThreePPosition());
+				}
+			}*/
 		}
 		
-		mClassified5ps.remove(0);
-		mClassified3ps.remove(0);
+		
 		
 		for(ScoredPosition p : tPositionSet){
-			if(p.isPaired()) continue;
 			int off = p.isPlusStrand()? 1 : -1;
-			if(p.is3pScored()){
-				if(paired5ps.contains(p.getThreePposition() - off )) continue;
-				Double fs = fivePScores.get(p.getThreePposition() - off);
-				if(fs!=null && fs > p.getThreePScore()) continue;
-				if(!mClassified3ps.contains(p.getThreePposition()) && mClassified5ps.contains(p.getThreePposition() - off)) continue;
-			}else{
-				if(paired3ps.contains(p.getFivePposition() + off )) continue;
-				Double ts = threePScores.get(p.getFivePposition() + off); 
-				if(ts!=null && ts > p.getFivePScore()) continue;
-				if(!mClassified5ps.contains(p.getFivePposition()) && mClassified3ps.contains(p.getFivePposition() + off)) continue;
-			}
+			if(p.isPaired()){
+				ScoredPosition fp = paired5pMap.get(p.getFivePPosition());
+				ScoredPosition tp = paired3pMap.get(p.getThreePPosition());
+				if(fp != null && tp != null && fp.equals(tp) && tp.equals(p));
+				else if(classifier == null) continue;
+				else if(p.getClassification().equals("M")){ // among "MT" choose smallest pairs..
+					continue;
+				}
+			}else{ // unpaired
+				if(p.is3pScored()){
+					if(paired5ps.contains(p.getThreePPosition() - off )) continue;
+					if(paired3ps.contains(p.getThreePPosition())) continue;	
+				}else{
+					if(paired3ps.contains(p.getFivePPosition() + off )) continue;
+					if(paired5ps.contains(p.getFivePPosition())) continue;					
+				}
+			}		
 			positionSet.add(p);
 		}
+		
+		//positionSet.addAll();
+		
 	}
 	
 	ArrayList<ScoredPosition> getScoredPositions(AnnotationFileParser parser, Classifier classifier, double unpairedScoreThreshold, double pairedScoreThreshold, boolean isPlusStrand){
@@ -465,17 +575,17 @@ public class FCLIP_Scorer {
 			ArrayList<MiRNA> miRNAs = null;
 			if(sp.is5pScored()){
 				miRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
-				ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getFivePposition());
+				ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getFivePPosition());
 				if(matched != null) miRNAs.addAll(matched);
 			}
 			if(sp.is3pScored()){
 				if(miRNAs == null){
 					miRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
-					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getThreePposition());
+					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getThreePPosition());
 					if(matched != null) miRNAs.addAll(matched);
 				}else{
 					ArrayList<MiRNA> intersectedMiRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
-					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getThreePposition());
+					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getThreePPosition());
 					if(matched != null){
 						for(MiRNA miRNA : matched){
 							if(miRNAs.contains(miRNA)){
@@ -503,15 +613,22 @@ public class FCLIP_Scorer {
 	}
 	
 	public static void main(String[] args){
+		String chr = "chr22";
+		int position = 46113753;//46113702; //4850365;4850366
+// 
+		boolean isPlusStrand = true;
+		boolean is5p = true;
+		
 		Bed12Parser bedParser = new Bed12Parser("/media/kyowon/Data1/fCLIP/samples/sample4/bed/merged.se.bed", 
-				new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt"),
-				"chr19", true);
+				new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt"),	chr, true);
 		//ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser("/media/kyowon/Data1/fCLIP/genomes/hg38.fa");
 		//MirGff3FileParser mirParser = new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa_hg38.gff3");
 		String parameterFileName = "/media/kyowon/Data1/fCLIP/samples/sample4/results/training/merged.param";
 		FCLIP_Scorer scorer = new FCLIP_Scorer(bedParser, null, null, parameterFileName);
 		
+		System.out.println(scorer.getScore(position, isPlusStrand, is5p));
 		
+		/*
 		for(int o = - 5; o<5; o++){
 			int currentPosition = 58349275 + o;
 			boolean isPlusStrand = true;
@@ -548,7 +665,7 @@ public class FCLIP_Scorer {
 			else System.out.println(currentPosition + " " + scorer.getScore(cos.get(0), currentPosition, isPlusStrand, is5p));
 		}
 		System.out.println();
-		
+	*/	
 	}
 	
 }

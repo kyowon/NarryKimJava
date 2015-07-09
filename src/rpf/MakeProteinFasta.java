@@ -4,15 +4,15 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.HashSet;
-import net.sf.samtools.util.BufferedLineReader;
 
+import parser.BufferedLineReader;
 public class MakeProteinFasta {
 
 	public static void main(String[] args) throws IOException {
 		HashSet<String> genes = new HashSet<String>();
 		String s;
 		PrintStream out = new PrintStream("/media/kyowon/Data1/RPF_Project/proteomes/HUMAN_Thy.fasta");
-		BufferedLineReader inScore = new BufferedLineReader(new FileInputStream("/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/Thy_Harr_10mHsum-uncollapsed.plus.cov.score.tsv"));
+		BufferedLineReader inScore = new BufferedLineReader(("/media/kyowon/Data1/RPF_Project/samples/sample1/coverages/Thy_Harr_10mHsum-uncollapsed.plus.cov.score.tsv"));
 		
 		while((s=inScore.readLine())!=null){
 			String[] token = s.split("\t");
@@ -25,7 +25,7 @@ public class MakeProteinFasta {
 		
 		inScore.close();
 		
-		BufferedLineReader inFasta = new BufferedLineReader(new FileInputStream("/media/kyowon/Data1/RPF_Project/proteomes/HUMAN.fasta"));
+		BufferedLineReader inFasta = new BufferedLineReader(("/media/kyowon/Data1/RPF_Project/proteomes/HUMAN.fasta"));
 		
 		boolean toWrite = true;
 		while((s=inFasta.readLine())!=null){

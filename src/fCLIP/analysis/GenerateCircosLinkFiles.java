@@ -139,8 +139,8 @@ public class GenerateCircosLinkFiles {
 			for(ScoredPosition p : sMap.keySet()){
 				StringBuilder sb = new StringBuilder();
 				String contig = p.getContig();
-				int pos5 = p.getFivePposition();
-				int pos3 = p.getThreePposition();
+				int pos5 = p.getFivePPosition();
+				int pos3 = p.getThreePPosition();
 				sb.append("hs");
 				sb.append(contig.substring(contig.indexOf("chr") + 3));
 				sb.append(' ');
@@ -157,8 +157,8 @@ public class GenerateCircosLinkFiles {
 			for(ScoredPosition p : eMap.keySet()){
 				StringBuilder sb = new StringBuilder();
 				String contig = p.getContig();
-				int pos5 = p.getFivePposition();
-				int pos3 = p.getThreePposition();
+				int pos5 = p.getFivePPosition();
+				int pos3 = p.getThreePPosition();
 				sb.append("hs");
 				sb.append(contig.substring(contig.indexOf("chr") + 3));
 				sb.append(' ');
@@ -183,8 +183,8 @@ public class GenerateCircosLinkFiles {
 			for(ScoredPosition p : shistMap.keySet()){
 				StringBuilder sb = new StringBuilder();
 				String contig = p.getContig();
-				int pos5 = p.getFivePposition();
-				int pos3 = p.getThreePposition();
+				int pos5 = p.getFivePPosition();
+				int pos3 = p.getThreePPosition();
 				sb.append("hs");
 				sb.append(contig.substring(contig.indexOf("chr") + 3));
 				sb.append(' ');
@@ -205,8 +205,8 @@ public class GenerateCircosLinkFiles {
 			for(ScoredPosition p : ehistMap.keySet()){
 				StringBuilder sb = new StringBuilder();
 				String contig = p.getContig();
-				int pos5 = p.getFivePposition();
-				int pos3 = p.getThreePposition();
+				int pos5 = p.getFivePPosition();
+				int pos3 = p.getThreePPosition();
 				sb.append("hs");
 				sb.append(contig.substring(contig.indexOf("chr") + 3));
 				sb.append(' ');
@@ -233,8 +233,8 @@ public class GenerateCircosLinkFiles {
 				for(int i = 0; i<sps.length;i++){
 					StringBuilder sb = new StringBuilder();
 					String contig = sps[i].getContig();
-					int pos5 = sps[i].getFivePposition();
-					int pos3 = sps[i].getThreePposition();
+					int pos5 = sps[i].getFivePPosition();
+					int pos3 = sps[i].getThreePPosition();
 					sb.append("hs");
 					sb.append(contig.substring(contig.indexOf("chr") + 3));
 					sb.append(' ');

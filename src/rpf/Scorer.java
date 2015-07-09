@@ -2,6 +2,7 @@ package rpf;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,11 +14,10 @@ import java.util.Random;
 import parser.AnnotationFileParser;
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.Bed12Parser;
+import parser.BufferedLineReader;
 import parser.ZeroBasedFastaParser;
 import rpf.parser.ScoringOutputParser;
 import rpf.parser.ScoringOutputParser.ScoredPosition;
-import net.sf.samtools.util.BufferedLineReader;
-
 public class Scorer {
 	private int leftWindowSize = 30;
 	private int rightWindowSize = 60;
@@ -142,7 +142,7 @@ public class Scorer {
 		BufferedLineReader in;
 		//double[] likelihoodFunctionCoefficients = null;
 		try {
-			in = new BufferedLineReader(new FileInputStream(paramFile));
+			in = new BufferedLineReader((paramFile));
 			String s;
 			int i = 0;
 			int mod = 0;
@@ -197,7 +197,7 @@ public class Scorer {
 			in.close();
 			startFilterNorm = getNorm(startFilter);
 			stopFilterNorm = getNorm(stopFilter);
-		} catch (FileNotFoundException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}		
 	}
@@ -457,7 +457,7 @@ public class Scorer {
 		ArrayList<Double> freqMinus = new ArrayList<Double>();
 		
 		try {
-			BufferedLineReader in = new BufferedLineReader(new FileInputStream(outFile));
+			BufferedLineReader in = new BufferedLineReader((outFile));
 			String s;
 			HashMap<String, Double> freqMap;
 			while((s=in.readLine())!=null){
@@ -510,7 +510,7 @@ public class Scorer {
 				}					
 			}
 			out.close();
-		} catch (FileNotFoundException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		

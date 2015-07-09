@@ -10,7 +10,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import util.DnDsCalculator;
 import util.Nucleotide;
-import net.sf.samtools.util.BufferedLineReader;
 
 public class MafParser {
 	private String folderName;
@@ -39,7 +38,7 @@ public class MafParser {
 		indexSPositions = new HashMap<String, ArrayList<Integer>>();
 		fileNameMap = new HashMap<String, String>();
 		try {
-			BufferedLineReader in = new BufferedLineReader(new FileInputStream(indexFilename));
+			BufferedLineReader in = new BufferedLineReader((indexFilename));
 			String s;
 			HashMap<Integer, Long> indexSubMap = null;
 			ArrayList<Integer> indexSubSPositions = null;

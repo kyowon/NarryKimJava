@@ -56,7 +56,7 @@ public class RNAfoldLauncher {
 	
 	public boolean isFeasibleFold(){
 		if(overHang < overhanglimit[0] || overHang > overhanglimit[1]) return false;
-		if(leftPaired < pairedNumberlimit[0] || rightPaired < pairedNumberlimit[1]) return false;
+	//	if(leftPaired < pairedNumberlimit[0] || rightPaired < pairedNumberlimit[1]) return false;
 		return true;
 	}
 			
@@ -137,7 +137,57 @@ public class RNAfoldLauncher {
 		//	if(nh == 1){			
 				this.overHang = 0;
 				
-				int[] threePPairedIndices = new int[500];
+				String fst = st.substring(0, st.length()/2);
+				//System.out.println(fst);
+				String tst = st.substring(st.length()/2+1);
+				
+				//fst tst
+				int fivePaired = 0;
+				for(int i=fst.length()-1; i>=flankingNTnumber; i--){
+					if(fst.charAt(i) == '(') fivePaired ++;
+					else if(fst.charAt(i) == ')') fivePaired--;
+				}
+				
+				int threePaired = 0;
+				for(int i=0; i<tst.length() - flankingNTnumber; i++){
+					if(tst.charAt(i) == ')') threePaired ++;
+					else if(tst.charAt(i) == '(') threePaired--;
+				}
+				
+				//int diff = fivePaired - threePaired;
+				
+			//	int fp = 0;
+				for(int i=flankingNTnumber;i<fst.length();i++){
+					if(fst.charAt(i)=='.') this.overHang--;
+					else{
+						if(threePaired >= fivePaired) break;
+						if(fst.charAt(i) == '('){
+							fivePaired --;
+						}else if(fst.charAt(i) == ')'){
+							fivePaired++;
+						}					
+						this.overHang--;
+						
+					}
+				}
+				
+			//	int tp = 0;
+				for(int i=tst.length() - flankingNTnumber-1;i>=0;i--){
+					if(tst.charAt(i)=='.') this.overHang++;
+					else{
+						if(threePaired <= fivePaired) break;	
+						if(tst.charAt(i) == ')'){
+							threePaired --;
+						}else if(tst.charAt(i) == '('){
+							threePaired++;
+						}
+						this.overHang++;
+										
+					}
+				}
+				
+				
+				/*int[] threePPairedIndices = new int[500];
 				int[] fivePPairedIndices = new int[500];
 				
 				int prev3p = 0;
@@ -162,7 +212,7 @@ public class RNAfoldLauncher {
 					this.overHang --;
 				}
 			
-				
+				*/
 				//for(int i=first-1;  i>= st.length() - flankingNTnumber ;i--){
 				//	this.overHang--;
 			//	}
@@ -259,7 +309,7 @@ public class RNAfoldLauncher {
 	
 	
 	static public void main(String[] args){
-		String seq = "ACTTTCTTCCTCTTCCTCCT CCAGCCCACTTTCTCTTCTCTGTGTCGTCAGAGCTCCAGGGAGGGACCTGGGTAGAAG GAGAAGCCGGAAACAGCGGG";
+		String seq = "CGCCACGCCTCCGCTGGCGACGGGACATTATTACTTTTGGTACGCGCTGTGACACTTCAAACTCGTACCGTGAGTAATAATGCGCCGTCCACGGCACCGCATCGAAAAC";
 		seq = seq.replaceAll(" ", "");
 		String seqw = "";
 		for(char s : seq.toCharArray()){

@@ -16,7 +16,6 @@ public class Bed12Parser {
 	
 	public static class Bed12Read{
 		private static boolean read3p = false;
-		//private String contig;
 		private int[] fivePs;// inclusive
 		private int[] threePs; // inclusive
 		private int[] depth = null;
@@ -603,30 +602,53 @@ public class Bed12Parser {
 		return coordinate;
 	}
 	
+	public double[] get3pSignalElementsForfCLIP(boolean isPlusStrand, ArrayList<Integer> coordinate, int windowSize){
+		double[] covs5p  = get5pCoverages(isPlusStrand, coordinate);
+		double[] covs3p = get3pCoverages(isPlusStrand, coordinate);
+		double[] depths = getDepths(isPlusStrand, coordinate);
+		double[] signal = new double[3];
+		
+		double c5 = covs5p[windowSize] + 1; 
+		double p = depths[windowSize] - covs5p[windowSize] + 1;
+		double c3 = covs3p[windowSize-1] + 1;		
+		signal[0] = p;
+		signal[1] = c5;
+		signal[2] = c3;
+		
+		return signal;
+	}
+	
+	
+	public double[] get5pSignalElementsForfCLIP(boolean isPlusStrand, ArrayList<Integer> coordinate, int windowSize){
+		double[] covs5p  = get5pCoverages(isPlusStrand, coordinate);
+		double[] covs3p = get3pCoverages(isPlusStrand, coordinate);
+		double[] depths = getDepths(isPlusStrand, coordinate);
+		double[] signal = new double[3];
+		double c3 = covs3p[windowSize-1] + 1; 
+		double p = depths[windowSize-1] - covs3p[windowSize-1] + 1;
+		double c5 = covs5p[windowSize] + 1;
+		signal[0] = p;
+		signal[1] = c3;
+		signal[2] = c5;
+		
+		return signal;
+	}
+	
 	
 	public double[] get3pSignalForfCLIP(boolean isPlusStrand, ArrayList<Integer> coordinate){
 		double[] covs5p  = get5pCoverages(isPlusStrand, coordinate);
 		double[] covs3p = get3pCoverages(isPlusStrand, coordinate);
 		double[] depths = getDepths(isPlusStrand, coordinate);
 		double[] signal = new double[depths.length];
-		double alpha = 1;
 		
 		for(int i=0;i<signal.length;i++){
-		//	if(i%2 == 0){
-			double c5 = covs5p[i] > 2 ? covs5p[i] + 1 : 1;
-			double c3 = i>0? covs3p[i-1] + 1:1;
-			
-			signal[i] = depths[i]==0? 0 : depths[i]  -  alpha * c5 * c3; //  * (c5/depths[i])
-			signal[i] = Math.sqrt(Math.abs(signal[i])) * Math.signum(signal[i]);
-			//System.out.print(signal[i] + " ");
-		
-		//	}else{
-			//	signal[i] = depths[i/2];// +  covs5p[i/2] ;
-		//	}
+			double c5 = covs5p[i] + 1; 
+			double p = depths[i] - covs5p[i] + 1;
+			double c3 = i>0? covs3p[i-1] + 1:1;		
+			signal[i] = p - c5*c3/Math.sqrt(p);//Math.log(c5*c3/p);
+			//System.out.println(i + " " + signal[i]);
 		}
-		//System.out.println();
 		return signal;
-		
 	}
 	
 	
@@ -635,22 +657,14 @@ public class Bed12Parser {
 		double[] covs3p = get3pCoverages(isPlusStrand, coordinate);
 		double[] depths = getDepths(isPlusStrand, coordinate);
 		double[] signal = new double[depths.length];
-		double alpha = 1;
-		
 		for(int i=0;i<signal.length;i++){
-			double c3 = covs3p[i] > 2 ? covs3p[i] + 1 : 1;
+			double c3 = covs3p[i] + 1; 
+			double p = depths[i] - covs3p[i] + 1;
 			double c5 = i<covs5p.length-1? covs5p[i+1] + 1:1;
-			
-			signal[i] =  depths[i]==0? 0 : depths[i] - alpha * c5 * c3;
-			signal[i] = Math.sqrt(Math.abs(signal[i])) * Math.signum(signal[i]);
-			//System.out.print(signal[i] + " ");
-		//	}else{
-			//	signal[i] = depths[i/2];// +  covs5p[i/2] ;
-		//	}
+			signal[i] = p-c5*c3/Math.sqrt(p);// Math.log(c5*c3/p);
+			//System.out.println(i + " " + signal[i]);
 		}
-		//System.out.println();
 		return signal;
-		
 	}
 	
 	//HashMap<String, HashMap<Boolean, HashMap<Integer, HashMap<Bed12Read, Short>>>> reads;

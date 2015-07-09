@@ -1,6 +1,7 @@
 package parser;
 
-import java.io.FileInputStream;
+import htsjdk.samtools.util.Interval;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -11,9 +12,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
 
-import net.sf.picard.util.IntervalTree;
-import net.sf.picard.util.IntervalTree.Node;
-import net.sf.samtools.util.BufferedLineReader;
+import htsjdk.samtools.util.IntervalTree;
+import htsjdk.samtools.util.IntervalTree.Node;
 
 public class AnnotationFileParser {
 	public class txStartComparator implements Comparator<AnnotatedGene>{
@@ -181,6 +181,29 @@ public class AnnotationFileParser {
 			}
 			sb.append('\t');
 			for(int t : exonEnds){
+				sb.append(t);sb.append(',');
+			}
+			return sb.toString();
+		}
+		
+		public String toBed12FormatString(){
+			StringBuffer sb = new StringBuffer();
+			sb.append(contig); sb.append('\t');
+			sb.append(txStart); sb.append('\t');
+			sb.append(txEnd-1); sb.append('\t');
+			sb.append(accession); sb.append('\t');
+			sb.append(0); sb.append('\t');
+			sb.append(isPlusStrand? '+' : '-'); sb.append('\t');
+			sb.append(txStart); sb.append('\t');
+			sb.append(txEnd-1); sb.append('\t');
+			sb.append("0,0,0"); sb.append('\t');
+			sb.append(exonCount); sb.append('\t');
+			for(int i=0;i<exonCount;i++){
+				sb.append(exonEnds[i] - exonStarts[i]);sb.append(',');
+			}
+			sb.append('\t');
+			
+			for(int t : exonStarts){
 				sb.append(t);sb.append(',');
 			}
 			return sb.toString();
@@ -447,11 +470,24 @@ public class AnnotationFileParser {
 //	public static AnnotatedGene getSudoAnnotatedGene(ScoredPosition position){
 //		return new AnnotationFileParser().new AnnotatedGene(position);
 //	}
-	
+	public void toBED12(String bed){
+		try {
+			PrintStream out = new PrintStream(bed);
+			Iterator<AnnotatedGene> iterator = getAnnotatedGeneIterator();
+			while(iterator.hasNext()){
+				AnnotatedGene gene = iterator.next();
+				out.println(gene.toBed12FormatString());
+			}			
+			out.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 	
 	public AnnotationFileParser(String annotationFile){
 		try {
-			BufferedLineReader in = new BufferedLineReader(new FileInputStream(annotationFile));
+			BufferedLineReader in = new BufferedLineReader((annotationFile));
 			annotatedGeneSetMap = new HashMap<String, ArrayList<AnnotatedGene>>();
 			accessionMap = new HashMap<String, AnnotationFileParser.AnnotatedGene>();
 			annotatedGenePositionMap = new HashMap<String, HashMap<Boolean,HashMap<Integer,ArrayList<AnnotatedGene>>>>();
@@ -501,7 +537,7 @@ public class AnnotationFileParser {
 				}
 			}
 			
-		} catch (FileNotFoundException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}		
 	}
@@ -762,6 +798,9 @@ public class AnnotationFileParser {
 	
 
 	public static void main(String[] args){
-		new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt").toBedFile("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.bed");
+		AnnotationFileParser parser = new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt");
+		parser.toBED12("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.bed");
+		//chr20;515643;515716
+		
 	}
 }

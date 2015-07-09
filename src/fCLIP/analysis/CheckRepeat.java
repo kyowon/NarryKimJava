@@ -121,8 +121,8 @@ public class CheckRepeat {
 				int[] p3 = originEnd3pMap.get(key3);
 				
 				p2.println(p + "\t" + (v5 == null? "_" : v5) +  "\t" + (v3 == null? "_" : v3) 
-						+ "\t" + (p5 == null? "" : p5[0] - p.getThreePPosition()) + "\t" + (p5 == null? "" : p5[1] - p.getThreePPosition())
-						+ "\t" + (p3 == null? "" : p3[0] - p.getFivePPosition()) + "\t" + (p3 == null? "" : p3[1] - p.getFivePPosition()));
+						+ "\t" + (p5 == null? "" : p5[0] - p.getThreePPosition()) + "\t" + (p5 == null? " " : p5[1] - p.getThreePPosition())
+						+ "\t" + (p3 == null? "" : p3[0] - p.getFivePPosition()) + "\t" + (p3 == null? " " : p3[1] - p.getFivePPosition()));
 				
 			
 				String mKey = p.getClassification();
@@ -296,19 +296,58 @@ public class CheckRepeat {
 			HashMap<String, HashMap<String, Integer>> stat3p = new HashMap<String, HashMap<String, Integer>>();
 			
 			for(ScoredPosition p : parser.getPositions()){
-				String key5 = p.getContig() + "\t" + p.getThreePposition();
-				String key3 = p.getContig() + "\t" + p.getFivePposition();
+				String key5 = p.getContig() + "\t" + p.getThreePPosition();
+				String key3 = p.getContig() + "\t" + p.getFivePPosition();
 				String v5 = repeat5pMap.get(key5);
 				String v3 = repeat3pMap.get(key3);
 				int[] p5 = originEnd5pMap.get(key5);
 				int[] p3 = originEnd3pMap.get(key3);
 				
 				p1.println(p + "\t" + (v5 == null? "_" : v5) +  "\t" + (v3 == null? "_" : v3) 
-						+ "\t" + (p5 == null? "" : p5[0] - p.getThreePposition()) + "\t" + (p5 == null? "" : p5[1] - p.getThreePposition())
-						+ "\t" + (p3 == null? "" : p3[0] - p.getFivePposition()) + "\t" + (p3 == null? "" : p3[1] - p.getFivePposition()));
+						+ "\t" + (p5 == null? "" : p5[0] - p.getThreePPosition()) + "\t" + (p5 == null? " " : p5[1] - p.getThreePPosition())
+						+ "\t" + (p3 == null? "" : p3[0] - p.getFivePPosition()) + "\t" + (p3 == null? " " : p3[1] - p.getFivePPosition()));
 				
 				String mKey = "";
 				
+				if(p.getClassification().equals("M")){
+					mKey += "MT";
+				}else{
+					mKey += "U";
+				}
+				if(!stat5p.containsKey(mKey)) stat5p.put(mKey, new HashMap<String, Integer>());
+				if(!stat3p.containsKey(mKey)) stat3p.put(mKey, new HashMap<String, Integer>());
+				
+				HashMap<String, Integer> mv5p = stat5p.get(mKey);
+				
+				String suffix5 = "";
+			//	if(v5 != null){
+			//		if(v5.startsWith("SINE")) suffix5 = "SINE";
+			//		else if(v5.startsWith("LINE")) suffix5 = "LINE";
+			//		else suffix5 = "R";
+			//	}
+				String k5 = getGenomicRegion(p, true, suffix5);
+				if(p.hasMatchingMiRNA()) k5 = "miRNA";
+				
+				if(!mv5p.containsKey(k5)) mv5p.put(k5, 0);
+				mv5p.put(k5, mv5p.get(k5)+1);
+				
+				
+				HashMap<String, Integer> mv3p = stat3p.get(mKey);
+				
+				String suffix3 = "";
+				//if(v3 != null){
+				//	if(v3.startsWith("SINE")) suffix3 = "SINE";
+				//	else if(v3.startsWith("LINE")) suffix3 = "LINE";
+				//	else suffix3 = "R";
+				//}
+				String k3 = getGenomicRegion(p, false, suffix3);
+				if(p.hasMatchingMiRNA()) k3 = "miRNA";
+				
+				if(!mv3p.containsKey(k3)) mv3p.put(k3, 0);
+				mv3p.put(k3, mv3p.get(k3)+1);	
+				
+				
+				/*
 				if(p.hasMatchingMiRNA()){
 					mKey += "MiRNA";
 				}else{
@@ -340,7 +379,8 @@ public class CheckRepeat {
 				}
 				String k3 = getGenomicRegion(p, false, suffix3);
 				if(!mv3p.containsKey(k3)) mv3p.put(k3, 0);
-				mv3p.put(k3, mv3p.get(k3)+1);						
+				mv3p.put(k3, mv3p.get(k3)+1);	
+				*/					
 			}
 			p1.close();
 			PrintStream statp = new PrintStream(statOut);
@@ -348,19 +388,26 @@ public class CheckRepeat {
 			statp.println("CIS\n");
 			for(String mKey : stat5p.keySet()){
 				HashMap<String, Integer> mv5p = stat5p.get(mKey);
-				statp.println(mKey + " 5p");
+				HashMap<String, Integer> mv3p = stat3p.get(mKey);
+				
+				statp.println(mKey);
 				int sum = 0;
 				for(String k5 : mv5p.keySet()){
 					sum += mv5p.get(k5);
 				}
 				
+				for(String k3 : mv3p.keySet()){
+					sum += mv3p.get(k3);
+				}
+				
 				for(String k5 : mv5p.keySet()){
-					statp.println(k5 + "\t" + mv5p.get(k5) + "\t" + ((double)mv5p.get(k5) * 100 / sum));
+					statp.println(k5 + "\t" + ( mv3p.get(k5) + mv5p.get(k5)) + "\t" + ((double)(mv3p.get(k5) + mv5p.get(k5)) * 100 / sum));
 				}
 				//	
 				statp.println("total\t" + sum + "\n\n");
 			}
 			
+			/*
 			for(String mKey : stat3p.keySet()){
 				HashMap<String, Integer> mv3p = stat3p.get(mKey);
 				statp.println(mKey + " 3p");
@@ -375,6 +422,7 @@ public class CheckRepeat {
 				//	
 				statp.println("total\t" + sum + "\n\n");
 			}
+			*/
 			statp.close();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -446,16 +494,16 @@ public class CheckRepeat {
 		HashMap<String, HashMap<String, Integer>> stat3p = new HashMap<String, HashMap<String, Integer>>();
 		
 		for(ScoredPosition p : parser.getPositions()){
-			String key5 = p.getContig() + "\t" + p.getThreePposition();
-			String key3 = p.getContig() + "\t" + p.getFivePposition();
+			String key5 = p.getContig() + "\t" + p.getThreePPosition();
+			String key3 = p.getContig() + "\t" + p.getFivePPosition();
 			String v5 = repeat5pMap.get(key5);
 			String v3 = repeat3pMap.get(key3);
 			int[] p5 = originEnd5pMap.get(key5);
 			int[] p3 = originEnd3pMap.get(key3);
 			
 			p1.println(p + "\t" + (v5 == null? "_" : v5) +  "\t" + (v3 == null? "_" : v3) 
-					+ "\t" + (p5 == null? "" : p5[0] - p.getThreePposition()) + "\t" + (p5 == null? "" : p5[1] - p.getThreePposition())
-					+ "\t" + (p3 == null? "" : p3[0] - p.getFivePposition()) + "\t" + (p3 == null? "" : p3[1] - p.getFivePposition()));
+					+ "\t" + (p5 == null? "" : p5[0] - p.getThreePPosition()) + "\t" + (p5 == null? "" : p5[1] - p.getThreePPosition())
+					+ "\t" + (p3 == null? "" : p3[0] - p.getFivePPosition()) + "\t" + (p3 == null? "" : p3[1] - p.getFivePPosition()));
 			
 			String mKey = "";
 			

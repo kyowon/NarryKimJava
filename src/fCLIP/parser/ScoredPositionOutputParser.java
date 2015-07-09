@@ -1,5 +1,10 @@
 package fCLIP.parser;
 
+import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SAMRecordIterator;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -12,16 +17,17 @@ import java.util.Random;
 import java.util.Set;
 import java.util.zip.Deflater;
 
+import launcher.RNAcofoldLauncher;
 import launcher.RNAfoldLauncher;
 import launcher.ShellLauncher;
-import net.sf.samtools.util.BufferedLineReader;
 import parser.AnnotationFileParser;
 import parser.AnnotationFileParser.AnnotatedGene;
+import parser.MirGff3FileParser.MiRNA;
 import parser.Bed12Parser;
+import parser.BufferedLineReader;
 import parser.MafParser;
 import parser.ZeroBasedFastaParser;
 import fCLIP.Classifier;
-import fCLIP.MirGff3FileParser.MiRNA;
 import fCLIP.FCLIP_Scorer;
 
 public class ScoredPositionOutputParser {
@@ -46,6 +52,7 @@ public class ScoredPositionOutputParser {
 		private int leftPaired;
 		private int rightPaired;
 		private int overHang;
+		private int preLength;
 		private String seq;
 		private ArrayList<String> miRNAs = null;
 		private ArrayList<String> containingGeneAccessions;
@@ -64,8 +71,15 @@ public class ScoredPositionOutputParser {
 		private double structureEntropy = 0;
 		private double hetero = 0;
 		private String misc = "";
+		private boolean isRepeat3p = false;
+	
+
+		private boolean isRepeat5p = false;
 		
+		static int rmsk3pHeaderColumnNumber = -1;
+		static int rmsk5pHeaderColumnNumber = -1;
 		
+			
 		public static ScoredPosition get3p5pSwappedPosition(ScoredPosition p, int flankingNTNumber){
 			ScoredPosition sp = new ScoredPosition();
 			sp.contig = p.contig;
@@ -85,7 +99,7 @@ public class ScoredPositionOutputParser {
 				seqw = s + seqw;
 			}
 			sp.seq = seqw;
-			RNAfoldLauncher fold = new RNAfoldLauncher(seqw, flankingNTNumber);
+			RNAcofoldLauncher fold = new RNAcofoldLauncher(seqw, flankingNTNumber);
 			sp.set(fold);		
 			sp.miRNAs = p.miRNAs;
 			sp.containingGeneAccessions = p.containingGeneAccessions;
@@ -105,15 +119,23 @@ public class ScoredPositionOutputParser {
 		//private double readLengthVariance = -1;
 		
 		public static String getHeader(){
-			return "Contig\tStrand\t5p\t3p\tPaired\tClass\tPredictionScore\t5p5preads\t5p3preads\t3p5preads\t3p3preads\tMatching miRNAs\tBlatHits\tAccession\tGeneName\tGenomicRegion5p\tGenomicRegion3p\tDistFromExon5p\tDistFromExon3p\t5pSocre\t3pScore\tDepth\tEnergy\tHairpinNum\tLeftPaired\tRightPaired\tOverhang\tSeqEntropy\tStructureEntropy\tHetero\tSeq";
+			return "Contig\t5p\t3p\tStrand\tPreLength\tPaired\tClass\tPredictionScore\t5p5preads\t5p3preads\t3p5preads\t3p3preads\tMatching miRNAs\tBlatHits\tAccession\tGeneName\tGenomicRegion5p\tGenomicRegion3p\tDistFromExon5p\tDistFromExon3p\t5pSocre\t3pScore\tDepth\tEnergy\tHairpinNum\tLeftPaired\tRightPaired\tOverhang\tSeqEntropy\tStructureEntropy\tHetero\tSeq";
 		}
 		
 		public ArrayList<String> getContainingGeneAccessions() {
-			return containingGeneAccessions;
+			return containingGeneAccessions == null? new ArrayList<String>() : containingGeneAccessions;
 		}
 
 		public ArrayList<String> getContainingGeneNames() {
 			return containingGeneNames;
+		}
+		
+		public boolean isRepeat3p() {
+			return isRepeat3p;
+		}
+
+		public boolean isRepeat5p() {
+			return isRepeat5p;
 		}
 		
 		public double getSeqEntropy(){
@@ -124,11 +146,11 @@ public class ScoredPositionOutputParser {
 			return structureEntropy;
 		}
 		
-		public int getFivePposition() {
+		public int getFivePPosition() {
 			return fivePposition;
 		}
 
-		public int getThreePposition() {
+		public int getThreePPosition() {
 			return threePposition;
 		}
 
@@ -138,6 +160,10 @@ public class ScoredPositionOutputParser {
 				
 		public int getOverHang(){
 			return overHang;
+		}
+		
+		public int getPreLength(){
+			return preLength;
 		}
 		
 		public ArrayList<String> getGenomicRegions5p(){
@@ -204,6 +230,10 @@ public class ScoredPositionOutputParser {
 		public int getBlatHits(){
 			return blatHits;
 		}
+		
+		public String getMiscInfo(){
+			return misc;
+		}
 		//public int getReadCount(){
 		//	return readCount;
 		//}
@@ -211,14 +241,16 @@ public class ScoredPositionOutputParser {
 			
 		}
 		
+		
+		
 		public ScoredPosition(String s){
 			String[] token = s.split("\t");
 			int i = 0;
 			this.contig = token[i++];
-			this.isPlusStrand = token[i++].equals("+");
 			this.threePposition = Integer.parseInt(token[i++]);
 			this.fivePposition = Integer.parseInt(token[i++]);
-		
+			this.isPlusStrand = token[i++].equals("+");
+			this.preLength = Integer.parseInt(token[i++]);			
 			i++;
 			this.classification = token[i++];
 			this.predictionScore = Double.parseDouble(token[i++]);
@@ -341,6 +373,14 @@ public class ScoredPositionOutputParser {
 			for(;i<token.length;i++){
 				this.misc += token[i] + (i<token.length-1 ? "\t" : "");
 			}
+			
+			if(rmsk3pHeaderColumnNumber> 0){
+				this.isRepeat3p = !token[rmsk3pHeaderColumnNumber].equals("_");
+			}
+			
+			if(rmsk5pHeaderColumnNumber> 0){
+				this.isRepeat5p = !token[rmsk5pHeaderColumnNumber].equals("_");
+			}
 		}
 		
 		public static void writeStringArray(StringBuilder sb, ArrayList<?> array, String emptyCharacter){
@@ -390,7 +430,7 @@ public class ScoredPositionOutputParser {
 		}
 		*/
 		private String getMafString(MafParser mafParser){
-			int length = seq.length() - 2 * FCLIP_Scorer.flankingNTNumber;
+			int length = seq.length() - 2 * FCLIP_Scorer.getFlankingNTNumber();
 			int position = this.threePposition;// > 0 ? this.threePposition 
 			if(position < 0 || this.fivePposition < 0) return null;
 			//		: this.fivePposition;// + (isPlusStrand? Scorer.flankingNTNumber - length : length - Scorer.flankingNTNumber);			
@@ -398,7 +438,7 @@ public class ScoredPositionOutputParser {
 		} 
 		
 		private String getSeedMafString(MafParser mafParser){
-			int length = Math.min(7, seq.length() - 2 * FCLIP_Scorer.flankingNTNumber);// ;
+			int length = Math.min(7, seq.length() - 2 * FCLIP_Scorer.getFlankingNTNumber());// ;
 			int position = this.threePposition;
 			if(position < 0 || this.fivePposition < 0) return null;
 					//: this.fivePposition;// + (isPlusStrand? Scorer.flankingNTNumber - length : length - Scorer.flankingNTNumber);			
@@ -409,9 +449,10 @@ public class ScoredPositionOutputParser {
 		public String toString(){
 			StringBuilder sb = new StringBuilder();
 			sb.append(contig); sb.append('\t');
-			sb.append(isPlusStrand? '+': '-'); sb.append('\t');
 			sb.append(threePposition); sb.append('\t');
 			sb.append(fivePposition); sb.append('\t');
+			sb.append(isPlusStrand? '+': '-'); sb.append('\t');
+			sb.append(preLength); sb.append('\t');
 			sb.append(isPaired() ? "T" : "F" ); sb.append('\t');
 			sb.append(classification); sb.append('\t');
 			sb.append(predictionScore); sb.append('\t');
@@ -450,7 +491,7 @@ public class ScoredPositionOutputParser {
 			sb.append(seqEntropy); sb.append('\t');
 			sb.append(structureEntropy); sb.append('\t');
 			sb.append(hetero); sb.append('\t');
-			sb.append(getCleavedSequence(seq, FCLIP_Scorer.flankingNTNumber));
+			sb.append(getCleavedSequence(seq, FCLIP_Scorer.getFlankingNTNumber()));
 			
 			if(!misc.isEmpty()){
 				sb.append('\t');
@@ -464,10 +505,10 @@ public class ScoredPositionOutputParser {
 		public String toSimpleString(){
 			StringBuilder sb = new StringBuilder();
 			sb.append(contig); sb.append('\t');
-			sb.append(isPlusStrand? '+': '-'); sb.append('\t');
 			sb.append(threePposition); sb.append('\t');
 			sb.append(fivePposition); sb.append('\t');
-			
+			sb.append(isPlusStrand? '+': '-'); sb.append('\t');
+			sb.append(preLength); sb.append('\t');
 			sb.append(threePreads == null? '_' : threePreads[0]); sb.append('\t');
 			sb.append(threePreads == null? '_' : threePreads[1]); sb.append('\t');
 			
@@ -490,15 +531,15 @@ public class ScoredPositionOutputParser {
 		}
 		
 		
-		static ScoredPosition getScoredPositionForScoredPair(String s){
+		static ScoredPosition getScoredPositionForScoredPair(String s){ 
 			ScoredPosition p = new ScoredPosition();
 			String[] token = s.split("\t");
 			int i = 0;
 			p.contig = token[i++];
-			p.isPlusStrand = token[i++].equals("+");
 			p.threePposition = Integer.parseInt(token[i++]);
 			p.fivePposition = Integer.parseInt(token[i++]);
-		
+			p.isPlusStrand = token[i++].equals("+");
+			p.preLength =  Integer.parseInt(token[i++]);
 			p.threePreads = new int[2];
 			p.threePreads[0] = Integer.parseInt(token[i++]);
 			p.threePreads[1] = Integer.parseInt(token[i++]);
@@ -604,6 +645,7 @@ public class ScoredPositionOutputParser {
 			this.threePposition = threePposition;
 			this.fivePScore = fivePscore;
 			this.threePScore = threePscore;
+			this.preLength = Math.abs(fivePposition - threePposition) + 1;
 			setGeneInfo(annotationParser);
 					
 		}
@@ -672,7 +714,7 @@ public class ScoredPositionOutputParser {
 			return this;
 		}
 		
-		public ScoredPosition set(RNAfoldLauncher fold){
+		public ScoredPosition set(RNAcofoldLauncher fold){
 			depth = fold.getDepth();
 			energy = fold.getEnergyPerNT();
 			hairpinNum = fold.getNumberOfHairPins();
@@ -733,12 +775,14 @@ public class ScoredPositionOutputParser {
 		
 		public ScoredPosition setFivePposition(int i, AnnotationFileParser annotationParser) {
 			fivePposition = i;
+			this.preLength = Math.abs(fivePposition - threePposition) + 1;
 			setGeneInfo(annotationParser);
 			return this;
 		}
 
 		public ScoredPosition setThreePposition(int i, AnnotationFileParser annotationParser) {
 			threePposition = i;
+			this.preLength = Math.abs(fivePposition - threePposition) + 1;
 			setGeneInfo(annotationParser);
 			return this;
 		}
@@ -831,11 +875,19 @@ public class ScoredPositionOutputParser {
 	private void read(String outFile){
 		positionMap = new HashMap<String, ArrayList<ScoredPosition>>();
 		try {
-			BufferedLineReader in  = new BufferedLineReader(new FileInputStream(outFile));
+			BufferedLineReader in  = new BufferedLineReader((outFile));
 			String s;
 			while((s=in.readLine())!=null){
 				if(s.startsWith("Contig")){
 					header = s;
+					String[] token = header.split("\t");
+					for(int i=0;i<token.length;i++){
+						if(token[i].equals("5p rmsk")) ScoredPosition.rmsk3pHeaderColumnNumber = i;
+						if(token[i].equals("3p rmsk")) ScoredPosition.rmsk5pHeaderColumnNumber = i;
+					}					
+					//rmsk3pHeaderColumnNumber
+					
+					
 					continue;
 				}
 				ScoredPosition position = new ScoredPosition(s);				
@@ -844,7 +896,7 @@ public class ScoredPositionOutputParser {
 				positionMap.get(position.getContig()).add(position);
 			}
 			in.close();
-		} catch (FileNotFoundException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}	
 	}
@@ -926,19 +978,19 @@ public class ScoredPositionOutputParser {
 				int r5 = region5p == null? 0 : (region5p.endsWith("Intron")? 1 : 2);
 				
 				
-				String fk =  sp.getContig() + sp.getThreePposition() + strandChar;
+				String fk =  sp.getContig() + sp.getThreePPosition() + strandChar;
 				if(!fstrs.contains(fk)){
-					String fstring = sp.getContig() + "\t" + Math.max(0, (sp.getThreePposition()-1+off)) + "\t" + 
-							Math.max(2,(sp.getThreePposition()+1+off)) + "\t" + sp.getThreePposition() +"\t1\t" + strandChar + "\t" + r3;
+					String fstring = sp.getContig() + "\t" + Math.max(0, (sp.getThreePPosition()-1+off)) + "\t" + 
+							Math.max(2,(sp.getThreePPosition()+1+off)) + "\t" + sp.getThreePPosition() +"\t1\t" + strandChar + "\t" + r3;
 					out5p.println(fstring);
 					fstrs.add(fk);
 				}
 				off = sp.isPlusStrand? 1 : 0;
 				
-				String tk =  sp.getContig() + sp.getFivePposition() + strandChar;
+				String tk =  sp.getContig() + sp.getFivePPosition() + strandChar;
 				if(!tstrs.contains(tk)){
-					String tstring = sp.getContig() + "\t" + Math.max(0, (sp.getFivePposition()-1+off)) + "\t" +
-							Math.max(2, (sp.getFivePposition()+1+off)) + "\t" + sp.getFivePposition() + "\t1\t" + strandChar + "\t" + r5;
+					String tstring = sp.getContig() + "\t" + Math.max(0, (sp.getFivePPosition()-1+off)) + "\t" +
+							Math.max(2, (sp.getFivePPosition()+1+off)) + "\t" + sp.getFivePPosition() + "\t1\t" + strandChar + "\t" + r5;
 					out3p.println(tstring);
 					tstrs.add(tk);
 				}
@@ -948,8 +1000,8 @@ public class ScoredPositionOutputParser {
 			out5p.close();
 			out3p.close();
 			
-			ShellLauncher.run("sort -V " + bed5p+".tmp >" + bed5p);
-			ShellLauncher.run("sort -V " + bed3p+".tmp >" + bed3p);
+			ShellLauncher.run("sort -k1,1 -k2,2n " + bed5p+".tmp >" + bed5p);
+			ShellLauncher.run("sort -k1,1 -k2,2n " + bed3p+".tmp >" + bed3p);
 			new File(bed5p+".tmp").delete();
 			new File(bed3p+".tmp").delete();
 			
@@ -1039,15 +1091,18 @@ public class ScoredPositionOutputParser {
 			HashSet<String> tseqs = new HashSet<String>();
 			for(ScoredPosition sp : parser.getPositions()){
 				if(sp.miRNAs != null && !sp.miRNAs.isEmpty()) continue;
+				//if(sp.miRNAs == null || sp.miRNAs.isEmpty()) continue;
+				
 				if(!sp.isPaired() || !sp.getClassification().equals(classification)) continue;
 				//else
+				//System.out.println(sp);
 				//	continue;
-				//if(sp.getOverHang() != 2) continue;
+				if(sp.getOverHang() != 2) continue;
 				//if(sp.getClassification().equals("M") && sp.getFivePScore() > threshold && sp.getThreePScore() > threshold)//  
 				{
-					String seq = ScoredPosition.getCleavedSequence(sp.getSeq(), FCLIP_Scorer.flankingNTNumber);
+					String seq = ScoredPosition.getCleavedSequence(sp.getSeq(), FCLIP_Scorer.getFlankingNTNumber());
 					String fseq = seq.substring(0, seq.indexOf(' '));
-				
+					//System.out.println(fseq);
 					if(!fseqs.contains(fseq)){
 						fseqs.add(fseq);
 						out5p.println(">"+ i);
@@ -1058,7 +1113,7 @@ public class ScoredPositionOutputParser {
 				
 				//if(sp.getClassification().equals("M") && sp.getFivePScore() > threshold && sp.getThreePScore() > threshold)//  && sp.getFivePScore() > 0.45
 				{
-					String seq = ScoredPosition.getCleavedSequence(sp.getSeq(), FCLIP_Scorer.flankingNTNumber);
+					String seq = ScoredPosition.getCleavedSequence(sp.getSeq(), FCLIP_Scorer.getFlankingNTNumber());
 					String tseq = seq.substring(seq.lastIndexOf(' ') + 1);
 					if(!tseqs.contains(tseq)){
 						tseqs.add(tseq);
@@ -1083,7 +1138,7 @@ public class ScoredPositionOutputParser {
 			PrintStream out = new PrintStream(outFile);
 			out.println(ScoredPosition.getHeader());
 			for(ScoredPosition sp : parser.getPositions()){
-				RNAfoldLauncher fold = new RNAfoldLauncher(sp.seq, FCLIP_Scorer.flankingNTNumber);
+				RNAfoldLauncher fold = new RNAfoldLauncher(sp.seq, FCLIP_Scorer.getFlankingNTNumber());
 				if(!fold.isFeasibleFold()) continue;
 				classifier.setClassification(sp);
 				
@@ -1095,7 +1150,49 @@ public class ScoredPositionOutputParser {
 		}	
 	}
 	
-//	static public void main(String[] args){
+	static public void intersectWithBam(String csvOut, String csv, String bamfile, boolean contained){
+		SamReader reader = SamReaderFactory.makeDefault().open(new File(bamfile));
+		ScoredPositionOutputParser parser = new ScoredPositionOutputParser(csv);		
+		
+		try {	
+			PrintStream out = new PrintStream(csvOut);
+			out.println(parser.getHeader()+"\t" + new File(bamfile).getName() + (contained? "_containedReads":"_overlappingReads"));
+			for(ScoredPosition p :parser.getPositions()){
+				int p1 = p.getFivePPosition();
+				int p2 = p.getThreePPosition();
+				if(p1 > p2){
+					int t = p1;
+					p1 = p2;
+					p2 = t;
+				}
+				if(p1<0){
+					p1 = p2 - FCLIP_Scorer.getMinReadDiff();
+				}
+				
+				SAMRecordIterator iterator = reader.query(p.getContig(), p1+1, p2+1, contained);
+				int n = 0;
+				try{
+				while(iterator.hasNext()){
+					SAMRecord r = iterator.next();
+					n++;
+				}
+				}finally{
+					iterator.close();
+				}
+				out.println(p+"\t"+n);
+				
+			}
+			out.close();	
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	
+	static public void main(String[] args){
+		ScoredPositionOutputParser.intersectWithBam("/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/cis/merged.complete.agodicerIntersected.csv", "/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/cis/merged.complete.agoIntersected.csv", "/media/kyowon/Data1/fCLIP/Data/Dicer_PAR-CLIP_Aligned_Sorted.bam", true);
+	}
 	//	ScoredPositionOutputParser.reClassify("/media/kyowon/Data1/Dropbox/fCLIP/new/h19x2.csv", "/media/kyowon/Data1/Dropbox/fCLIP/new/h19x2n.csv", "/media/kyowon/Data1/Dropbox/fCLIP/new/h19x2.train.arff");
 		
 	//	ScoringOutputParser.generateBedFromCsv("/media/kyowon/Data1/Dropbox/h19x2.sorted.out.csv", 
