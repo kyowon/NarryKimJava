@@ -30,12 +30,15 @@ public class OffsetCalibrator { // just recalibrate precursor mz
 			MSGFPlusPSM psm = allPSMs.get(i);
 			if(psm.getQvalue() > qvalueThreshold) continue;
 			hqPSMIndices.add(i);
-			if(psm.getPrecursorErr() > tolerance.getToleranceAsPPM(psm.getCharge() * psm.getPrecursor())) continue;
+			//if(psm.getPrecursorErr() > tolerance.getToleranceAsDa(psm.getCharge() * psm.getPrecursor())) continue;
 			n++;
 		}
 		System.out.println("Qualified psms before calibration : " + n);
+		if(n < 5) return;
 		calculateOffsets();
+		System.out.println("Calculating offsets done");
 		updatePrecursorMzs();
+		System.out.println("Precursor recalibration done");
 	}
 	
 	private void calculateOffsets(){
@@ -53,11 +56,11 @@ public class OffsetCalibrator { // just recalibrate precursor mz
 			//if(i>0 && x[i] == preMax) x[i] = x[i-1] + .00001;
 			y[i] = c.getPrecursorErr();
 		}
-		LoessInterpolator interpolator = new LoessInterpolator(.05, 10);
+		LoessInterpolator interpolator = new LoessInterpolator(.1, 10);
 		double[] z = interpolator.smooth(x, y);
 		for(int i=0;i<x.length;i++){
-			//System.out.println(x[i]);
-			offsetMap.put((int)x[i], z[i]);
+			//System.out.println(x[i] +  " " + y[i] + " " + z[i] );
+			offsetMap.put((int)x[i], Double.isNaN(z[i]) ? y[i] : z[i]);
 		}
 		
 		
@@ -70,6 +73,7 @@ public class OffsetCalibrator { // just recalibrate precursor mz
 		int currentIndex = 0;
 		
 		for(int i=0;i<allPSMs.size();i++){
+			//System.out.println(i + " " + allPSMs.size());
 			MSGFPlusPSM psm = allPSMs.get(i);
 			CurveFitter<Parametric> fitter = new CurveFitter<Parametric>(new LevenbergMarquardtOptimizer());
 			if(currentIndex < hqPSMIndices.size() && i > hqPSMIndices.get(currentIndex)) currentIndex ++;
@@ -88,15 +92,17 @@ public class OffsetCalibrator { // just recalibrate precursor mz
 					c = hqPSMIndices.get(k);
 				}
 				//System.out.println(c + " " + offsetMap.get(allPSMs.get(c).getScanNumber()));
+				//System.out.println(n++);
 				fitter.addObservedPoint(allPSMs.get(c).getScanNumber(), offsetMap.get(allPSMs.get(c).getScanNumber()));
 			}
-		
+			//System.out.println("hh");
 			coeff = fitter.fit(new PolynomialFunction.Parametric(), new double[coeff.length]);
+			//System.out.println(coeff[0] + " " + coeff[1]);
 			PolynomialFunction fitted = new PolynomialFunction(coeff);
 			
 			double offset = fitted.value(psm.getScanNumber());
 			psm.setRecalibratedPrecursor((float) (psm.getPrecursor() - offset));
-			if(Math.abs(psm.getRecalibratedPrecursorErr()) > tolerance.getToleranceAsPPM(psm.getPrecursor() * psm.getCharge())) continue;
+			if(Math.abs(psm.getRecalibratedPrecursorErr()) > tolerance.getToleranceAsDa(psm.getPrecursor() * psm.getCharge())) continue;
 			filteredPSMs.add(psm);
 		}
 	}

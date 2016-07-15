@@ -20,6 +20,7 @@ public class FCLIP_ScorerTrainer {
 	private int rightWindowSize = 60;
 	private int maxDepthThreshold = 1;
 	//private int coverageThreshold = 1;
+	static private boolean ignoreDepth = false;
 	
 	private ArrayList<double[]> signal3p = null;
 	private ArrayList<double[]> noise3p = null;
@@ -141,12 +142,12 @@ public class FCLIP_ScorerTrainer {
 			cov5p = bedParser.get5pCoverages(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p));
 			double[] _cov3p = bedParser.get3pCoverages(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p));
 			
-			double[] dep5p = bedParser.get5pSignalForfCLIP(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p));
+			double[] dep5p = bedParser.get5pSignalForfCLIP(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p), ignoreDepth);
 					
 			cov3p = bedParser.get3pCoverages(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, maxOffset3p));
 			double[] _cov5p = bedParser.get5pCoverages(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, maxOffset3p));
 			
-			double[] dep3p = bedParser.get3pSignalForfCLIP(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, maxOffset3p));
+			double[] dep3p = bedParser.get3pSignalForfCLIP(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize, maxOffset3p), ignoreDepth);
 			
 			boolean recorded = false;
 			if(Scorer.max(cov5p) + Scorer.max(_cov3p) >= maxDepthThreshold){
@@ -182,7 +183,7 @@ public class FCLIP_ScorerTrainer {
 				
 				//noiseCov5p = bedCov5PFileParser.getCoverages(mi.getContig(), pos5p + offset + getMaxCenterOffset(noiseCov5p), leftWindowSize, rightWindowSize, isPlusStrand);
 				if(Scorer.max(noiseCov5p)  + Scorer.max(_noiseCov3p) >= maxDepthThreshold){	
-					double[] noiseDep5p = bedParser.get5pSignalForfCLIP(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p + offset));
+					double[] noiseDep5p = bedParser.get5pSignalForfCLIP(isPlusStrand, mi.get3pCoordinate(leftWindowSize, rightWindowSize, maxOffset5p + offset), ignoreDepth);
 					Scorer.normalize(noiseDep5p, (new Random().nextDouble() - .5) * valoffset);
 					//noiseDep5p = MC.multiply(noiseDep5p, 0.5);
 					noise5p.add(noiseDep5p);
@@ -194,7 +195,7 @@ public class FCLIP_ScorerTrainer {
 				//noiseCov3p = invert(noiseCov3p);
 				//noiseCov3p = bedCov5PFileParser.getCoverages(mi.getContig(), pos3p + offset + getMaxCenterOffset(noiseCov3p), leftWindowSize, rightWindowSize, !isPlusStrand);
 				if(Scorer.max(noiseCov3p) + Scorer.max(_noiseCov5p) >= maxDepthThreshold){	
-					double[] noiseDep3p = bedParser.get3pSignalForfCLIP(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize,maxOffset3p + offset));
+					double[] noiseDep3p = bedParser.get3pSignalForfCLIP(isPlusStrand, mi.get5pCoordinate(rightWindowSize, leftWindowSize,maxOffset3p + offset), ignoreDepth);
 					Scorer.normalize(noiseDep3p, (new Random().nextDouble() - .5) * valoffset);
 					//noiseDep3p = MC.multiply(noiseDep3p, 0.5);
 					noise3p.add(noiseDep3p);
@@ -209,7 +210,7 @@ public class FCLIP_ScorerTrainer {
 	private void write(String outParamFile){
 		try {
 			PrintStream out = new PrintStream(outParamFile);
-			
+			out.println("#IGNOREDEPTH\t"+(ignoreDepth?1:0));
 			out.println("#LEFT\t"+leftWindowSize);
 			out.println("#RIGHT\t"+rightWindowSize);
 			out.println("#MAXDEPTHTHRESHOLD\t"+maxDepthThreshold);
@@ -285,9 +286,11 @@ public class FCLIP_ScorerTrainer {
 			mirParser = new MirGff3FileParser(args[2]);
 			annotationParser = new AnnotationFileParser(args[3]);
 			outParam = args[0];
-			leftWindow = Integer.parseInt(args[4]);;
-			rightWindow = Integer.parseInt(args[5]);;
-			numNonzero = Integer.parseInt(args[6]);;
+			leftWindow = Integer.parseInt(args[4]);
+			rightWindow = Integer.parseInt(args[5]);
+			numNonzero = Integer.parseInt(args[6]);
+			if(args.length>7)
+				ignoreDepth = args[7].equals("1");
 		}else{
 			bed = "/media/kyowon/Data1/fCLIP/samples/sample4/bed/merged.se.bed";
 			mirParser = new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa_hg38.gff3");

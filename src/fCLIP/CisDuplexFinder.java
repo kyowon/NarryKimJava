@@ -75,7 +75,7 @@ public class CisDuplexFinder {
 			int flankingLength = Integer.parseInt(args[10]);
 			int minpre = Integer.parseInt(args[11]);
 			int maxpre = Integer.parseInt(args[12]);
-			RNAcofoldLauncher.setSeqLength(minpre);
+			RNAcofoldLauncher.setSeqLength(maxpre);
 			
 			FCLIP_Scorer.setFlankingNTNumber(flankingLength);
 			FCLIP_Scorer.setMaxReadDiff(maxpre);
@@ -88,7 +88,7 @@ public class CisDuplexFinder {
 				ArrayList<Thread> threads = new ArrayList<Thread>();
 				
 				for(String contig : fastaParser.getContigs()){
-					//if(!contig.equals("chr17")) continue; // TODO remove
+					//if(!contig.equals("chr16")) continue; // TODO remove
 					if(contig.length() > 5 || contig.equals("chrM")) continue;
 					for(int i=0;i<2;i++){
 						String t = outFileName + contig + i;

@@ -11,25 +11,25 @@ import fCLIP.parser.ScoredPositionOutputParser.ScoredPosition;
 public class CheckList {
 
 	public static void main(String[] args) {
-		String cis = "/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/cis/merged.beforeBlatCsv";
-		String trans = "/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/trans/merged.trans.complete.M.csv";
+		String cis = "/media/kyowon/Data1/fCLIP/samples/sample12_293TH/results/lists/cis/293T.csv.rmsk";//
+		//"/media/kyowon/Data1/fCLIP/samples/sample13_HelaH/results/lists/cis/Hela.csv.rmsk";
+		String trans = "/media/kyowon/Data1/fCLIP/samples/sample8/results/lists/trans/bamMerged.trans.complete.M.csv";
 		int numMiRNAs = 0; //
 		int novelCis = 0; //
 		int novelTrans = 0; //
 		int cisOverhang2 = 0; //
 		int numAlu = 0;
-		double transThreshold = 0.0;
+		double transThreshold = 0.4;
 		double predictionThreshold = .7;
 		
 		int transOverhang2 = 0; //
 		ArrayList<ScoredPosition> snoRNAs = new ArrayList<ScoredPosition>();//
 		ArrayList<ScoredPosition> rRNAs = new ArrayList<ScoredPosition>();//
-		String[] cisKnownGenes = {"AURKB", "STAT6", "MIR17HG", "SH2B1", "SPHK", "ANKS6", "DROSHA", "CBX6"};//
+		String[] cisKnownGenes = {"AURKB", "STAT6", "MIR17HG", "SH2B1", "SPHK", "ANKS6", "DROSHA", "CBX6", "OTUD5"};//
 		String[] transKnownGenes = {"CERS5", "SCAF4", "CBX6", "ACSL3", "PCBP2", "SPECC1L", "MAPK8IP3", "KNTC1", "TRAPPC3", "IRF3", "DROSHA"};//		
 		
 		HashSet<String> cisExpGenes = new HashSet<String>();
-		HashSet<String> transExpGenes = new HashSet<String>();
-		
+		HashSet<String> transExpGenes = new HashSet<String>();		
 		
 		ScoredPositionOutputParser cisParser = new ScoredPositionOutputParser(cis);
 		for(ScoredPosition sp : cisParser.getPositions()){

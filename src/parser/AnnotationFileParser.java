@@ -1,8 +1,5 @@
 package parser;
 
-import htsjdk.samtools.util.Interval;
-
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -38,14 +35,22 @@ public class AnnotationFileParser {
 		private boolean isPlusStrand;
 		private int txStart;
 		private int txEnd;
-		private int cdsStart;
-		private int cdsEnd;
+		private int cdsStart; // 0 based
+		private int cdsEnd; // exclusive, smaller than cdsStart
 		private int exonCount;		
-		private int[] exonStarts;
-		private int[] exonEnds;
+		private int[] exonStarts; // 0 based check.. 
+		private int[] exonEnds; // exclusive 
 		private int[][] introns; // intron inclusive, increasing
 		private HashMap<Integer, Integer> fivepSplices = null;
 		private HashMap<Integer, Integer> threepSplices = null;
+		
+		public int getExonSize(){
+			int size = 0;
+			for(int i=0;i<exonCount;i++){
+				size += exonEnds[i] - exonStarts[i] + 1;
+			}
+			return size;
+		}
 		
 		public AnnotatedGene(String s){
 			String[] token = s.split("\t");
@@ -133,8 +138,16 @@ public class AnnotationFileParser {
 			return true;
 		}
 
-		public Integer getDistFromClosestExon(int position){ // 0 if within an exon strand matters 
-			if(exonCount==0) return null;		
+		public Integer getDistToNextExon(int position){ // 0 if within an exon strand matters 
+			for(int j=0; j<exonCount-1;j++){
+				if(position < exonStarts[j+1] && position >= exonEnds[j]){
+					if(isPlusStrand) return exonStarts[j+1] - position;
+					else return position - exonEnds[j] + 1;
+				}
+			}
+			return null;
+			/*
+			
 			for(int j=0; j<exonCount;j++){
 				if(position < exonStarts[j]){
 					int d1 = exonStarts[j] - position; 
@@ -150,13 +163,7 @@ public class AnnotationFileParser {
 			}
 			int d2 = position - exonEnds[exonCount-1] + 1;
 			if(!isPlusStrand) d2 = -d2;
-			//else d1 = -d1;
-			return d2;
-			//int d1 = position - exonStarts[exonCount-1];
-			//int d2 = exonEnds[exonCount-1] - position - 1;
-			//if(isPlusStrand) d2 = -d2;
-			//else d1 = -d1;
-			//return Math.abs(d1) < Math.abs(d2)? d1 : d2;
+			return d2;	*/		
 		}
 
 		private AnnotatedGene(int txStart, int txEnd){ // constructor for comparison
@@ -352,6 +359,7 @@ public class AnnotationFileParser {
 			return introns;
 		}
 		public boolean isAnnotated(int position){
+			if(this.cdsStart == this.cdsEnd) return false;
 			return isPlusStrand? position == this.cdsStart : position == this.cdsEnd - 1;
 		}
 		
@@ -470,7 +478,7 @@ public class AnnotationFileParser {
 //	public static AnnotatedGene getSudoAnnotatedGene(ScoredPosition position){
 //		return new AnnotationFileParser().new AnnotatedGene(position);
 //	}
-	public void toBED12(String bed){
+	public void toBED12File(String bed){
 		try {
 			PrintStream out = new PrintStream(bed);
 			Iterator<AnnotatedGene> iterator = getAnnotatedGeneIterator();
@@ -597,7 +605,7 @@ public class AnnotationFileParser {
 	    * @return the matching genes
 	    */
 	public ArrayList<AnnotatedGene> getMatchingGenes(String contig, boolean isPlusStrand, int position, ArrayList<Integer> coordinate){
-		ArrayList<AnnotatedGene> genes = getContainingGenes(contig, isPlusStrand, position);
+		ArrayList<AnnotatedGene> genes = getContainingGenes(contig, position);
 		return getMatchingGenes(genes, isPlusStrand, coordinate);
 	}
 	
@@ -617,11 +625,10 @@ public class AnnotationFileParser {
 	/**
 	    * Get the containing genes
 	    * @param contig the contig
-	    * @param isPlusStrand is plus strand?
 	    * @param position the genomic position
 	    * @return the containing genes
 	    */
-	public ArrayList<AnnotatedGene> getContainingGenes(String contig, boolean isPlusStrand, int position){
+	public ArrayList<AnnotatedGene> getContainingGenes(String contig, int position, Boolean isPlusStrand){
 		ArrayList<AnnotatedGene> ret = new ArrayList<AnnotationFileParser.AnnotatedGene>();
 		ArrayList<AnnotatedGene> genes = annotatedGeneSetMap.get(contig);
 		if(genes != null)// ret = null;
@@ -631,12 +638,19 @@ public class AnnotationFileParser {
 				Node<ArrayList<Integer>> is = it.next();
 				for(int i : is.getValue()){
 					AnnotatedGene gene = genes.get(i);
-					if(gene.isPlusStrand() == isPlusStrand)
-						ret.add(gene);
+					if(isPlusStrand!=null){
+						if(gene.isPlusStrand() == isPlusStrand)
+							ret.add(gene);
+					}else ret.add(gene);
+					
 				}
 			}
 		}
 		return ret.isEmpty()? null : ret;
+	}
+	
+	public ArrayList<AnnotatedGene> getContainingGenes(String contig, int position){
+		return getContainingGenes(contig, position, null);
 	}
 	
 	/**
@@ -662,8 +676,8 @@ public class AnnotationFileParser {
 				if(position >= gene.getCdsStart() && position < gene.getCdsEnd()){
 					name += "_ORF";			
 				}else{
-					if(isPlusStrand && position < gene.getCdsStart()) name += "_5_UTR";
-					else if(!isPlusStrand && position >= gene.getCdsEnd()) name += "_5_UTR";
+					if(gene.isPlusStrand && position < gene.getCdsStart()) name += "_5_UTR";
+					else if(!gene.isPlusStrand && position >= gene.getCdsEnd()) name += "_5_UTR";
 					else name += "_3_UTR";
 				}				
 			}
@@ -682,7 +696,7 @@ public class AnnotationFileParser {
 			
 			if(name.endsWith("_ORF") || name.endsWith("_UTR")){
 				Integer j = 0;
-				if(isPlusStrand){
+				if(gene.isPlusStrand){
 					int i = 0;
 					for(;i<gene.getExonCount()-1;i++){
 						if(position < gene.getExonEnds()[i]) break;
@@ -785,7 +799,7 @@ public class AnnotationFileParser {
 				sb.append(gene.getContig());sb.append('\t');
 				sb.append(gene.getTxStart());sb.append('\t');
 				sb.append(gene.getTxEnd());sb.append('\t');
-				sb.append(gene.getAccession());sb.append('\t');
+				sb.append(gene.getAccession());sb.append(';');sb.append(gene.getGeneName());sb.append('\t');
 				sb.append('0');sb.append('\t');
 				sb.append(gene.isPlusStrand()? '+' : '-');
 				out.println(sb.toString());
@@ -798,8 +812,9 @@ public class AnnotationFileParser {
 	
 
 	public static void main(String[] args){
-		AnnotationFileParser parser = new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt");
-		parser.toBED12("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.bed");
+		AnnotationFileParser parser = new AnnotationFileParser(args[0]);
+		parser.toBedFile(args[1]);
+		parser.toBED12File(args[2]);
 		//chr20;515643;515716
 		
 	}

@@ -35,7 +35,7 @@ public class MirGff3FileParser {
 		private int prifp;
 		private int pritp;
 		private Integer fivepPosition = null; // inclusive, pre position
-		private Integer threepPosition = null;
+		private Integer threepPosition = null;// inclusive, pre position
 		private boolean isPlusStrand;
 		//private int[][] pres;
 		public String getContig() {
@@ -241,7 +241,6 @@ public class MirGff3FileParser {
 			while((s=in.readLine())!=null){
 				if(s.startsWith("#")) continue;
 				String[] token = s.split("\t");
-				contig = token[0];
 				if(token[2].equals("miRNA_primary_transcript")){
 					if(c != null){
 						if(!miRNAMap.containsKey(contig)) miRNAMap.put(contig, new ArrayList<MiRNA>());
@@ -252,6 +251,7 @@ public class MirGff3FileParser {
 					c = s;
 					continue;
 				}
+				contig = token[0];				
 				c += "\n" + s;
 			}
 			if(c != null){
@@ -308,6 +308,17 @@ public class MirGff3FileParser {
 		return null;
 	}
 	
+	public MiRNA getMiRNA(String contig, String name){ // very slow..
+		ArrayList<MiRNA> allmiRNAs = miRNAMap.get(contig);
+		if(allmiRNAs != null){
+			for(MiRNA mr : allmiRNAs){
+				if(mr.name.equals(name)) return mr;
+			}
+		}
+		return null;
+	}
+	
+	
 	public Iterator<MiRNA> getMiRNAIterator(){
 		ArrayList<MiRNA> allmiRNAs = new ArrayList<MiRNA>();
 		
@@ -320,10 +331,7 @@ public class MirGff3FileParser {
 	}
 	
 	
-	public static void main(String[] args){
-		new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa_hg38.gff3");
-	}
-	
+
 	/**
 	    * Get the containing miRNA
 	    * @param contig the contig
@@ -331,12 +339,12 @@ public class MirGff3FileParser {
 	    * @param position the tx start position
 	    * @return the containing miRNA
 	    */
-	public ArrayList<MiRNA> getContainingMiRNAs(String contig, boolean isPlusStrand, int position){
+	public ArrayList<MiRNA> getContainingMiRNAs(String contig, boolean isPlusStrand, int position, int margin){
 		ArrayList<MiRNA> ret = new ArrayList<MiRNA>();
 		ArrayList<MiRNA> miRNAs = miRNAMap.get(contig);
 		if(miRNAs != null)// ret = null;
 		{
-			Iterator<Node<ArrayList<Integer>>> it = miRNAIntervalMap.get(contig).overlappers(position, position);
+			Iterator<Node<ArrayList<Integer>>> it = miRNAIntervalMap.get(contig).overlappers(position-margin, position+margin);
 			while(it.hasNext()){
 				Node<ArrayList<Integer>> is = it.next();
 				for(int i : is.getValue()){
@@ -349,6 +357,109 @@ public class MirGff3FileParser {
 		return ret.isEmpty()? null : ret;
 	}
 
+	public void correctAnnotationUsignMirGeneDB(String file){
+		HashMap<String, HashMap<String, String>> miRNAsInMDB = new HashMap<String, HashMap<String,String>>();
+		//HashSet<String> miRNANamesInMDB = new HashSet<String>();
+		try {
+			BufferedLineReader in = new BufferedLineReader(file);
+			String s;
+			while((s=in.readLine())!=null){
+				String[] token = s.split("\t");
+				String name = token[1].trim();
+				//miRNANamesInMDB.add(name);
+				String contig = token[5].trim();
+				int l = Integer.parseInt(token[6].trim());
+				int r = Integer.parseInt(token[7].trim());
+				boolean isPlusStrand = token[8].trim().equals("+");
+				int fp = isPlusStrand? l : r;
+				int tp = isPlusStrand? r : l;
+				if(!miRNAsInMDB.containsKey(contig)) miRNAsInMDB.put(contig, new HashMap<String, String>());
+				miRNAsInMDB.get(contig).put(name,fp + "\t" + tp);						
+			}
+			in.close();
+			
+			for(String contig : miRNAsInMDB.keySet()){
+				ArrayList<MiRNA> miRNAs = miRNAMap.get(contig);
+				ArrayList<MiRNA> filteredmiRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
+				HashMap<String, String> mirRNAsInMDBsub = miRNAsInMDB.get(contig);
+				for(MiRNA m : miRNAs){
+					if(mirRNAsInMDBsub.containsKey(m.getName())){
+						String mm = mirRNAsInMDBsub.get(m.getName());
+						String[] tt = mm.split("\t");
+						m.fivepPosition = Integer.parseInt(tt[0])-1;
+						m.threepPosition = Integer.parseInt(tt[1])-1;
+						filteredmiRNAs.add(m);
+					}
+				}
+				miRNAMap.put(contig, filteredmiRNAs);				
+			}			
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
+	
+	
+	
+	public static void main(String[] args) throws IOException{
+		MirGff3FileParser mirParser = new MirGff3FileParser("/media/kyowon/Data1/fCLIP/genomes/hsa_hg38.gff3");
+		
+		Iterator<MiRNA> mirit = mirParser.getMiRNAIterator();
+		int i = 0;
+		int j = 0;
+		while(mirit.hasNext()){
+			MiRNA mirna = mirit.next();
+			i++;
+			if(mirna.get3p() == null || mirna.get5p() == null) j++;
+		}
+		
+		System.out.println(i + " " + j);
+		/*String csv = "/media/kyowon/Data1/fCLIP/samples/sample8/results/lists/cis/bamMerged.completeNoverlapped.csv";
+		PrintStream outCsv = new PrintStream(csv+"modified.csv");
+		ScoredPositionOutputParser sparser = new ScoredPositionOutputParser(csv);
+		int mirBaseSearchMargin = 5;
+		outCsv.println(sparser.getHeader());
+		for(ScoredPosition sp : sparser.getPositions()){
+			ArrayList<MiRNA> miRNAs = null;
+			boolean isPlusStrand = sp.isPlusStrand();
+			if(sp.is5pScored()){
+				miRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
+				ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(sp.getContig(), isPlusStrand, sp.getFivePPosition(),mirBaseSearchMargin);
+				if(matched != null) miRNAs.addAll(matched);
+			}
+			if(sp.is3pScored()){
+				if(miRNAs == null){
+					miRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
+					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(sp.getContig(), isPlusStrand, sp.getThreePPosition(),mirBaseSearchMargin);
+					if(matched != null) miRNAs.addAll(matched);
+				}else{
+					ArrayList<MiRNA> intersectedMiRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
+					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(sp.getContig(), isPlusStrand, sp.getThreePPosition(),mirBaseSearchMargin);
+					if(matched != null){
+						for(MiRNA miRNA : matched){
+							if(miRNAs.contains(miRNA)){
+								intersectedMiRNAs.add(miRNA);
+							}
+						}
+					}
+					miRNAs = intersectedMiRNAs;
+				}
+			}
+			if(miRNAs != null && !miRNAs.isEmpty()){
+				sp.setMiRNAs(miRNAs);
+			}
+			
+			outCsv.println(sp);
+			
+		}
+		
+		
+		outCsv.close();
+		*/
+		
+	}
 	
 	
 }

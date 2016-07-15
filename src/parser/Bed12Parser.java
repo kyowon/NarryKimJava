@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Random;
 
 import parser.AnnotationFileParser.AnnotatedGene;
 
@@ -28,29 +29,44 @@ public class Bed12Parser {
 			int start = Integer.parseInt(token[1]);
 			boolean isPlusStrand = token[5].equals("+");
 			if(invertStrand) isPlusStrand = !isPlusStrand;
-			String[] lenString = token[10].split(",");
-			int[] lens = new int[lenString.length]; 
-			for(int i=0;i<lenString.length;i++){
-				lens[i] = Integer.parseInt(lenString[i]);
-			}
-			String[] startString = token[11].split(",");
-			int[] starts = new int[startString.length];
-			for(int i=0;i<startString.length;i++){
-				starts[i] = Integer.parseInt(startString[i]);
-			}
-			fivePs = new int[starts.length];
-			threePs = new int[starts.length];
-			if(isPlusStrand){
-				for(int i=0;i<starts.length;i++){
-					fivePs[i] = start + starts[i];
-					threePs[i] = fivePs[i] + lens[i] - 1;
+			if(token.length > 6){
+				String[] lenString = token[10].split(",");
+				int[] lens = new int[lenString.length]; 
+				for(int i=0;i<lenString.length;i++){
+					lens[i] = Integer.parseInt(lenString[i]);
 				}
-			}else{
-				for(int i=0;i<starts.length;i++){
-					fivePs[fivePs.length - i - 1] = start + starts[i] + lens[i] - 1;
-					threePs[threePs.length - i - 1] = fivePs[fivePs.length - i - 1] - lens[i] + 1;
+				String[] startString = token[11].split(",");
+				int[] starts = new int[startString.length];
+				for(int i=0;i<startString.length;i++){
+					starts[i] = Integer.parseInt(startString[i]);
 				}
-			}	
+				fivePs = new int[starts.length];
+				threePs = new int[starts.length];
+				if(isPlusStrand){
+					for(int i=0;i<starts.length;i++){
+						fivePs[i] = start + starts[i];
+						threePs[i] = fivePs[i] + lens[i] - 1;
+					}
+				}else{
+					for(int i=0;i<starts.length;i++){
+						fivePs[fivePs.length - i - 1] = start + starts[i] + lens[i] - 1;
+						threePs[threePs.length - i - 1] = fivePs[fivePs.length - i - 1] - lens[i] + 1;
+					}
+				}	
+			}
+			else{
+				fivePs = new int[1];
+				threePs = new int[1];
+				if(isPlusStrand){ 
+					fivePs[0] = start;
+					threePs[0] = Integer.parseInt(token[2])-1;
+				}else{
+					threePs[0] = start;
+					fivePs[0] = Integer.parseInt(token[2])-1;
+				}
+				
+				
+			}
 		//	if(!isPlusStrand) System.out.println(this); //TODO
 		}
 		
@@ -243,14 +259,11 @@ public class Bed12Parser {
 	private HashMap<Boolean, HashMap<Integer, Integer>> readDepthMap;
 	private HashMap<Boolean, HashMap<Integer, HashSet<Integer>>> splices3pDirection; // inclusive
 	private HashMap<Boolean, HashMap<Integer, HashSet<Integer>>> splices5pDirection; // inclusive
-	private int totalReadCount = 0;
-	
-	/**
-	 * @return the totalReadCount
-	 */
-	public int getTotalReadCount() {
-		return totalReadCount;
-	}
+	//private int totalReadCount = 0;
+
+	//public int getTotalReadCount() {
+	//	return totalReadCount;
+//	}
 	
 	private String filename;
 	private String contig;
@@ -282,7 +295,7 @@ public class Bed12Parser {
 			BufferedLineReader in = new BufferedLineReader(filename);
 			String s;
 			while((s=in.readLine())!=null){
-				totalReadCount++;
+				//totalReadCount++;
 				if(!s.startsWith(this.contig + "\t")) continue;
 				String[] token = s.split("\t");
 				Bed12Read read = new Bed12Read(s, invertStrand);
@@ -478,10 +491,23 @@ public class Bed12Parser {
 	}
 	
 	public Iterator<Integer> getNonZero5pPositionIterator(boolean isPlusStrand){
+		return getNonZero5pPositionIterator(isPlusStrand, 1, 0);
+	}
+	public Iterator<Integer> getNonZero5pPositionIterator(boolean isPlusStrand, int nt, int n){
 		ArrayList<Integer> positions = new ArrayList<Integer>();
 		if(!read5pMap.containsKey(isPlusStrand)) return positions.iterator();
 		positions.addAll(read5pMap.get(isPlusStrand).keySet());
 		Collections.sort(positions);
+		if(nt > 1){
+			ArrayList<Integer> tpositions = new ArrayList<Integer>();
+			for(int i=0;i<positions.size();i++){
+				if(i%nt != n) continue;
+				tpositions.add(positions.get(i));
+			}
+			//System.out.println("Multithreading .. # total positions: " + positions.size() + " # positions in this thread: " + tpositions.size() );
+			positions = tpositions;
+		}
+		
 		return positions.iterator();
 		//HashMap<String, HashMap<Boolean, HashMap<Integer, HashMap<Bed12Read, Short>>>> reads;
 	}
@@ -635,34 +661,51 @@ public class Bed12Parser {
 	}
 	
 	
-	public double[] get3pSignalForfCLIP(boolean isPlusStrand, ArrayList<Integer> coordinate){
+	public double[] get3pSignalForfCLIP(boolean isPlusStrand, ArrayList<Integer> coordinate, boolean ignoreDepth){
 		double[] covs5p  = get5pCoverages(isPlusStrand, coordinate);
 		double[] covs3p = get3pCoverages(isPlusStrand, coordinate);
-		double[] depths = getDepths(isPlusStrand, coordinate);
-		double[] signal = new double[depths.length];
-		
-		for(int i=0;i<signal.length;i++){
-			double c5 = covs5p[i] + 1; 
-			double p = depths[i] - covs5p[i] + 1;
-			double c3 = i>0? covs3p[i-1] + 1:1;		
-			signal[i] = p - c5*c3/Math.sqrt(p);//Math.log(c5*c3/p);
-			//System.out.println(i + " " + signal[i]);
+		double[] signal = new double[covs5p.length];
+		if(ignoreDepth){
+			for(int i=0;i<signal.length;i++){
+				double c5 = covs5p[i]; 
+				double c3 = i>0? covs3p[i-1]:(covs3p[i] * new Random().nextInt(2));		
+				signal[i] =  - c5*c3;//Math.log(c5*c3/p);
+				//System.out.println(i + " " + signal[i] + " " + ignoreDepth);
+			}
+		}else{		
+			double[] depths = getDepths(isPlusStrand, coordinate);
+			for(int i=0;i<signal.length;i++){
+				double c5 = covs5p[i] + 1; 
+				double p = depths[i] - covs5p[i] + 1;
+				double c3 = i>0? covs3p[i-1] + 1:1;		
+				signal[i] = p - c5*c3/Math.sqrt(p);//Math.log(c5*c3/p);
+				//System.out.println(i + " " + signal[i]);
+			}
 		}
 		return signal;
 	}
 	
 	
-	public double[] get5pSignalForfCLIP(boolean isPlusStrand, ArrayList<Integer> coordinate){
+	public double[] get5pSignalForfCLIP(boolean isPlusStrand, ArrayList<Integer> coordinate, boolean ignoreDepth){
 		double[] covs5p  = get5pCoverages(isPlusStrand, coordinate);
 		double[] covs3p = get3pCoverages(isPlusStrand, coordinate);
-		double[] depths = getDepths(isPlusStrand, coordinate);
-		double[] signal = new double[depths.length];
-		for(int i=0;i<signal.length;i++){
-			double c3 = covs3p[i] + 1; 
-			double p = depths[i] - covs3p[i] + 1;
-			double c5 = i<covs5p.length-1? covs5p[i+1] + 1:1;
-			signal[i] = p-c5*c3/Math.sqrt(p);// Math.log(c5*c3/p);
-			//System.out.println(i + " " + signal[i]);
+		double[] signal = new double[covs5p.length];
+		if(ignoreDepth){
+			for(int i=0;i<signal.length;i++){
+				double c3 = covs3p[i]; 
+				double c5 = i<covs5p.length-1? covs5p[i+1]:(covs5p[i] * new Random().nextInt(2));
+				signal[i] = -c5*c3;// Math.log(c5*c3/p);
+				//System.out.println(i + " " + signal[i]);
+			}
+		}else{
+			double[] depths = getDepths(isPlusStrand, coordinate);
+			for(int i=0;i<signal.length;i++){
+				double c3 = covs3p[i] + 1; 
+				double p = depths[i] - covs3p[i] + 1;
+				double c5 = i<covs5p.length-1? covs5p[i+1] + 1:1;
+				signal[i] = p-c5*c3/Math.sqrt(p);// Math.log(c5*c3/p);
+				//System.out.println(i + " " + signal[i]);
+			}
 		}
 		return signal;
 	}

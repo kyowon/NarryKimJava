@@ -1,7 +1,5 @@
 package rpf;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -11,6 +9,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
 
+import msdictionary.Codon;
 import parser.AnnotationFileParser;
 import parser.AnnotationFileParser.AnnotatedGene;
 import parser.Bed12Parser;
@@ -21,6 +20,7 @@ import rpf.parser.ScoringOutputParser.ScoredPosition;
 public class Scorer {
 	private int leftWindowSize = 30;
 	private int rightWindowSize = 60;
+	private int maxLengthUntilStopcodon = 700;
 	private static int numberOfNonZeroElements = 5;
 	//private int coverageThreshold = 1;
 	
@@ -35,12 +35,20 @@ public class Scorer {
 //	private PolynomialFunction likelihoodFunction;
 	private AnnotationFileParser annotationFileParser = null; // if specified, only annotated start positions are considered
 	private ZeroBasedFastaParser fastaParser = null;
+	private int nt = 1;
+	private int n = 0;
 	
 	public Scorer(Bed12Parser bedParser, String paramFile, AnnotationFileParser annotationFileParser, ZeroBasedFastaParser fastaParser){
+		this(bedParser, paramFile, annotationFileParser, fastaParser, 1, 0);
+	}
+	
+	public Scorer(Bed12Parser bedParser, String paramFile, AnnotationFileParser annotationFileParser, ZeroBasedFastaParser fastaParser, int nt, int n){
 		this.bedParser = bedParser;
 		read(paramFile);		
 		this.annotationFileParser = annotationFileParser;
 		this.fastaParser = fastaParser;
+		this.nt = nt;
+		this.n = n;
 	}
 	
 	public AnnotationFileParser getAnnotationFileParser(){
@@ -51,6 +59,7 @@ public class Scorer {
 		ArrayList<ScoredPosition> positions = new ArrayList<ScoringOutputParser.ScoredPosition>();
 		positions.addAll(getScoredPositions(scoreThreshold, false, allowedCodons));
 		positions.addAll(getScoredPositions(scoreThreshold, true, allowedCodons));
+		System.out.println("# positions : " + positions.size());
 		return positions;
 	}
 	
@@ -61,27 +70,35 @@ public class Scorer {
 		iterator = bedParser.getNonZero5pPositionIterator(isPlusStrand);
 		int lastConsidered = 0;
 		ArrayList<ScoredPosition> positions = new ArrayList<ScoringOutputParser.ScoredPosition>();
+		int cntr = 0;
 		while(iterator.hasNext()){
 			int position = iterator.next();
 			int	start = isPlusStrand? position - leftWindowSize - 1: position - rightWindowSize - 1;
-			int	end = isPlusStrand? position + rightWindowSize + 1: position + leftWindowSize + 1;				
+			int	end = isPlusStrand? position + rightWindowSize + 1: position + leftWindowSize + 1;	
+			
+			if(++cntr % 1000 == 0){
+				System.out.print(cntr + " ");
+			}
+			
 			for(int currentPosition=Math.max(lastConsidered + 1, start);currentPosition<end;currentPosition++){
-				//double[] cov = bedCovFileParser.getSqrtCoverages(contig, currentPosition, leftWindowSize, rightWindowSize, isPlusStrand);
+				lastConsidered = currentPosition;
 				
-				ArrayList<String> genomicRegionAndFrameShift = null;
+				if(nt>1){
+					if(currentPosition%nt != n) continue;
+				}
+				
+				HashMap<String, ArrayList<String>> genomicRegionAndFrameShiftMatching = new HashMap<String, ArrayList<String>>();
+				HashMap<String, ArrayList<String>> genomicRegionAndFrameShiftUnmatching = new HashMap<String, ArrayList<String>>();
+				
 				if(annotationFileParser != null){
-					ArrayList<ArrayList<Integer>> coordinates = bedParser.getCoordinates(currentPosition, leftWindowSize, rightWindowSize, isPlusStrand);
-					ArrayList<AnnotatedGene> containingGenes = annotationFileParser.getContainingGenes(bedParser.getContig(), isPlusStrand, currentPosition);
+					ArrayList<ArrayList<Integer>> coordinates = bedParser.getCoordinates(currentPosition, leftWindowSize, maxLengthUntilStopcodon, isPlusStrand);
+					boolean isContainingGenesGot = false;
+					ArrayList<AnnotatedGene> containingGenes = null;
 					
 					for(ArrayList<Integer> coordinate : coordinates){
 						
 						double startScore = getStartScore(coordinate, isPlusStrand);
 						if(startScore <= scoreThreshold) continue;
-						//System.out.println((bedParser.getCoordinates("chr1", 4822442, 50, 50, true)));
-						
-					//	if(currentPosition == 4822442)
-					//		System.out.println(currentPosition + " " + Bed12Parser.getSplices(coordinate));
-						ArrayList<AnnotatedGene> matchingGenes = annotationFileParser.getMatchingGenes(containingGenes, isPlusStrand, coordinate);
 						
 						String seq = null;
 						if(!fastaParser.containsContig(bedParser.getContig())){
@@ -90,46 +107,70 @@ public class Scorer {
 							seq = fastaParser.getSequence(bedParser.getContig(), coordinate.subList(leftWindowSize, coordinate.size()));
 							if(!isPlusStrand)						
 								seq = ZeroBasedFastaParser.getComplementarySequence(seq, false);
-							//System.out.println(currentPosition + " " + coordinate.subList(leftWindowSize, leftWindowSize+3));
 						}	
-						String codon = seq.substring(0, Math.min(seq.length(), 3));
+						
+						String startCodon = seq.substring(0, Math.min(seq.length(), 3));						
+						if(!allowedCodons.contains(startCodon)) continue;
+						
+						if(!seq.equals("N/A")){
+							for(int i=leftWindowSize;i<seq.length()-2;i+=3){
+								String codon = seq.substring(i, i+3);
+								if(Codon.translate(codon) == 'X'){
+									seq = seq.substring(0, i);
+									coordinate = new ArrayList<Integer>(coordinate.subList(0, Math.min(coordinate.size(), seq.length() + leftWindowSize + rightWindowSize)));
+									break;
+								}
+							}
+						}
+						
+						if(coordinate.size() < leftWindowSize + rightWindowSize + 12) continue;
+						
+						if(!isContainingGenesGot){
+							containingGenes = annotationFileParser.getContainingGenes(bedParser.getContig(), currentPosition);
+							isContainingGenesGot = true;
+						}
+						ArrayList<AnnotatedGene> matchingGenes = annotationFileParser.getMatchingGenes(containingGenes, isPlusStrand, coordinate);
 						
 						if(matchingGenes == null){
 							if(containingGenes == null){ // intergenic
-								genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(bedParser.getContig(), isPlusStrand, currentPosition, null, false);
-								if(!genomicRegionAndFrameShift.get(0).equals("NM_3_UTR")){										
-									if(!allowedCodons.contains(codon)) continue;
-								}								
-							
+								if(!genomicRegionAndFrameShiftUnmatching.containsKey("NULL")){
+									ArrayList<String> genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(bedParser.getContig(), isPlusStrand, currentPosition, null, false);
+									genomicRegionAndFrameShiftUnmatching.put("NULL", genomicRegionAndFrameShift);
+								}
+								ArrayList<String> genomicRegionAndFrameShift = genomicRegionAndFrameShiftUnmatching.get("NULL");
+								
 								ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(bedParser.getContig(), currentPosition, coordinate, isPlusStrand, startScore, seq, null, false, genomicRegionAndFrameShift.get(0), genomicRegionAndFrameShift.get(1));
 								positions.add(scoredPosition);						
 							}else{
 								for(AnnotatedGene gene : containingGenes){
-									genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(bedParser.getContig(), isPlusStrand, currentPosition, gene, false);
-									if(!genomicRegionAndFrameShift.get(0).equals("NM_3_UTR")){										
-										if(!allowedCodons.contains(codon)) continue;
-									}								
-								
+									if(!genomicRegionAndFrameShiftUnmatching.containsKey(gene.getAccession())){
+										ArrayList<String> genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(bedParser.getContig(), isPlusStrand, currentPosition, gene, false);
+										genomicRegionAndFrameShiftUnmatching.put(gene.getAccession(), genomicRegionAndFrameShift);
+									}
+									ArrayList<String> genomicRegionAndFrameShift = genomicRegionAndFrameShiftUnmatching.get(gene.getAccession());
+									
 									ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(bedParser.getContig(), currentPosition, coordinate, isPlusStrand, startScore, seq, gene, false, genomicRegionAndFrameShift.get(0), genomicRegionAndFrameShift.get(1));
 									positions.add(scoredPosition);	
 								}
 							}							
-						}else{
+						}else{ // matching
 							for(AnnotatedGene gene : matchingGenes){
-								genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(bedParser.getContig(), isPlusStrand, currentPosition, gene, true);
-								if(!genomicRegionAndFrameShift.get(0).equals("NM_3_UTR")){										
-									if(!allowedCodons.contains(codon)) continue;
-								}								
-							
+								if(!genomicRegionAndFrameShiftMatching.containsKey(gene.getAccession())){
+									ArrayList<String> genomicRegionAndFrameShift = annotationFileParser.getGenomicRegionNameAndFrameShift(bedParser.getContig(), isPlusStrand, currentPosition, gene, true);
+									genomicRegionAndFrameShiftMatching.put(gene.getAccession(), genomicRegionAndFrameShift);
+								}
+								ArrayList<String> genomicRegionAndFrameShift = genomicRegionAndFrameShiftMatching.get(gene.getAccession());
+								
 								ScoredPosition scoredPosition = ScoringOutputParser.getScoredPosition(bedParser.getContig(), currentPosition, coordinate, isPlusStrand, startScore, seq, gene, gene.isAnnotated(currentPosition), genomicRegionAndFrameShift.get(0), genomicRegionAndFrameShift.get(1));
 								positions.add(scoredPosition);						
 							}							
 						}
 					}
 				}	
-				lastConsidered = currentPosition;				
+								
 			}
 		}
+		System.out.println(" ..Done");
 		return positions;
 	}
 
@@ -150,10 +191,12 @@ public class Scorer {
 				String[] token = s.split("\t");
 				if(s.startsWith("#RIGHT")){
 					rightWindowSize = Integer.parseInt(token[1]);
+				}else if(s.startsWith("#SEQLENGTH")){
+					maxLengthUntilStopcodon = Integer.parseInt(token[1]);
 				}else if(s.startsWith("#LEFT")){
 					leftWindowSize = Integer.parseInt(token[1]);
-				//}else if(s.startsWith("#NONZERO")){
-				//	numberOfNonZeroElements = Integer.parseInt(token[1]);
+				}else if(s.startsWith("#NONZERO")){
+					numberOfNonZeroElements = Integer.parseInt(token[1]);
 				//}else if(s.startsWith("COVTHRESHOLD")){
 				//	coverageThreshold = Integer.parseInt(token[1]);
 				}else if(s.startsWith("#STARTFILTER")){
@@ -258,7 +301,11 @@ public class Scorer {
 		return score;
 	}*/
 	
-	private static double getRawScore(double[] filter, double[] cov, double filterNorm){
+	private static double getRawScore(double[] filter, double[] rcov, double filterNorm){
+		double[] cov = new double[filter.length];
+		
+		for(int i=0;i<Math.min(cov.length, rcov.length);i++) cov[i] = rcov[i];
+		
 		if(numberOfNonZeroElements(cov) < numberOfNonZeroElements) return 0;
 	//	double[] sqrtCov = getSqrtVector(cov);
 		//System.out.println("hh ");
@@ -522,7 +569,7 @@ public class Scorer {
 		
 		ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.fa");
 		String paramFile = "/media/kyowon/Data1/RPF_Project/samples/sample3/bed/Harr_C-uncollapsed.bed.param";
-		Scorer test = new Scorer(bedParser, paramFile, annotationFileParser, fastaParser);
+		Scorer test = new Scorer(bedParser, paramFile, annotationFileParser, fastaParser, 1, 0);
 		HashSet allowedCodons = new HashSet<String>();
 		allowedCodons.add("ATG");
 		allowedCodons.add("CTG");

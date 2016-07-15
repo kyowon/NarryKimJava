@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import jspp.SignalPeptidePredictor;
 import launcher.PhyloPLauncher;
@@ -180,8 +181,9 @@ public class MergedFileParser {
 		}
 		
 		public int getLength(){
-			if(stopPosition < 0) return -1;
-			return Math.abs(position.getPosition() - stopPosition) + 1;
+			return seq.length();
+			//if(stopPosition < 0) return -1;
+			//return Math.abs(position.getPosition() - stopPosition) + 1;
 		}
 		public boolean isPredictionCorrect(){
 			boolean correct = true;
@@ -193,7 +195,8 @@ public class MergedFileParser {
 			return correct;
 		}
 		
-		public MergedResult(ScoredPosition scoredPosition, Scorer[] harrScorers, Scorer[] rpfScorers, Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers, int[][] groups, ZeroBasedFastaParser fastaFileParser, MafParser mafParser,
+		public MergedResult(ScoredPosition scoredPosition, Scorer[] harrScorers, Scorer[] rpfScorers, 
+				Quantifier[] rpfQuantifiers, Quantifier[] rnaQuantifiers, int[][] groups, ZeroBasedFastaParser fastaFileParser, MafParser mafParser,
 				SignalPeptidePredictor pd, int positionQuantityChangeLength, int positionQuantityOffset, int maxLengthUntilStopcodon){
 			this.contig = scoredPosition.getContig();
 			this.position = scoredPosition;
@@ -214,15 +217,17 @@ public class MergedFileParser {
 					return;
 				}
 			}else{
-				stopPosition = position.getPosition();
+				//stopPosition = position.getPosition();				
+				
 				for(int i=0;i<seq.length()-2;i+=3){
 					String codon = seq.substring(i, i+3);
 					if(codon.equals("TAG") || codon.equals("TAA") || codon.equals("TGA")){		
 						//stopPosition += (isPlusStrand? +3 : -3);
 						break;
 					}
-					stopPosition += (isPlusStrand? +3 : -3);
+					stopPosition = position.getCoordinate().get(i+2);//(isPlusStrand? +3 : -3);
 				}
+				//position.getCoordinate()
 			}
 			
 			
@@ -281,6 +286,7 @@ public class MergedFileParser {
 				if(gene != null && !genomicRegion.startsWith("NR") && !this.genomicRegion.endsWith("ISOFORM")){				
 					rpfCDSQuantities = new double[rpfQuantifiers.length];
 					for(int i=0; i<rpfQuantifiers.length;i++){
+						if(rpfQuantifiers[i]==null) continue;
 						rpfCDSQuantities[i] = rpfQuantifiers[i].getCDSRPKM(gene);
 					}
 				}
@@ -290,7 +296,8 @@ public class MergedFileParser {
 				if(gene!=null && this.genomicRegion.equals("NM_ORF") && !this.isAnnotated) rpfCDSRPKMchanges = new double[rpfQuantifiers.length];
 					
 				for(int i=0; i<rpfPositionQuantities.length;i++){
-					rpfPositionQuantities[i] = rpfQuantifiers[i].getPositionRPKM(isPlusStrand, position.getCoordinate());
+					if(rpfQuantifiers[i]==null) continue;
+					rpfPositionQuantities[i] = rpfQuantifiers[i].getPositionRPKM(position.getContig(), isPlusStrand, position.getCoordinate());
 					//.getPositionRPKM(contig, this.position, isPlusStrand, maxLengthUntilStopcodon, positionQuantityOffset);
 					rpfPositionQuantityChanges[i] = rpfQuantifiers[i].getPositionQuantityChangeRatio(position, positionQuantityChangeLength, positionQuantityOffset);
 									//.getPositionQuantityChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength, positionQuantityOffset);
@@ -329,13 +336,15 @@ public class MergedFileParser {
 				if(gene != null && !genomicRegion.startsWith("NR")  && !this.genomicRegion.endsWith("ISOFORM")){				
 					rnaCDSQuantities = new double[rnaQuantifiers.length];
 					for(int i=0; i<rnaQuantifiers.length;i++){
+						if(rnaQuantifiers[i]==null) continue;
 						rnaCDSQuantities[i] = rnaQuantifiers[i].getCDSRPKM(gene);
 					}
 				}
 				rnaPositionQuantities = new double[rnaQuantifiers.length];
 				rnaPositionQuantityChanges = new double[rnaQuantifiers.length];
 				for(int i=0; i<rnaPositionQuantities.length;i++){
-					rnaPositionQuantities[i] = rnaQuantifiers[i].getPositionRPKM(isPlusStrand, position.getCoordinate());//getPositionRPKM(contig, this.position, isPlusStrand, maxLengthUntilStopcodon, 0);
+					if(rnaQuantifiers[i]==null) continue;
+					rnaPositionQuantities[i] = rnaQuantifiers[i].getPositionRPKM(position.getContig(), isPlusStrand, position.getCoordinate());//getPositionRPKM(contig, this.position, isPlusStrand, maxLengthUntilStopcodon, 0);
 					rnaPositionQuantityChanges[i] = rnaQuantifiers[i].getPositionQuantityChangeRatio(position, positionQuantityChangeLength, positionQuantityOffset);
 					//.getPositionQuantityChangeRatio(contig, this.position, isPlusStrand, positionQuantityChangeLength, 0);
 					//rnaPositionQuantityChanges[i] = Math.log(rnaPositionQuantityChanges[i]+.0001)/Math.log(2);
@@ -482,7 +491,6 @@ public class MergedFileParser {
 			this.predictedClassesScores[index] = predictedClassesScore;
 		}
 		
-		public int getStopPostion() { return stopPosition; }
 		
 		private double[] subParse(String s){
 			String[] token = s.split(";");
@@ -540,7 +548,7 @@ public class MergedFileParser {
 		}
 		
 		public String getSimpleHeader(){
-			String header = "Contig\tPosition\tStrand\tCodon\t" + AnnotatedGene.getSimpleHeader() + "\tGenomicRegion\tFrame\tAnnotated\tDnDs\tPhyloP\t";
+			String header = "Contig\tPosition\tStopPosition\tStrand\tCodon\t" + AnnotatedGene.getSimpleHeader() + "\tGenomicRegion\tFrame\tAnnotated\tDnDs\tPhyloP\t";
 			header += subGetHeader("Predicted", groups) + "\t";
 			
 			header += "Length\t";
@@ -609,6 +617,7 @@ public class MergedFileParser {
 			StringBuffer sb = new StringBuffer();
 			sb.append(contig);sb.append('\t');
 			sb.append(position.getPosition());sb.append('\t');
+			sb.append(stopPosition);sb.append('\t');
 			sb.append(isPlusStrand? '+' : '-');sb.append('\t');
 			sb.append(seq.substring(0, 3));sb.append('\t');
 			
@@ -692,8 +701,8 @@ public class MergedFileParser {
 			
 			sb.append(stopPosition>=0? stopPosition : "_");
 			sb.append('\t');
-			
-			sb.append(stopPosition>=0? Math.abs(position.getPosition() - stopPosition) : "_");
+			sb.append(seq.length());
+			//sb.append(stopPosition>=0? Math.abs(position.getPosition() - stopPosition) : "_");
 			sb.append('\t');
 			
 			
@@ -1167,26 +1176,57 @@ public class MergedFileParser {
 		
 	}
 	
-	public static void main(String[] args){
-		MergedFileParser test = new MergedFileParser("/media/kyowon/Data1/RPF_Project/samples/sample5/results/out_new_0.3.csv");
+	private static double getAvg(double[] v){
+		double sum = 0;
+		for(double t : v){
+			sum += t;
+		}
+		return sum / v.length;
+	}
+	
+	public static void main(String[] args) throws IOException{
+		MergedFileParser test = new MergedFileParser("/media/kyowon/Data1/RPF_Project/samples/sample4/results/out_ssh_0.3.csv");
 	//	ZeroBasedFastaParser fasta = new ZeroBasedFastaParser("/media/kyowon/Data1/RPF_Project/genomes/hg19.fa");
-		ArrayList<MergedResult> list = new ArrayList<MergedFileParser.MergedResult>();
-		MafParser mafParser = new MafParser("/media/kyowon/Data1/RPF_Project/genomes/maf/");
-		mafParser.readIndexFile();
-		PhyloPLauncher.setModFile("/media/kyowon/Data1/RPF_Project/genomes/maf/phylo.mod");
-		
-		int i=0;
-		for(MergedResult r : test.getList()){			
-			String mafString = mafParser.getSeqsInMafFormat(r.contig, r.position.getCoordinate(), r.position.getPosition(), r.isPlusStrand, 51);
-			r.phyloP = new PhyloPLauncher(mafString).getPvalConservation();
-			list.add(r);
-			
-			//System.out.println(mafString + "\t" + phyloP);
-			
+		ArrayList<MergedResult> list = test.getList();
+		HashMap<String, double[]> terpkmMap = new HashMap<String, double[]>();
+		for(MergedResult mr : list){
+			if( mr.getGene() == null) continue;
+			String gn = mr.getGene().getGeneName();
+			double[] te = mr.getCdsTE();
+			double[] rpkm = mr.getRpfCDSQuantities();
+			if(te == null || rpkm == null) continue;
+			double[] v = new double[2];
+			v[0] = getAvg(te);
+			v[1] = getAvg(rpkm);
+			terpkmMap.put(gn, v);
 		}
 		
-		test.write(list, "/media/kyowon/Data1/RPF_Project/samples/sample5/results/out_new_0.3_2.csv");
-		//System.out.println(test.toString().equals(s));
+		BufferedLineReader in = new  BufferedLineReader("/home/kyowon/protein.csv");
+		String s;
+		PrintStream out = new PrintStream("/home/kyowon/protein.out.csv");
+		HashSet<String> gns = new HashSet<String>(); 
+		while((s=in.readLine())!=null){
+			if(!s.startsWith(">")){
+				out.println("Gene\tTE\tRPKM\tSpecInt");
+				continue;
+			}
+			String[] token = s.split("\t")[0].split(";");
+			
+			for(String t : token){
+				if(t.indexOf("GN=")<0 || t.indexOf(" PE=")<0){					
+					continue;
+				}
+				String gn = t.substring(t.indexOf("GN=") + 3, t.indexOf(" PE="));
+				if(gns.contains(gn)) continue;
+				gns.add(gn);
+				double[] v = terpkmMap.get(gn);
+				if(v == null) continue;
+				out.println(gn+"\t"+v[0]+"\t"+v[1] + "\t" + s.split("\t")[1].replace(".E", "e"));				
+			}
+			
+		}
+		out.close();
+		in.close();
 	}
 	
 }

@@ -26,7 +26,7 @@ public class AttributeTrainer {
 		FCLIP_Scorer.setFlankingNTNumber(Integer.parseInt(args[9]));
 		int minpre =  Integer.parseInt(args[10]);
 		int maxpre =  Integer.parseInt(args[11]);
-		RNAcofoldLauncher.setSeqLength(minpre);
+		RNAcofoldLauncher.setSeqLength(maxpre);
 		
 		FCLIP_Scorer.setMaxReadDiff(maxpre);
 		FCLIP_Scorer.setMinReadDiff(minpre);
@@ -43,7 +43,8 @@ public class AttributeTrainer {
 			}
 			for(ScoredPosition sp : scorer.getScoredPositions(annotationParser, null, unpairedScoreThreshold, pairedScoreThreshold, false)){
 				trainingPositions.add(sp);
-			}		
+			}	
+//break;
 		}	
 		
 		try {

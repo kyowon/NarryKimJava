@@ -1,9 +1,8 @@
 package msgfpipeline.parser;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import parser.BufferedLineReader;
 import suffixarray.MatchSet;
@@ -18,10 +17,12 @@ public class MSGFPlusParser {
 	
 	public static class MSGFPlusPSM implements Comparable<MSGFPlusPSM>{
 	//	private SuffixArray sa; 
+		static public double proteinWeightThrehsold = -1;
+
 		static private Enzyme enzyme;
 		static private boolean listAllProteins = true;
 		
-
+		private String originalString;
 		private String specFile;
 		private String specID;
 		private int scanNumber;
@@ -34,7 +35,9 @@ public class MSGFPlusParser {
 		//private String[] proteins;
 		private int[] startInPro;
 		private int[] endInPro;
+		private int[] startInSuffixArray;
 		private int[] proteinLength;
+		private boolean isDecoyHit =false;
 		
 		private String[] proteinID = null;
 		private String[] proteinName = null;
@@ -76,6 +79,17 @@ public class MSGFPlusParser {
 			return recalibratedPrecursorErr;
 		}		
 
+		public int getProteinIndex(String proteinID){
+			int index = -1;
+			for(int i = 0;i<getProteinIDs().length;i++){
+				if(getProteinIDs()[i].equals(proteinID)){
+					index = i;
+					break;
+				}
+			}
+			return index;
+		}
+		
 		public int[] getStartInPro() {
 			return startInPro;
 		}
@@ -84,6 +98,9 @@ public class MSGFPlusParser {
 			return endInPro;
 		}
 
+		public int[] getStartInSuffixArray(){
+			return startInSuffixArray;
+		}
 		public int[] getProteinLength() {
 			return proteinLength;
 		}
@@ -92,6 +109,10 @@ public class MSGFPlusParser {
 			return proteinID;
 		}
 
+		public void setProteinIDs(String[] pid){
+			proteinID = pid;
+		}
+		
 		public String[] getProteinNames() {
 			return proteinName;
 		}
@@ -102,6 +123,10 @@ public class MSGFPlusParser {
 
 		public String[] getSpecies() {
 			return species;
+		}
+		
+		public boolean isDecoyHit(){
+			return isDecoyHit;
 		}
 		
 		public float[] getProteinMass() {
@@ -174,11 +199,10 @@ public class MSGFPlusParser {
 			return postAAs;
 		}
 		
-		
-		
-		public MSGFPlusPSM(String s, SuffixArray sa){
+		private MSGFPlusPSM(String s, SuffixArray sa, double specEvalThreshold){
 			//this.sa = sa;
 			//this.enzyme = enzyme;
+			originalString = s;
 			String[] token = s.split("\t");
 			specFile = token[0];
 			specID = token[1];
@@ -193,6 +217,7 @@ public class MSGFPlusParser {
 			deNovoScore = Integer.parseInt(token[10]);
 			msgfScore = Integer.parseInt(token[11]);
 			specEvalue = Float.parseFloat(token[12]);
+			if(specEvalue > specEvalThreshold) return;
 			evalue = Float.parseFloat(token[13]);
 			if(token.length > 14){
 				qvalue = Float.parseFloat(token[14]);
@@ -202,10 +227,28 @@ public class MSGFPlusParser {
 			SuffixArraySequence sequence = sa.getSequence();
 			MatchSet matchSet = sa.findAll(Peptide.getUnmodifiedSequence(peptide).toString());
 			int numProtein = matchSet.getSize();
-						
+			ArrayList<Integer> indices = new ArrayList<Integer>();
+			
+			if(proteinWeightThrehsold > 0){
+				int tnumProtein = 0;
+				for(int i=0;i<numProtein;i++){
+					int start = matchSet.getStart(i);
+					double pm = new Peptide(sequence.getMatchingEntry(start)).getMass();
+					if(pm < proteinWeightThrehsold){
+						tnumProtein++;
+						indices.add(i);
+					}
+				}
+				numProtein = tnumProtein;
+			}else{
+				for(int i=0;i<numProtein;i++) indices.add(i);
+				
+			}
+			//if(numProtein == 0) return;
 			preAAs = new String[numProtein];
 			postAAs = new String[numProtein];
 			startInPro = new int[numProtein];
+			startInSuffixArray = new int[numProtein];
 			endInPro = new int[numProtein];
 			proteinID = new String[numProtein];
 			proteinName = new String[numProtein];
@@ -215,19 +258,26 @@ public class MSGFPlusParser {
 			proteinLength = new int[numProtein];
 			String[] proteinSeq = new String[numProtein];
 			
-			for(int i=0;i<numProtein;i++){
-				int start = matchSet.getStart(i);
-				int end = matchSet.getEnd(i);
-				preAAs[i] = sequence.getSubsequence(Math.max(0, start-1), start);
+			for(int i=0;i<indices.size();i++){
+				int k = indices.get(i);
+				startInSuffixArray[i] = matchSet.getStart(k);
+				int end = matchSet.getEnd(k);
+				
+				proteinSeq[i] = sequence.getMatchingEntry(startInSuffixArray[i]);
+				proteinLength[i] = proteinSeq[i].length();
+				proteinMass[i] = new Peptide(proteinSeq[i]).getMass();
+								
+				preAAs[i] = sequence.getSubsequence(Math.max(0, startInSuffixArray[i]-1), startInSuffixArray[i]);
 				postAAs[i] = sequence.getSubsequence(end, Math.min(end+1, sequence.getSize())); // bug fixed by kyowon
-				int proStart = (int) sequence.getStartPosition(start);
-				startInPro[i] = start -proStart;
+				int proStart = (int) sequence.getStartPosition(startInSuffixArray[i]);
+				startInPro[i] = startInSuffixArray[i] -proStart;
 				endInPro[i] = end - proStart;
 				
-				String annotation = sequence.getAnnotation(start).split(";")[0];
+				String annotation = sequence.getAnnotation(startInSuffixArray[i]).split(";")[0];
 				int spaceIndex = annotation.indexOf(' ');
 				if(spaceIndex < 0) spaceIndex = annotation.length();
 				proteinID[i] = annotation.substring(0, spaceIndex);
+				if(proteinID[i].startsWith("XXX")) isDecoyHit = true;
 				
 				int pIndex = -1;
 				int gnIndex = annotation.indexOf("GN=");
@@ -257,13 +307,12 @@ public class MSGFPlusParser {
 				if(pIndex > 0) proteinName[i] = annotation.substring(spaceIndex, pIndex);
 				else proteinName[i] = annotation.substring(spaceIndex);
 				
-				proteinSeq[i] = sequence.getMatchingEntry(start);
-				proteinLength[i] = proteinSeq[i].length();
-				proteinMass[i] = new Peptide(proteinSeq[i]).getMass();
 			}
 		}
 		
-		
+		public String toOriginalString(){
+			return originalString;
+		}
 		
 		@Override
 		public String toString(){
@@ -365,6 +414,10 @@ public class MSGFPlusParser {
 	
 	private ArrayList<MSGFPlusPSM> psms;
 	public MSGFPlusParser(String fileName, String fasta, Enzyme enzyme){
+		this(fileName, fasta, enzyme, 1);
+	}
+	
+	public MSGFPlusParser(String fileName, String fasta, Enzyme enzyme, double specEvalThreshold){
 		psms = new ArrayList<MSGFPlusPSM>();
 		MSGFPlusPSM.enzyme = enzyme;
 		SuffixArraySequence sequence = new SuffixArraySequence(fasta);
@@ -376,7 +429,9 @@ public class MSGFPlusParser {
 				if(s.startsWith("#") || s.startsWith("ID")){
 					continue;
 				}
-				psms.add(new MSGFPlusPSM(s, sa));
+				MSGFPlusPSM psm = new MSGFPlusPSM(s, sa, specEvalThreshold);
+				if(psm.proteinID != null && psm.proteinID.length > 0)
+					psms.add(psm);
 			}in.close();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -385,6 +440,15 @@ public class MSGFPlusParser {
 	
 	public ArrayList<MSGFPlusPSM> getPsms() {
 		return psms;
+	}
+	
+	public HashSet<String> getUniquePeptides(float pepQvalue){
+		HashSet<String> peptides = new HashSet<String>();
+		for(MSGFPlusPSM psm : psms){
+			if(psm.pepQvalue>pepQvalue) continue;
+			peptides.add(psm.peptide);
+		}
+		return peptides;
 	}
 	
 	public static String getHeader(){
@@ -424,6 +488,15 @@ public class MSGFPlusParser {
 			if(token[i].equals("ProteinID")) return i;
 		}
 		return - 1; 
+	}
+	
+	static public void main(String[] args){
+		String csv = "/media/kyowon/Data1/DE/HeLa_DE_J70_NAQ1_0818_1.tsv";
+		//csv = "/media/kyowon/Data1/DE/HeLa_DE_J70_NAQ1_0818_1_charge_fixed.tsv"; //11528 8030
+		MSGFPlusParser test = new MSGFPlusParser(csv, "/media/kyowon/Data1/DE/H_sapiens_Uniprot_SPROT_2013-05-01.fasta", Enzyme.TRYPSIN);
+		
+		System.out.println(test.getUniquePeptides(.01f).size());
+		
 	}
 /*	static public void main(String[] args){
 		

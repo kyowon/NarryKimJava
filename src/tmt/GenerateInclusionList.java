@@ -10,7 +10,6 @@ import java.util.HashSet;
 import sequences.ProteinFastaSequence;
 import suffixarray.SuffixArray;
 import suffixarray.SuffixArraySequence;
-import msgf.Tolerance;
 import msutil.AminoAcidSet;
 import msutil.Annotation;
 import msutil.Composition;

@@ -108,6 +108,7 @@ public class GenerateMfile {
 				String kko = kks[i];
 				String kk = kko.replace('-', '_');
 				String figOut = figFolder + ck + kk;
+				
 				out.println("clear cs" + (i+1));
 				out.println("cs" + (i+1) + " = {");
 				for(String legend : legends){
@@ -127,6 +128,21 @@ public class GenerateMfile {
 				}
 				out.println("};");
 				out.println("%createGeneFC(cs" + (i+1)+ ", ts"  + (i+1) + ", legends, " + numThreshold + ",'" + figOut + "','" + cko + " vs "+ kko + "');");
+				
+				out.println("clear acccs" + (i+1));
+				out.println("acccs" + (i+1) + " = {");
+				for(String legend : legends){
+					out.println("Acc" + legend + "_" + ck +";");
+				}
+				out.println("};");
+				out.println("clear accts" + (i+1));
+				out.println("accts" + (i+1) + " = {");
+				for(String legend : legends){
+					out.println("Acc" + legend + "_" + kk + ";");
+				}
+				out.println("};");
+				
+				//out.println("%createGeneFC(cs" + (i+1)+ ", ts"  + (i+1) + ", legends, " + numThreshold + ",'" + figOut + "','" + cko + " vs "+ kko + "');");
 			}
 			out.println("clear cs;");
 			out.println("clear ts;");
@@ -148,6 +164,15 @@ public class GenerateMfile {
 			out.println("cs=cs';");
 			out.println("ts=ts';");
 			
+			out.println("clear acccs;");
+			out.println("clear accts;");
+			
+
+			
+		
+			out.println("acccs=acccs1';");
+			out.println("accts=accts1';");
+
 			//out.println("createFC(cs, ts, legends, " + numThreshold + ",'" + figFolder  + "','" + cko + " vs "+ kko + "');");
 			
 			out.close();

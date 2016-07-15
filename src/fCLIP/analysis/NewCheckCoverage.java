@@ -5,8 +5,6 @@ import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
-import htsjdk.samtools.util.CloseableIterator;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -14,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Hashtable;
-import java.util.Iterator;
 import java.util.Random;
 import java.util.Vector;
 
@@ -104,14 +101,16 @@ public class NewCheckCoverage {
 					
 					for(int i=0; i<cKeys.length;i++){
 						String cKey = ksuf + "_" +  cKeys[i];				
+						String cKeyInfo = "Info_" + cKey;
 						
-						int[] c = getPassingThroughReadCount(sp, creaders1[i]);
+						int[] c = getUncleavedReadCount(sp, creaders1[i]);
 						int c5 = c[0];
 						int c3 = c[1];
 						
 						out.print("\t" + c5 + "\t" + c3);
 						
 						if(!mStringMap.containsKey(cKey)) mStringMap.put(cKey, new StringBuffer());
+						if(!mStringMap.containsKey(cKeyInfo)) mStringMap.put(cKeyInfo, new StringBuffer());
 						//mStringMap.get(cKey).append((c5 + c3) + ";");
 						
 						StringBuffer sbc = new StringBuffer();
@@ -121,8 +120,8 @@ public class NewCheckCoverage {
 						sbc.append(sp.getEnergy());sbc.append(",");
 						sbc.append(region1);sbc.append(",");
 						sbc.append(region2);sbc.append(",");
-						sbc.append(sp.isRepeat5p()? 1 :0);sbc.append(",");
-						sbc.append(sp.isRepeat3p()? 1 :0);sbc.append(",");	
+						sbc.append(sp.isALU5p()? 1 :0);sbc.append(",");
+						sbc.append(sp.isALU3p()? 1 :0);sbc.append(",");	
 						sbc.append(sp.getPreLength());sbc.append(",");
 						sbc.append(sp.getPredictionScore());sbc.append(",");
 						
@@ -133,10 +132,30 @@ public class NewCheckCoverage {
 						sbc.append("\n");
 						mStringMap.get(cKey).append(sbc);
 						
+						StringBuffer sbci = new StringBuffer();
+						sbci.append("'");
+						sbci.append(sp.getContig());sbci.append(" ");
+						sbci.append(sp.getThreePPosition());sbci.append(" ");
+						sbci.append(sp.getFivePPosition());sbci.append(" ");
+						if(sp.getContainingGeneAccessions() == null || sp.getContainingGeneAccessions().isEmpty()){
+							sbci.append("NaN");
+						}else{
+							for(String ga : sp.getContainingGeneAccessions())
+							{	
+								sbci.append(ga);sbci.append(';');
+							
+							}
+						}						
+						
+						sbci.append("'\n");						
+						mStringMap.get(cKeyInfo).append(sbci);
+						
+						
+						
 						for(int j=0; i + j*cKeys.length<tKeys.length; j++){
 							String tKey = ksuf + "_" + tKeys[i + j*cKeys.length];						
 							
-							int[] t =  getPassingThroughReadCount(sp, treaders1[i + j*cKeys.length]);
+							int[] t =  getUncleavedReadCount(sp, treaders1[i + j*cKeys.length]);
 							int t5 = t[0];
 							int t3 = t[1];
 							
@@ -152,8 +171,8 @@ public class NewCheckCoverage {
 							sbt.append(sp.getEnergy());sbt.append(",");
 							sbt.append(region1);sbt.append(",");
 							sbt.append(region2);sbt.append(",");
-							sbt.append(sp.isRepeat5p()? 1 :0);sbt.append(",");
-							sbt.append(sp.isRepeat3p()? 1 :0);sbt.append(",");						
+							sbt.append(sp.isALU5p()? 1 :0);sbt.append(",");
+							sbt.append(sp.isALU3p()? 1 :0);sbt.append(",");						
 							sbt.append(sp.getPreLength());sbt.append(",");
 							sbt.append(sp.getPredictionScore());sbt.append(",");
 						
@@ -222,7 +241,7 @@ public class NewCheckCoverage {
 				RNAfoldLauncher fold = new RNAfoldLauncher(seq, fn);			
 				
 				for(int i=0; i<keys.length;i++){
-					int[] c = getPassingThroughReadCount(token[0], p1, p2, readers1[i]);					
+					int[] c = getUncleavedReadCount(token[0], p1, p2, readers1[i]);					
 					String mKey = "BG_" + new String(keys[i]);
 					if(!mStringMap.containsKey(mKey)) mStringMap.put(mKey, new StringBuffer());
 					if(!ctm.containsKey(keys[i])) ctm.put(keys[i], new Vector<Double>());					
@@ -267,6 +286,15 @@ public class NewCheckCoverage {
 			if(s <= p1 && e >= p2) return true;
 			else return false;			
 		}
+		return false;
+	}
+	
+	public static boolean isCleaved(SAMRecord rec, int p1){
+		int p2 = p1 + 1;
+		if(p1 <= 0 || p2 <= 0) return false;
+		if(rec.getAlignmentStart() - 1 == p2) return true;
+		if(rec.getAlignmentEnd() - 1 == p1) return true;
+				
 		return false;
 	}
 	
@@ -337,7 +365,7 @@ public class NewCheckCoverage {
 	}*/
 	
 	// is3p = true : left side of cleavage if strand == '+'
-	private static int[] getPassingThroughReadCount(String contig, int p1, int p2, SamReader reader){
+	private static int[] getUncleavedReadCount(String contig, int p1, int p2, SamReader reader){
 		
 		SAMRecordIterator iterator = reader.query(contig, p1+1, p2+1, false);
 		try{
@@ -364,7 +392,7 @@ public class NewCheckCoverage {
 	}*/	
 		
 	// output[0] = 3p output[1] = 5p
-	private static int[] getPassingThroughReadCount(ScoredPosition position, SamReader reader){
+	private static int[] getUncleavedReadCount(ScoredPosition position, SamReader reader){
 		boolean strand = position.isPlusStrand();
 		int p1 = strand? position.getThreePPosition() : position.getFivePPosition();
 		int p2 = strand? position.getFivePPosition() : position.getThreePPosition();	
@@ -377,7 +405,6 @@ public class NewCheckCoverage {
 				SAMRecord rec = iterator.next(); 
 				//if(!rec.getReadPairedFlag()) continue;
 				//if(countRead1Only && !rec.getFirstOfPairFlag()) continue;				
-				
 				if(isPassingThrough(rec, p1-1)) c[strand? 0 : 1]++;
 				if(isPassingThrough(rec, p2)) c[strand? 1 : 0]++;
 			}
@@ -457,9 +484,15 @@ public class NewCheckCoverage {
 						
 			PrintStream outm = new PrintStream(mOut);
 			for(String mkey : mStringMap.keySet()){
-				outm.println(mkey.replace('-', '_') + "= [");
-				outm.println(mStringMap.get(mkey));
-				outm.println("]';");
+				if(mkey.startsWith("Info")){
+					outm.println(mkey.replace('-', '_') + "= {");
+					outm.println(mStringMap.get(mkey));
+					outm.println("}';");
+				}else{
+					outm.println(mkey.replace('-', '_') + "= [");
+					outm.println(mStringMap.get(mkey));
+					outm.println("]';");
+				}
 				//outm.println(mkey + "FC = " + mkey + "(find(" + mkey + "(:,1)>=20 & " + mkey + "(:,2)>= 20),:);" + mkey + "FC = log("+mkey+"FC(:,2)./"+ mkey + "FC(:,1))/log(2);" );
 			}
 			outm.close();
@@ -530,7 +563,7 @@ public class NewCheckCoverage {
 			//HashSet<ScoredPosition> positions = new HashSet<ScoredPositionOutputParser.ScoredPosition>();
 
 
-				for(ScoredPair pair : transParser.getPairs()){
+			for(ScoredPair pair : transParser.getPairs()){
 			//	if(pair.getOverHang() !=2) continue;
 				
 				out.print(pair);
@@ -562,6 +595,7 @@ public class NewCheckCoverage {
 				for(int i=0; i<cKeys.length;i++){
 					
 					String cKey = (filtered? "TransFiltered" : "Trans") + ksuf + "_" + cKeys[i];				
+					String cKeyInfo = "Info_" + cKey;
 					
 					String key5 = pair.getThreePContig() + ";" + pair.getThreePPosition() + ";" + pair.getThreePStrand();
 					String key3 = pair.getFivePContig() + ";" + pair.getFivePPosition() + ";" + pair.getFivePStrand();
@@ -572,6 +606,8 @@ public class NewCheckCoverage {
 					out.print("\t" + c5 +  "\t" + c3);
 					
 					if(!mStringMap.containsKey(cKey)) mStringMap.put(cKey, new StringBuffer());
+					if(!mStringMap.containsKey(cKeyInfo)) mStringMap.put(cKeyInfo, new StringBuffer());
+					
 					StringBuffer sbc = mStringMap.get(cKey);
 					sbc.append((c5));sbc.append(",");
 					sbc.append((c3));sbc.append(",");
@@ -592,6 +628,36 @@ public class NewCheckCoverage {
 					
 					sbc.append("\n");				
 				
+					
+					StringBuffer sbci = mStringMap.get(cKeyInfo);
+					sbci.append("'");
+					sbci.append(pair.getThreePContig());sbci.append(" ");
+					sbci.append(pair.getThreePPosition());sbci.append(" ");
+					sbci.append(pair.getFivePContig());sbci.append(" ");
+					sbci.append(pair.getFivePPosition());sbci.append(" ");
+										
+					if(pair.getPairedScoredPositions()[0].getContainingGeneAccessions() == null || pair.getPairedScoredPositions()[0].getContainingGeneAccessions().isEmpty()){
+						sbci.append("NaN");
+					}else{
+						for(String ga : pair.getPairedScoredPositions()[0].getContainingGeneAccessions())
+						{	
+							sbci.append(ga);sbci.append(';');
+						
+						}
+					}						
+					;sbci.append(" ");
+					if(pair.getPairedScoredPositions()[1].getContainingGeneAccessions() == null || pair.getPairedScoredPositions()[1].getContainingGeneAccessions().isEmpty()){
+						sbci.append("NaN");
+					}else{
+						for(String ga : pair.getPairedScoredPositions()[1].getContainingGeneAccessions())
+						{	
+							sbci.append(ga);sbci.append(';');
+						
+						}
+					}				
+					
+					sbci.append("'\n");						
+					
 					for(int j=0; i + j*cKeys.length<tKeys.length; j++){
 						String tKey = (filtered? "TransFiltered" : "Trans") + ksuf + "_" + tKeys[i + j*cKeys.length];						
 						double median = medians.get(cKeys[i]+";"+tKeys[i + j*cKeys.length]);		
@@ -628,9 +694,15 @@ public class NewCheckCoverage {
 			}
 		
 			for(String mkey : mStringMap.keySet()){
-				outm.println(mkey.replace('-', '_') + "= [");
-				outm.println(mStringMap.get(mkey));
-				outm.println("]';"); 
+				if(mkey.startsWith("Info_")){
+					outm.println(mkey.replace('-', '_') + "= {");
+					outm.println(mStringMap.get(mkey));
+					outm.println("}';");
+				}else{
+					outm.println(mkey.replace('-', '_') + "= [");
+					outm.println(mStringMap.get(mkey));
+					outm.println("]';");
+				}
 			}
 			outm.close();
 			out.close();
@@ -695,7 +767,7 @@ public class NewCheckCoverage {
 		ArrayList<String> ret = new ArrayList<String>();
 		
 		for(ScoredPosition sp : parser.getPositions()){
-			for(int n=0;n<10;n++){
+			for(int n=0;n<2;n++){
 				int rd1 = 0;
 				int rd2 = 0;
 				int r1 = 0;
@@ -706,7 +778,7 @@ public class NewCheckCoverage {
 					rd2 = rd1 + FCLIP_Scorer.getMinReadDiff() + new Random().nextInt(FCLIP_Scorer.getMaxReadDiff() - FCLIP_Scorer.getMinReadDiff());
 							
 					for(int i=0;i<2;i++){
-						ArrayList<AnnotatedGene> genes = annotationParser.getContainingGenes(sp.getContig(), i==0, rd1);
+						ArrayList<AnnotatedGene> genes = annotationParser.getContainingGenes(sp.getContig(), rd1, i==0);
 						
 						if(genes != null && !genes.isEmpty()){
 							AnnotatedGene gene = genes.get(0);
@@ -863,49 +935,53 @@ public class NewCheckCoverage {
 	}
 	
 	public static void main(String[] args) {
-		if(args[args.length - 1].equals("CIS")){ // cis
-			String cisOut = args[0];
-			String cisMOut = args[1] + new File(cisOut).getName().replace('.', '_');
-			cisMOut = cisMOut.substring(0, cisMOut.length() - 4) + ".m";			
-			String cisCsv = args[2];			
-			String[] cBams = args[3].split(",");
-			String[] tBams = args[4].split(",");
-			String[] cKeys = args[5].split(",");
-			String[] tKeys = args[6].split(",");
-			int maxSpan = Integer.parseInt(args[7]);	
-			int fcThreshold = Integer.parseInt(args[8]);
-			String bc = args[9];
-		    int numThreads = Integer.parseInt(args[10]);
-			generateForCis(cisOut, cisMOut, cisCsv, cBams, tBams, cKeys, tKeys, maxSpan, fcThreshold, getMedians(bc), numThreads);
+	    if(args.length > 0){		
+			if(args[args.length - 1].equals("CIS")){ // cis
+				String cisOut = args[0];
+				if(!new File(args[1]).exists()) new File(args[1]).mkdir();
+				String cisMOut = args[1] + new File(cisOut).getName().replace('.', '_');
+				cisMOut = cisMOut.substring(0, cisMOut.length() - 4) + ".m";			
+				String cisCsv = args[2];			
+				String[] cBams = args[3].split(",");
+				String[] tBams = args[4].split(",");
+				String[] cKeys = args[5].split(",");
+				String[] tKeys = args[6].split(",");
+				int maxSpan = Integer.parseInt(args[7]);	
+				int fcThreshold = Integer.parseInt(args[8]);
+				String bc = args[9];
+			    int numThreads = Integer.parseInt(args[10]);
+				generateForCis(cisOut, cisMOut, cisCsv, cBams, tBams, cKeys, tKeys, maxSpan, fcThreshold, getMedians(bc), numThreads);
+			}
+			if(args[args.length - 1].equals("TRANS")){
+				String transOut = args[0];
+				if(!new File(args[1]).exists()) new File(args[1]).mkdir();
+				String transMOut = args[1] + new File(transOut).getName().replace('.', '_');
+				transMOut = transMOut.substring(0, transMOut.length() - 4)  + ".m";
+				String transCsv = args[2];
+				String cisCsv = args[3];
+				String[] cKeys = args[4].split(",");
+				String[] tKeys = args[5].split(",");
+				int maxSpan = Integer.parseInt(args[6]);		
+				boolean filtered = args[7].equals("True");
+				boolean control = args[8].equals("True");
+				int fcThreshold = Integer.parseInt(args[9]);
+				String bc = args[10];
+				generateForTrans(transOut, transMOut, transCsv, cisCsv, cKeys, tKeys, maxSpan, filtered, control, fcThreshold, getMedians(bc));
+			}
+			
+			if(args[args.length - 1].equals("BG")){
+				String cisCsv = args[0];
+				AnnotationFileParser annotationParser = new AnnotationFileParser(args[1]);
+				ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser(args[2]);
+				String mOut = args[3];
+				String[] bams = args[4].split(",");
+				String[] keys = args[5].split(",");	
+				int maxSpan = Integer.parseInt(args[6]);		
+				int cutThreshold = Integer.parseInt(args[7]);
+			    int numThreads = Integer.parseInt(args[8]);
+				generateForBackground(cisCsv, annotationParser, fastaParser, mOut, bams, keys, cutThreshold, maxSpan, numThreads);
+			}		
 		}
-		if(args[args.length - 1].equals("TRANS")){
-			String transOut = args[0];
-			String transMOut =args[1] + new File(transOut).getName().replace('.', '_');
-			transMOut = transMOut.substring(0, transMOut.length() - 4)  + ".m";
-			String transCsv = args[2];
-			String cisCsv = args[3];
-			String[] cKeys = args[4].split(",");
-			String[] tKeys = args[5].split(",");
-			int maxSpan = Integer.parseInt(args[6]);		
-			boolean filtered = args[7].equals("True");
-			boolean control = args[8].equals("True");
-			int fcThreshold = Integer.parseInt(args[9]);
-			String bc = args[10];
-			generateForTrans(transOut, transMOut, transCsv, cisCsv, cKeys, tKeys, maxSpan, filtered, control, fcThreshold, getMedians(bc));
-		}
-		
-		if(args[args.length - 1].equals("BG")){
-			String cisCsv = args[0];
-			AnnotationFileParser annotationParser = new AnnotationFileParser(args[1]);
-			ZeroBasedFastaParser fastaParser = new ZeroBasedFastaParser(args[2]);
-			String mOut = args[3];
-			String[] bams = args[4].split(",");
-			String[] keys = args[5].split(",");	
-			int maxSpan = Integer.parseInt(args[6]);		
-			int cutThreshold = Integer.parseInt(args[7]);
-		    int numThreads = Integer.parseInt(args[8]);
-			generateForBackground(cisCsv, annotationParser, fastaParser, mOut, bams, keys, cutThreshold, maxSpan, numThreads);
-		}		
 	}
 
 }

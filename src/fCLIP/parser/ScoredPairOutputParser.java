@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 
 import launcher.RNAcofoldLauncher;
@@ -26,7 +25,7 @@ public class ScoredPairOutputParser {
 		private ScoredPosition[] sps;
 		private int depth;
 		private double energy;
-		private int hairpinNum;
+		private int hairpinNumInStem;
 		private int leftPaired;
 		private int rightPaired;
 		private boolean isFeasibleFold;
@@ -53,6 +52,8 @@ public class ScoredPairOutputParser {
 		private String misc = "";
 		private boolean isRepeat3p = false;
 		private boolean isRepeat5p = false;		
+		private boolean isALU3p = false;
+		private boolean isALU5p = false;
 		
 		static int rmsk3pHeaderColumnNumber = -1;
 		static int rmsk5pHeaderColumnNumber = -1;
@@ -63,6 +64,14 @@ public class ScoredPairOutputParser {
 
 		public boolean isRepeat5p() {
 			return isRepeat5p;
+		}
+		
+		public boolean isALU3p() {
+			return isALU3p;
+		}
+
+		public boolean isALU5p() {
+			return isALU5p;
 		}
 		
 		public int compareTo(ScoredPair o) {
@@ -90,7 +99,7 @@ public class ScoredPairOutputParser {
 		}
 
 		public int getHairpinNumber() {
-			return hairpinNum;
+			return hairpinNumInStem;
 		}
 
 		public int getLeftPaired() {
@@ -166,8 +175,8 @@ public class ScoredPairOutputParser {
 		}
 		//\tPreLength
 		static public String getHeader(){
-			return "Contig1\t5pPosition1\t3pPosition1\tStrand1\tPreLength1\t5p5preads1\t5p3preads1\t3p5preads1\t3p3preads1\tAccession1\tGeneName1\tGenomicRegion5p1\tGenomicRegion3p1\tDistFromExon5p1\tDistFromExon3p1\tDepth1\tEnergy1\tHairpinNumber1\tOverhang1\t"
-					+ "Contig2\t5pPosition2\t3pPosition2\tStrand2\tPreLength2\t5p5preads2\t5p3preads2\t3p5preads2\t3p3preads2\tAccession2\tGeneName2\tGenomicRegion5p2\tGenomicRegion3p2\tDistFromExon5p2\tDistFromExon3p2\tDepth2\tEnergy2\tHairpinNumber2\tOverhang2\t"
+			return "Contig1\t5pPosition1\t3pPosition1\tStrand1\tPreLength1\t5p5preads1\t5p3preads1\t3p5preads1\t3p3preads1\tAccession1\tGeneName1\tGenomicRegion5p1\tGenomicRegion3p1\tDistFromExon5p1\tDistFromExon3p1\tDepth1\tEnergy1\tHairpinNumberInStem1\tOverhang1\t"
+					+ "Contig2\t5pPosition2\t3pPosition2\tStrand2\tPreLength2\t5p5preads2\t5p3preads2\t3p5preads2\t3p3preads2\tAccession2\tGeneName2\tGenomicRegion5p2\tGenomicRegion3p2\tDistToNextExon5p2\tDistToNextExon3p2\tDepth2\tEnergy2\tHairpinNumberInStem2\tOverhang2\t"
 					+ "Class\tPredictionScore\tNumMatched3p\tNumMatched5p\tDepth\tEnergy\tHairpinNumber\tLeftPaired\tRightPaired\tOverhang\t5pScore\t3pScore\tblastHit1\tblastHit2"
 					+ "\tSeqEntropy\tStructureEntropy\tHetero\tSeq1\tSeq2\tSeq";
 		}
@@ -186,7 +195,7 @@ public class ScoredPairOutputParser {
 			this.leftPaired = fold.getLeftPaired();
 			this.rightPaired = fold.getRightPaired();
 			this.overHang = fold.getOverHang();
-			this.hairpinNum = fold.getNumberOfHairPins();
+			this.hairpinNumInStem = fold.getNumberOfHairPinsInStem();
 			this.seqEntropy = fold.getSeqEntropy();
 			this.structureEntropy = fold.getStructureEntropy();
 		//	this.seedConservation = sps[0].getThreePScore()>=0?sps[0].getSeedConservation() : sps[1].getSeedConservation();
@@ -237,7 +246,7 @@ public class ScoredPairOutputParser {
 			//this.seedConservation = Double.parseDouble(token[i++]);
 			this.depth = Integer.parseInt(token[i++]);
 			this.energy = Double.parseDouble(token[i++]);
-			this.hairpinNum = Integer.parseInt(token[i++]);
+			this.hairpinNumInStem = Integer.parseInt(token[i++]);
 			this.leftPaired = Integer.parseInt(token[i++]);
 			this.rightPaired = Integer.parseInt(token[i++]);
 			this.overHang = Integer.parseInt(token[i++]);
@@ -261,10 +270,12 @@ public class ScoredPairOutputParser {
 			}
 			if(rmsk3pHeaderColumnNumber> 0){
 				this.isRepeat3p = !token[rmsk3pHeaderColumnNumber].equals("_");
+				this.isALU3p = token[rmsk3pHeaderColumnNumber].toUpperCase().contains("ALU");
 			}
 			
 			if(rmsk5pHeaderColumnNumber> 0){
 				this.isRepeat5p = !token[rmsk5pHeaderColumnNumber].equals("_");
+				this.isALU5p = token[rmsk5pHeaderColumnNumber].toUpperCase().contains("ALU");
 			}
 		}
 		
@@ -338,7 +349,7 @@ public class ScoredPairOutputParser {
 			
 			sb.append(depth); sb.append('\t');
 			sb.append(energy); sb.append('\t');
-			sb.append(hairpinNum); sb.append('\t');
+			sb.append(hairpinNumInStem); sb.append('\t');
 			sb.append(leftPaired); sb.append('\t');
 			sb.append(rightPaired); sb.append('\t');
 			sb.append(overHang); sb.append('\t');

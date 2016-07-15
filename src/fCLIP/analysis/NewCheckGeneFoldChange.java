@@ -1,12 +1,12 @@
 package fCLIP.analysis;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Set;
 import java.util.Vector;
 
 import fCLIP.parser.ScoredPairOutputParser;
@@ -15,7 +15,6 @@ import fCLIP.parser.ScoredPairOutputParser.ScoredPair;
 import fCLIP.parser.ScoredPositionOutputParser.ScoredPosition;
 import parser.AnnotationFileParser;
 import parser.BufferedLineReader;
-import parser.ZeroBasedFastaParser;
 
 public class NewCheckGeneFoldChange {
 	// trans
@@ -25,11 +24,11 @@ public class NewCheckGeneFoldChange {
 		try {	
 			PrintStream out = new PrintStream(mOut);		
 			Hashtable<String, Vector<Double>> ctm = new Hashtable<String, Vector<Double>>(); // key , coverages
-			ArrayList<String> accessions = new ArrayList<String>(getGeneCoverage(beds[0]).keySet());			
+			ArrayList<String> accessions = new ArrayList<String>(getGeneCoverage(null, beds[0]).keySet());			
 			
 			for(int i=0;i<keys.length;i++){
 				Vector<Double> covs = new Vector<Double>();
-				HashMap<String, Integer> cov = getGeneCoverage(beds[i]);
+				HashMap<String, Integer> cov = getGeneCoverage(null, beds[i]);
 				out.println("GeneBG_" + keys[i].replace('-', '_') + "=[");
 				for(String accession : accessions){
 					covs.add((double)cov.get(accession));
@@ -39,14 +38,21 @@ public class NewCheckGeneFoldChange {
 				out.println("]';");
 			}
 					
+			for(int i=0;i<keys.length;i++){
+				out.println("AccBG_" + keys[i].replace('-', '_') + "={");
+				for(String accession : accessions){
+					out.println("'" + accession + "'");
+				}
+				out.println("}';");
+			}
+			
 			for(String key1 : ctm.keySet()){
 				for(String key2 : ctm.keySet()){
 					if(key1.equals(key2)) continue;					
 					out.print("%"+key1 + ";"+key2+";");
 					out.println(NewCheckCoverage.getMedianFC(ctm.get(key1), ctm.get(key2), 1));
 				}
-			}
-			
+			}			
 			
 			out.close();
 		}catch(IOException e){
@@ -154,7 +160,7 @@ public class NewCheckGeneFoldChange {
 							sbc.append(pair.isRepeat3p()? 1 :0);sbc.append(",");						
 							sbc.append(0);sbc.append(",");
 							sbc.append(pair.getPredictionScore());sbc.append(",");
-									
+								
 							sbc.append("%");
 							sbc.append(pair.getThreePContig());sbc.append(" ");
 							sbc.append(pair.getThreePPosition());sbc.append(" ");
@@ -223,10 +229,12 @@ public class NewCheckGeneFoldChange {
 	}
 	
 	
-	public static void generateForCis(String cisOut, String mOut, String cisCsv, 
+	public static void generateForCis(AnnotationFileParser aparser, String cisOut, String mOut, String cisCsv, 
 			String[] cBeds, String[] tBeds,	String[] cKeys, String[] tKeys, Hashtable<String, Double> medians){ 
 		
 		ScoredPositionOutputParser parser = new ScoredPositionOutputParser(cisCsv);		
+		parser.setLongestGeneIndex(aparser);
+		
 		try {	
 			PrintStream out = new PrintStream(cisOut);
 			
@@ -240,24 +248,38 @@ public class NewCheckGeneFoldChange {
 				}
 			}
 			out.println(); // print header
-			
+						
 			HashMap<String, HashMap<String, Integer>> covMap = new HashMap<String, HashMap<String,Integer>>();
 			HashMap<String, StringBuffer> mStringMTMap = new HashMap<String, StringBuffer>();
+			HashMap<String, StringBuffer> mStringMTAccMap = new HashMap<String, StringBuffer>();
+			
+			
 			HashMap<String, StringBuffer> mStringMiRNAMap = new HashMap<String, StringBuffer>();
+			HashMap<String, StringBuffer> mStringMiRNAAccMap = new HashMap<String, StringBuffer>();
+			
+			
 			HashMap<String, StringBuffer> mStringMap = null;
+			HashMap<String, StringBuffer> mStringAccMap = null;
+			
 			
 			for(int i=0;i<cKeys.length;i++){
-				covMap.put(cKeys[i], getGeneCoverage(cBeds[i]));
+				covMap.put(cKeys[i], getGeneCoverage(parser.getContigs(), cBeds[i]));
 			}
 			
 			for(int i=0;i<tKeys.length;i++){
-				covMap.put(tKeys[i], getGeneCoverage(tBeds[i]));
+				covMap.put(tKeys[i], getGeneCoverage(parser.getContigs(),tBeds[i]));
 			}
 			
 			for(ScoredPosition sp : parser.getPositions()){
 				
-				if(sp.hasMatchingMiRNA()) mStringMap = mStringMiRNAMap;
-				else mStringMap = mStringMTMap;
+				if(sp.hasMatchingMiRNA()){
+					mStringMap = mStringMiRNAMap;
+					mStringAccMap = mStringMiRNAAccMap;
+				}
+				else{
+					mStringMap = mStringMTMap;
+					mStringAccMap = mStringMTAccMap;
+				}
 				
 				int region1 = 0;
 				if(sp.getGenomicRegions3p() != null && !sp.getGenomicRegions3p().isEmpty()){
@@ -287,33 +309,45 @@ public class NewCheckGeneFoldChange {
 				for(int i=0; i<cKeys.length; i++){
 					String ckey = cKeys[i];		
 					if(!mStringMap.containsKey(ckey)) mStringMap.put(ckey, new StringBuffer());
+					if(!mStringAccMap.containsKey(ckey)) mStringAccMap.put(ckey, new StringBuffer());
+					
 					if(sp.getContainingGeneAccessions() == null || sp.getContainingGeneAccessions().isEmpty()){
 						out.print("_\t");
 					}else{
 						
+						
 						StringBuffer sbc = mStringMap.get(ckey);
+						StringBuffer sbcAcc = mStringAccMap.get(ckey);
+						
 						HashMap<String, Integer> cmap = covMap.get(ckey);
 						ccovs = new int[sp.getContainingGeneAccessions().size()];
 						for(int k=0; k<sp.getContainingGeneAccessions().size(); k++){
 							String accession = sp.getContainingGeneAccessions().get(k);
 							ccovs[k] = cmap.get(accession);
 							out.print(ccovs[k]+";");
-							if(sp.getClassification().equals("M")){	
+							if(k == sp.getLongestGeneIndex() && sp.getClassification().equals("M")){	
 								sbc.append(ccovs[k]);sbc.append(",");
 								sbc.append(sp.getOverHang());sbc.append(",");
 								sbc.append(sp.getEnergy());sbc.append(",");
 								sbc.append(region1);sbc.append(",");
 								sbc.append(region2);sbc.append(",");
-								sbc.append(sp.isRepeat5p()? 1 :0);sbc.append(",");
-								sbc.append(sp.isRepeat3p()? 1 :0);sbc.append(",");	
+								sbc.append(sp.isALU5p()? 1 :0);sbc.append(",");
+								sbc.append(sp.isALU3p()? 1 :0);sbc.append(",");	
 								sbc.append(sp.getPreLength());sbc.append(",");
 								sbc.append(sp.getPredictionScore());sbc.append(",");
-							
+								sbc.append(sp.getDistToNextExon5p() == null || sp.getDistToNextExon5p().get(k) == null? -1 : sp.getDistToNextExon5p().get(k));sbc.append(",");
+								sbc.append(sp.getDistToNextExon3p() == null || sp.getDistToNextExon3p().get(k) == null? -1 : sp.getDistToNextExon3p().get(k));sbc.append(",");
+								
 								sbc.append("%");
 								sbc.append(sp.getContig());sbc.append(" ");
 								sbc.append(sp.getThreePPosition());sbc.append(" ");
 								sbc.append(sp.getFivePPosition());sbc.append(" ");
+								sbc.append(accession+"\t"+sp.getContainingGeneNames().get(k));
 								sbc.append("\n");
+								
+								sbcAcc.append("'");
+								sbcAcc.append(accession+"\t"+sp.getContainingGeneNames().get(k));
+								sbcAcc.append("'\n");
 							}
 						}
 						out.print("\t");
@@ -321,12 +355,16 @@ public class NewCheckGeneFoldChange {
 					for(int j=0; i + j*cKeys.length<tKeys.length; j++){
 						String tkey = tKeys[i + j*cKeys.length];
 						if(!mStringMap.containsKey(tkey)) mStringMap.put(tkey, new StringBuffer());
+						if(!mStringAccMap.containsKey(tkey)) mStringAccMap.put(tkey, new StringBuffer());
 						
 						double median = medians.get(ckey+";"+tkey);								
 						if(sp.getContainingGeneAccessions() == null || sp.getContainingGeneAccessions().isEmpty()){
 							out.print("_\t_\t");
 						}else{
-							StringBuffer sbt = mStringMap.get(tkey);							
+							StringBuffer sbt = mStringMap.get(tkey);
+							StringBuffer sbtAcc = mStringAccMap.get(tkey);
+							
+							
 							HashMap<String, Integer> tmap = covMap.get(tkey);
 							tcovs = new int[sp.getContainingGeneAccessions().size()];
 							for(int k=0; k<sp.getContainingGeneAccessions().size(); k++){
@@ -334,22 +372,29 @@ public class NewCheckGeneFoldChange {
 								tcovs[k] = tmap.get(accession);
 								out.print(tcovs[k]+";");
 								
-								if(sp.getClassification().equals("M")){
+								if(k == sp.getLongestGeneIndex() && sp.getClassification().equals("M")){
 									sbt.append(tcovs[k]);sbt.append(",");
 									sbt.append(sp.getOverHang());sbt.append(",");
 									sbt.append(sp.getEnergy());sbt.append(",");
 									sbt.append(region1);sbt.append(",");
 									sbt.append(region2);sbt.append(",");
-									sbt.append(sp.isRepeat5p()? 1 :0);sbt.append(",");
-									sbt.append(sp.isRepeat3p()? 1 :0);sbt.append(",");	
+									sbt.append(sp.isALU5p()? 1 :0);sbt.append(",");
+									sbt.append(sp.isALU3p()? 1 :0);sbt.append(",");	
 									sbt.append(sp.getPreLength());sbt.append(",");
 									sbt.append(sp.getPredictionScore());sbt.append(",");
-																	
+									sbt.append(sp.getDistToNextExon5p() == null || sp.getDistToNextExon5p().get(k) == null? -1 : sp.getDistToNextExon5p().get(k));sbt.append(",");
+									sbt.append(sp.getDistToNextExon3p() == null || sp.getDistToNextExon3p().get(k) == null? -1 : sp.getDistToNextExon3p().get(k));sbt.append(",");
+															
 									sbt.append("%");
 									sbt.append(sp.getContig());sbt.append(" ");
 									sbt.append(sp.getThreePPosition());sbt.append(" ");
 									sbt.append(sp.getFivePPosition());sbt.append(" ");
+									sbt.append(accession+"\t"+sp.getContainingGeneNames().get(k));
 									sbt.append("\n");
+									
+									sbtAcc.append("'");
+									sbtAcc.append(accession+"\t"+sp.getContainingGeneNames().get(k));
+									sbtAcc.append("'\n");
 								}
 							}
 							out.print("\t");
@@ -373,10 +418,22 @@ public class NewCheckGeneFoldChange {
 				outm.println("]';");
 			}
 			
+			for(String mkey : mStringMTAccMap.keySet()){
+				outm.println("AccMT_" + mkey.replace('-', '_') + "= {");
+				outm.println(mStringMTAccMap.get(mkey));
+				outm.println("}';");
+			}
+			
 			for(String mkey : mStringMiRNAMap.keySet()){
 				outm.println("GeneMiRNA_" + mkey.replace('-', '_') + "= [");
 				outm.println(mStringMiRNAMap.get(mkey));
 				outm.println("]';");
+			}
+			
+			for(String mkey : mStringMiRNAAccMap.keySet()){
+				outm.println("AccMiRNA_" + mkey.replace('-', '_') + "= {");
+				outm.println(mStringMiRNAAccMap.get(mkey));
+				outm.println("}';");
 			}
 			outm.close();			
 		
@@ -386,7 +443,7 @@ public class NewCheckGeneFoldChange {
 	}
 	
 	
-	private static HashMap<String, Integer> getGeneCoverage(String covBed){ // key : accession value : coverage
+	private static HashMap<String, Integer> getGeneCoverage(Set<String> contigs, String covBed){ // key : accession value : coverage
 		BufferedLineReader in;	
 		HashMap<String, Integer> ret = new HashMap<String, Integer>();
 		try {
@@ -395,6 +452,7 @@ public class NewCheckGeneFoldChange {
 			while((s=in.readLine())!=null){
 				String[] token = s.split("\t");
 				//3 vs 12
+				if(contigs != null && (!contigs.contains(token[0]))) continue;
 				ret.put(token[3], Integer.parseInt(token[12]));
 			}
 			in.close();
@@ -408,14 +466,15 @@ public class NewCheckGeneFoldChange {
 		if(args[args.length - 1].equals("CIS")){ // cis
 			String cisOut = args[0];
 			String cisMOut = args[1] + new File(cisOut).getName().replace('.', '_');
-			cisMOut = cisMOut.substring(0, cisMOut.length() - 4) + "_gene.m";			
+			cisMOut = cisMOut.substring(0, cisMOut.length() - 4) + "_gene.m";	
 			String cisCsv = args[2];			
 			String[] cBeds = args[3].split(",");
 			String[] tBeds = args[4].split(",");
 			String[] cKeys = args[5].split(",");
 			String[] tKeys = args[6].split(",");
-			String bc = args[7];		    
-		    generateForCis(cisOut, cisMOut, cisCsv, cBeds, tBeds, cKeys, tKeys, NewCheckCoverage.getMedians(bc));	
+			String bc = args[7];	
+			AnnotationFileParser aparser = new AnnotationFileParser(args[8]);
+		    generateForCis(aparser, cisOut, cisMOut, cisCsv, cBeds, tBeds, cKeys, tKeys, NewCheckCoverage.getMedians(bc));	
 		}
 		if(args[args.length - 1].equals("TRANS")){
 			String transOut = args[0];

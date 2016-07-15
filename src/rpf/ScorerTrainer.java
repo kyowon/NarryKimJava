@@ -17,6 +17,8 @@ public class ScorerTrainer {
 	private int leftWindowSize = 30;
 	private int rightWindowSize = 200;
 	private int numberOfNonZeroElements = 7;
+	private int numberOfNonZeroElementsForTraining = 20;
+	private int maxLengthUntilStopcodon = 700;
 	//private int coverageThreshold = 1;
 	
 	private ArrayList<double[]> startSignal = null;
@@ -43,10 +45,11 @@ public class ScorerTrainer {
 		this.outParamFile = outParamFile;
 	}
 		
-	public void train(int leftWindowSize, int rightWindowSize, int numberOfNonZeroElements){
+	public void train(int leftWindowSize, int rightWindowSize, int numberOfNonZeroElements, int maxLengthUntilStopcodon){
 		this.leftWindowSize = leftWindowSize;
 		this.rightWindowSize = rightWindowSize;
 		this.numberOfNonZeroElements = numberOfNonZeroElements;
+		this.maxLengthUntilStopcodon = maxLengthUntilStopcodon;
 		//this.coverageThreshold = coverageThreshold;
 		startSignal = new ArrayList<double[]>();
 		stopSignal = new ArrayList<double[]>();
@@ -81,13 +84,13 @@ public class ScorerTrainer {
 			ArrayList<Integer> stopCoordinate = gene.getLiftOverPositions(stopPosition, leftWindowSize, rightWindowSize, false);		
 			double[] stopCov = bedParser.get5pCoverages(isPlusStrand, stopCoordinate);
 			
-			if(Scorer.numberOfNonZeroElements(startCov) >= numberOfNonZeroElements){
+			if(Scorer.numberOfNonZeroElements(startCov) >= numberOfNonZeroElementsForTraining){
 				//double[] sqrtCov = Scorer.getSqrtVector(cov);				
 				Scorer.addSmallValuesNNormalize(startCov);
 				startSignal.add(startCov);				
 			}
 			
-			if(Scorer.numberOfNonZeroElements(stopCov) >= numberOfNonZeroElements){
+			if(Scorer.numberOfNonZeroElements(stopCov) >= numberOfNonZeroElementsForTraining){
 				//double[] sqrtCov = Scorer.getSqrtVector(cov);				
 				Scorer.addSmallValuesNNormalize(stopCov);
 				stopSignal.add(stopCov);				
@@ -103,14 +106,14 @@ public class ScorerTrainer {
 				ArrayList<Integer> startNoiseCoordinate = gene.getLiftOverPositions(startPosition + offset, leftWindowSize, rightWindowSize, false);
 				double[] startNoiseCov = bedParser.get5pCoverages(isPlusStrand, startNoiseCoordinate);
 				
-				if(Scorer.numberOfNonZeroElements(startNoiseCov) >= numberOfNonZeroElements){					
+				if(Scorer.numberOfNonZeroElements(startNoiseCov) >= numberOfNonZeroElementsForTraining){					
 					Scorer.addSmallValuesNNormalize(startNoiseCov);
 					startNoise.add(startNoiseCov);	
 				}
 				
 				ArrayList<Integer> stopNoiseCoordinate = gene.getLiftOverPositions(startPosition + offset, leftWindowSize, rightWindowSize, false);
 				double[] stopNoiseCov = bedParser.get5pCoverages(isPlusStrand, stopNoiseCoordinate);
-				if(Scorer.numberOfNonZeroElements(stopNoiseCov) >= numberOfNonZeroElements){					
+				if(Scorer.numberOfNonZeroElements(stopNoiseCov) >= numberOfNonZeroElementsForTraining){					
 					Scorer.addSmallValuesNNormalize(stopNoiseCov);
 					stopNoise.add(stopNoiseCov);	
 				}
@@ -127,6 +130,9 @@ public class ScorerTrainer {
 			out.println("#LEFT\t"+leftWindowSize);
 			out.println("#RIGHT\t"+rightWindowSize);
 			out.println("#NONZERO\t"+numberOfNonZeroElements);
+			out.println("#SEQLENGTH\t"+maxLengthUntilStopcodon);
+			
+			
 			//out.println("#COVTHRESHOLD\t"+coverageThreshold);
 			
 			out.println("#STARTFILTER\t"+startFilter.length);
@@ -213,7 +219,7 @@ public class ScorerTrainer {
 	
 		String annotationFile = "/media/kyowon/Data1/RPF_Project/genomes/hg19.refFlat.txt";
 		ScorerTrainer test = new ScorerTrainer(annotationFile, new AnnotationFileParser(annotationFile), "/media/kyowon/Data1/RPF_Project/samples/sample1/bed/Noco_Harr_10mHsum-uncollapsed.bed.param");
-		test.train(90, 300, 30);
+		test.train(90, 300, 30, 700);
 	}
 	
 	

@@ -1,9 +1,7 @@
 package rpf.parser;
 
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -20,12 +18,61 @@ public class ScoringOutputParser {
 	//private HashMap<String, HashMap<Integer, >>
 	
 	public class ScoredPosition implements Comparable<ScoredPosition>{
+	
+
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result
+					+ ((contig == null) ? 0 : contig.hashCode());
+			result = prime * result + (isPlusStrand ? 1231 : 1237);
+			result = prime
+					* result
+					+ ((mappedRegionStartsEnds == null) ? 0
+							: mappedRegionStartsEnds.hashCode());
+			result = prime * result + position;
+			return result;
+		}
+		/* (non-Javadoc)
+		 * @see java.lang.Object#equals(java.lang.Object)
+		 */
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			ScoredPosition other = (ScoredPosition) obj;		
+			if (contig == null) {
+				if (other.contig != null)
+					return false;
+			} else if (!contig.equals(other.contig))
+				return false;
+			if (isPlusStrand != other.isPlusStrand)
+				return false;
+			if (mappedRegionStartsEnds == null) {
+				if (other.mappedRegionStartsEnds != null)
+					return false;
+			} else if (!mappedRegionStartsEnds
+					.equals(other.mappedRegionStartsEnds))
+				return false;
+			if (position != other.position)
+				return false;
+			return true;
+		}
 		private String contig;		
 		private boolean isPlusStrand;
 		private int position;
 		private double startScore;
-		private ArrayList<Integer> coordinate;
+		//private ArrayList<Integer> coordinate; // save memory!!
 		//private double stopScore;
+		public ArrayList<ArrayList<Integer>> mappedRegionStartsEnds;
 		private String seq;
 		private boolean isAnnotated = false;
 		private AnnotatedGene gene = null;
@@ -74,7 +121,7 @@ public class ScoringOutputParser {
 		 * @return the coordinate
 		 */
 		public ArrayList<Integer> getCoordinate() {
-			return coordinate;
+			return Bed12Parser.getCoordinate(mappedRegionStartsEnds, isPlusStrand);
 		}
 		private ScoredPosition(String s){ 
 			int i=0;
@@ -83,7 +130,7 @@ public class ScoringOutputParser {
 			position = Integer.parseInt(token[i++]);
 			String[] mrStarts = token[i++].split(",");
 			String[] mrEnds = token[i++].split(",");
-			ArrayList<ArrayList<Integer>> mappedRegionStartsEnds = new ArrayList<ArrayList<Integer>>();
+			mappedRegionStartsEnds = new ArrayList<ArrayList<Integer>>();
 			for(int j=0;j<mrStarts.length;j++){
 				ArrayList<Integer> exom = new ArrayList<Integer>();
 				exom.add(Integer.parseInt(mrStarts[j]));
@@ -91,7 +138,7 @@ public class ScoringOutputParser {
 				mappedRegionStartsEnds.add(exom);
 			}
 			isPlusStrand = token[i++].equals("+");
-			coordinate = Bed12Parser.getCoordinate(mappedRegionStartsEnds, isPlusStrand);
+		
 			
 			startScore = Double.parseDouble(token[i++]);
 			//stopScore = Double.parseDouble(token[4]);
@@ -111,47 +158,13 @@ public class ScoringOutputParser {
 		
 		
 		
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			//result = prime * result + getOuterType().hashCode();
-			result = prime * result
-					+ ((contig == null) ? 0 : contig.hashCode());
-			result = prime * result
-					+ ((coordinate == null) ? 0 : coordinate.hashCode());
-			result = prime * result + position;
-			return result;
-		}
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (!(obj instanceof ScoredPosition))
-				return false;
-			ScoredPosition other = (ScoredPosition) obj;
-			if (contig == null) {
-				if (other.contig != null)
-					return false;
-			} else if (!contig.equals(other.contig))
-				return false;
-			if (coordinate == null) {
-				if (other.coordinate != null)
-					return false;
-			} else if (!coordinate.equals(other.coordinate))
-				return false;
-			if (position != other.position)
-				return false;
-			return true;
-		}
+		
 		public ScoredPosition(String contig, int position, ArrayList<Integer> coordinate, boolean isPlusStrand, double startScore, String seq, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
 			this.contig = contig;
 			this.position = position;
 			this.isPlusStrand = isPlusStrand;
 			this.startScore = startScore;
-			this.coordinate = coordinate;
+			this.mappedRegionStartsEnds = Bed12Parser.getCoordinateStartsEnds(coordinate, isPlusStrand);
 			//this.stopScore = stopScore;
 			this.seq = seq;
 			this.genomicRegion = genomicRegion;
@@ -162,7 +175,11 @@ public class ScoringOutputParser {
 			}
 			
 		}
-				
+			
+		public int getLength(){
+			return getCoordinate().size();
+		}
+		
 		public int compareTo(ScoredPosition o) {
 			return new Integer(this.getPosition()).compareTo(new Integer(o.getPosition()));
 		}
@@ -170,7 +187,7 @@ public class ScoringOutputParser {
 
 		public String toMappedRegionString(StringBuffer sb){
 			//StringBuilder sb = new StringBuilder();
-			ArrayList<ArrayList<Integer>> mappedRegionStartsEnds = Bed12Parser.getCoordinateStartsEnds(coordinate, isPlusStrand);
+			//ArrayList<ArrayList<Integer>> mappedRegionStartsEnds = Bed12Parser.getCoordinateStartsEnds(coordinate, isPlusStrand);
 			for(int j=0;j<mappedRegionStartsEnds.size()-1;j++){
 				sb.append(mappedRegionStartsEnds.get(j).get(0));
 				sb.append(',');
@@ -209,7 +226,7 @@ public class ScoringOutputParser {
 				sb.append(AnnotatedGene.getEmptyString());
 			}
 			return sb.toString(); 
-		}
+		}		
 	
 		
 	}
@@ -220,16 +237,26 @@ public class ScoringOutputParser {
 		read(inFile);
 	}
 	
-	public ScoringOutputParser() {
+	public ScoringOutputParser(String inFile, String contig) {
+		read(inFile, contig);
+	}
+	
+	public ScoringOutputParser(){
+		
 	}
 
 	private void read(String outFile){
+		read(outFile, null);
+	}
+	
+	private void read(String outFile, String contig){
 		positionMap = new HashMap<String, ArrayList<ScoredPosition>>();
 		try {
 			BufferedLineReader in  = new BufferedLineReader((outFile));
 			String s;
 			while((s=in.readLine())!=null){
-				ScoredPosition position = new ScoredPosition(s);				
+				ScoredPosition position = new ScoredPosition(s);	
+				if(contig != null && !position.getContig().equals(contig)) continue;
 				if(!positionMap.containsKey(position.getContig()))
 					positionMap.put(position.getContig(), new ArrayList<ScoredPosition>());
 				positionMap.get(position.getContig()).add(position);
@@ -270,12 +297,13 @@ public class ScoringOutputParser {
 	}
 	*/
 	
-	public static ScoredPosition getScoredPosition(String contig, int position, ArrayList<Integer> coordinate, boolean isPlusStrand, double startScore, String seq, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
+	public static ScoredPosition getScoredPosition(String contig, int position, ArrayList<Integer> coordinate, boolean isPlusStrand, double startScore, 
+			String seq, AnnotatedGene gene, boolean isAnnotated, String genomicRegion, String frameShift){
 		return  new ScoringOutputParser().new ScoredPosition(contig, position, coordinate, isPlusStrand, startScore, seq, gene, isAnnotated, genomicRegion, frameShift);			
 	}
 	
 	public static ArrayList<ScoredPosition> getUnionPositions(ScoringOutputParser[] parsers,
-			AnnotationFileParser annotationParser, String contig, double scoreThreshold, int length, int offset){
+			AnnotationFileParser annotationParser, String contig, double scoreThreshold){
 		//HashMap<Integer, ArrayList<ScoredPosition>> positions = new HashMap<Integer, ArrayList<ScoredPosition>>();
 		
 		ArrayList<ScoredPosition> positionList = new ArrayList<ScoredPosition>();
@@ -284,6 +312,10 @@ public class ScoringOutputParser {
 		for(int i=0; i<parsers.length;i++){
 			for(ScoredPosition position : parsers[i].getPositions(contig)){
 				if(position.getScore() < scoreThreshold) continue;
+				if( position.getCoordinate().isEmpty()){
+					System.out.println("Empty : " + position );
+					continue;
+				}
 				if(!positions.containsKey(position)) positions.put(position, new HashSet<Integer>());
 				positions.get(position).add(i); // rpf index
 			}
@@ -338,7 +370,9 @@ public class ScoringOutputParser {
 	
 	static public ArrayList<ScoredPosition> getQuantityFilteredPositions(ArrayList<ScoredPosition> positions, Quantifier[] quantifiers, double RPKM){
 		ArrayList<ScoredPosition> ret = new ArrayList<ScoredPosition>();
+		//int i = 0;
 		for(ScoredPosition position : positions){
+			//System.out.print(i++);
 			boolean isAbundant = false;
 			for(Quantifier q : quantifiers){
 				if(q.isAbundant(position, RPKM)){
@@ -346,6 +380,7 @@ public class ScoringOutputParser {
 					break;
 				}
 			}
+			//System.out.println(" " + isAbundant);
 			if(isAbundant)				
 				ret.add(position);
 		}
@@ -353,11 +388,11 @@ public class ScoringOutputParser {
 	}
 	
 	public static void main(String[] args) throws FileNotFoundException{
-		ScoringOutputParser test = new ScoringOutputParser("/media/kyowon/Data1/RPF_Project/samples/sample3/bed/RPF-0_1-uncollapsed.bed.score0.3.tsv");
-		PrintStream out = new PrintStream("/media/kyowon/Data1/RPF_Project/samples/sample3/bed/RPF-0_1-uncollapsed.bed.score0.3.tsv2");
-		for(ScoredPosition s: test.getPositions()){
-			out.println(s);
-		}
-		out.close();
+		ScoringOutputParser test = new ScoringOutputParser("/media/kyowon/Data1/RPF_Project/samples/sample5/bed/RPF-C_1-uncollapsed.bed.score0.3.tsv");
+		//PrintStream out = new PrintStream("/media/kyowon/Data1/RPF_Project/samples/sample5/results/out_0.3_smORFcopy.csv");
+		HashSet<ScoredPosition> set = new HashSet<ScoringOutputParser.ScoredPosition>(test.getPositions());
+		System.out.println(set.size());
+		System.out.println(test.getPositions().get(0).equals(test.getPositions().get(1)));
+		//out.close();
 	}
 }

@@ -75,6 +75,9 @@ public class ZeroBasedFastaParser {
 		return seq.toString();
 	}
 	
+	
+	
+	
 	/**
 	    * Get the complementary sequence (order reversed)
 	    * @param seq the sequence to be complemented

@@ -52,7 +52,7 @@ public class Classifier {
 		//if(!p.isPaired() && (p.getOverHang() < 0 || p.getOverHang() > 5)) p.setClassification("T", 1);
 		//else{
 			double prediction = classify(toInstance(p));
-			String classificaition = prediction>=0.0? (prediction >= 0.7?"M" : "m") : "U";
+			String classificaition = prediction>=0.0? (prediction >= 0.7?"M" : "u") : "U";
 			
 			//if(p.getSCI()<0) 
 			//	classificaition = classificaition.toLowerCase();
@@ -65,7 +65,7 @@ public class Classifier {
 		//if(p.getOverHang() < 0 || p.getOverHang() > 4) p.setClassification("u", 1);
 		else{
 			double prediction = classify(toInstance(p));
-			p.setClassification(prediction>=0.0? (prediction >= 0.7?"M" : "m") : "U", Math.abs(prediction));
+			p.setClassification(prediction>=0.0? (prediction >= 0.7?"M" : "u") : "U", Math.abs(prediction));
 		}
 	}
 	
@@ -74,7 +74,7 @@ public class Classifier {
 		Instance inst = new DenseInstance(7);
 		inst.setDataset(this.getDataset());
 		inst.setValue(i++, p.getEnergy());
-		inst.setValue(i++, p.getHairpinNumber());
+		inst.setValue(i++, p.getHairpinNumberInStem());
 		//if(p.getSCI()<0) inst.setMissing(i);
 		//else inst.setValue(i, p.getSCI());
 		//i++;
@@ -138,7 +138,7 @@ public class Classifier {
 	static public String toTrainingArffString(ScoredPosition p){
 		StringBuilder sb = new StringBuilder();
 		sb.append(p.getEnergy()); sb.append(',');
-		sb.append(p.getHairpinNumber()); sb.append(',');
+		sb.append(p.getHairpinNumberInStem()); sb.append(',');
 		//sb.append(p.getSCI()<0? "?" : p.getSCI()); sb.append(',');
 		//sb.append(p.getZScore()==10000? "?" : p.getZScore()); sb.append(',');
 		sb.append(p.is3pScored()? p.getThreePScore() : "?"); sb.append(',');
@@ -160,7 +160,7 @@ public class Classifier {
 	static public String toArffString(ScoredPosition p){
 		StringBuilder sb = new StringBuilder();
 		sb.append(p.getEnergy()); sb.append(',');
-		sb.append(p.getHairpinNumber()); sb.append(',');
+		sb.append(p.getHairpinNumberInStem()); sb.append(',');
 		//sb.append(p.getSCI()<0? "?" : p.getSCI()); sb.append(',');
 		//sb.append(p.getZScore()==10000? "?" : p.getZScore()); sb.append(',');
 		sb.append(p.is3pScored()? p.getThreePScore() : "?"); sb.append(',');

@@ -2,6 +2,7 @@ package util;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.regex.Pattern;
 
 public class Codon extends ArrayList<Nucleotide>{
@@ -144,6 +145,15 @@ public class Codon extends ArrayList<Nucleotide>{
 		}
 		return matchingCodons;
 	}
+	
+	static public HashSet<String> getStopCodonStringSet(){
+		HashSet<String> stopCodons = new HashSet<String>();
+		stopCodons.add ("TAA");
+		stopCodons.add ("TAG");
+		stopCodons.add ("TGA");
+		return stopCodons;
+	}
+	
 	
 	public ArrayList<Codon> getMutatedStandardCodons(int index){
 		String seq = getNucleotideSeq();

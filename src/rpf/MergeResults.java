@@ -1,5 +1,7 @@
 package rpf;
 
+import htsjdk.samtools.SamReader;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -32,16 +34,19 @@ public class MergeResults {
 	private int[][] groups;
 	private String[] harrBedFiles;
 	private String[] rpfBedFiles;
-	private String[] rnaBedFiles;
-	private String[] harrParamFiles;
-	private String[] rpfParamFiles;
+	private SamReader[] rpfSamReaders;
+	private SamReader[] rnaSamReaders;
+	private String harrParamFiles;
+	private String rpfParamFiles;
+	private String[] rpfScoreOutFiles;
 	
 	public MergeResults(String[] rpfScoreOutFiles, 
 			String[] harrBedFiles, 
 			String[] rpfBedFiles,
-			String[] rnaBedFiles,
-			String[] harrParamFiles,
-			String[] rpfParamFiles,
+			SamReader[] rpfSamReaders,
+			SamReader[] rnaSamReaders,			
+			String harrParamFiles,
+			String rpfParamFiles,
 			int[][] groups,
 			AnnotationFileParser annotationFileParser,
 			ZeroBasedFastaParser fastaFileParser,
@@ -52,15 +57,13 @@ public class MergeResults {
 		
 		this.harrBedFiles = harrBedFiles;
 		this.rpfBedFiles = rpfBedFiles;
-		this.rnaBedFiles = rnaBedFiles;
+		this.rpfSamReaders = rpfSamReaders;
+		this.rnaSamReaders = rnaSamReaders;
+		//this.rnaBedFiles = rnaBedFiles;
 		this.harrParamFiles = harrParamFiles;
 		this.rpfParamFiles = rpfParamFiles;
+		this.rpfScoreOutFiles = rpfScoreOutFiles;
 		
-		rpfScoringOutputParsers = new ScoringOutputParser[rpfScoreOutFiles.length];
-		
-		for(int i=0;i<rpfScoringOutputParsers.length;i++){
-			rpfScoringOutputParsers[i] = new ScoringOutputParser(rpfScoreOutFiles[i]);			
-		}
 		///media/kyowon/Data1/RPF_Project/tools/matrices(SearchMatrix-objects)/eukarya.smx
 		File pmatrix=new File("./../tools/matrices(SearchMatrix-objects)/eukarya.smx");
 	      ObjectInputStream in;
@@ -71,47 +74,39 @@ public class MergeResults {
 				smp = (SearchMatrix) in.readObject();
 				pd = new SignalPeptidePredictor(smp);
 			} catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		    in.close();    
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		this.fastaFileParser = fastaFileParser;
 	}
 	
 	private void initiate(String contig){
+		rpfScoringOutputParsers = new ScoringOutputParser[rpfScoreOutFiles.length];
+		
+		for(int i=0;i<rpfScoringOutputParsers.length;i++){
+			rpfScoringOutputParsers[i] = new ScoringOutputParser(rpfScoreOutFiles[i], contig);			
+		}
+		
 		if(harrBedFiles != null){
-			harrScorers = new Scorer[harrParamFiles.length];			
+			harrScorers = new Scorer[harrBedFiles.length];			
 			for(int i=0;i<harrScorers.length;i++){		
 				Bed12Parser harrParser = new Bed12Parser(harrBedFiles[i], annotationFileParser, contig);
-				harrScorers[i] = new Scorer(harrParser, harrParamFiles[i], annotationFileParser, fastaFileParser);
+				harrScorers[i] = new Scorer(harrParser, harrParamFiles, annotationFileParser, fastaFileParser);
 			}
 		}
 		
 		rpfScorers = new Scorer[rpfBedFiles.length];
-		rpfQuantifiers = new Quantifier[rpfBedFiles.length];
-		if(rnaBedFiles!=null)
-			rnaQuantifiers = new Quantifier[rnaBedFiles.length];
 		
 		for(int i=0;i<rpfBedFiles.length;i++){
 			Bed12Parser rpfParser = new Bed12Parser(rpfBedFiles[i], annotationFileParser, contig);
-			rpfScorers[i] = new Scorer(rpfParser, rpfParamFiles[i], annotationFileParser, fastaFileParser);
-		//	for(int i=0;i<rpfQuantifiers.length;i++){
-			rpfQuantifiers[i] = new Quantifier(rpfParser, annotationFileParser, fastaFileParser);
-		//	}
-		
+			rpfScorers[i] = new Scorer(rpfParser, rpfParamFiles, annotationFileParser, fastaFileParser);
+			
 		}
 		
 		
-		if(rnaQuantifiers!=null){
-			for(int i=0;i<rnaBedFiles.length;i++){
-				Bed12Parser rnaParser = new Bed12Parser(rnaBedFiles[i], annotationFileParser, contig);	
-				rnaQuantifiers[i] = new Quantifier(rnaParser, annotationFileParser, fastaFileParser);
-			}
-		}
 	
 	}
 	
@@ -143,15 +138,34 @@ public class MergeResults {
 			boolean start = true;
 			
 			ArrayList<MergedResult> mrs = new ArrayList<MergedResult>();
+			System.out.print("Quantifiers init");
+			rpfQuantifiers = new Quantifier[rpfBedFiles.length];
+			if(rnaSamReaders!=null)
+				rnaQuantifiers = new Quantifier[rnaSamReaders.length];
 			
+			
+			for(int i=0;i<rpfSamReaders.length;i++){
+				rpfQuantifiers[i] = new Quantifier(rpfSamReaders[i]); 
+			}
+			System.out.print(".. ");
+			if(rnaQuantifiers!=null){
+				for(int i=0;i<rnaSamReaders.length;i++){
+					rnaQuantifiers[i] = new Quantifier(rnaSamReaders[i]);  
+				}
+			}
+			
+			System.out.println(".. done");
 			for(String contig : contigs){
+								
 				//contig = "chr5";
-				System.out.println("Merging " + contig);
+				System.out.print("Merging " + contig);
 				initiate(contig);
+				System.out.println(" - Init done");
+				
 				boolean harrRPFsynced = harrScorers != null && harrScorers.length == rpfQuantifiers.length;
 				
 				ScoredPosition prevPosition = null;
-				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(rpfScoringOutputParsers, annotationFileParser, contig, scoreThreshold, positionQuantityChangeLength, positionQuantityOffset)){
+				for(ScoredPosition position : ScoringOutputParser.getUnionPositions(rpfScoringOutputParsers, annotationFileParser, contig, scoreThreshold)){
 					//if(position.getGenomicRegion().equals("NM_3_UTR")){
 					if(prevPosition !=null && !prevPosition.equals(position)){
 						if(position.getGene() == null){
@@ -162,9 +176,10 @@ public class MergeResults {
 						//(position.getGene() == null && prevPosition.getGene() == null || position.getGene().equals(prevPosition.getGene()))) continue;	
 					}
 					//}else if(!position.getCodon().equals("ATG") && !position.getCodon().equals("CTG")) continue;
-					
+					if(position.getCoordinate().isEmpty()) continue;
 					//if(position.getCodon() != )
-					MergedResult mr = new MergedResult(position, harrScorers, rpfScorers, rpfQuantifiers, rnaQuantifiers, groups, fastaFileParser, mafParser, pd, positionQuantityChangeLength, positionQuantityOffset, maxLengthUntilStopcodon);
+					MergedResult mr = new MergedResult(position, harrScorers, rpfScorers, rpfQuantifiers, rnaQuantifiers, groups, fastaFileParser, mafParser, pd, 
+							positionQuantityChangeLength, positionQuantityOffset, maxLengthUntilStopcodon);
 					
 					if(mr.getLength() < 25) continue;
 					

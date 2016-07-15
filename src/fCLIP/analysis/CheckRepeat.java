@@ -320,11 +320,13 @@ public class CheckRepeat {
 				HashMap<String, Integer> mv5p = stat5p.get(mKey);
 				
 				String suffix5 = "";
-			//	if(v5 != null){
-			//		if(v5.startsWith("SINE")) suffix5 = "SINE";
-			//		else if(v5.startsWith("LINE")) suffix5 = "LINE";
-			//		else suffix5 = "R";
-			//	}
+				if(v5 != null){
+					if(v5.startsWith("SINE")) suffix5 = "SINE";
+					else if(v5.startsWith("LINE")) suffix5 = "LINE";
+					else if(v5.startsWith("Simple_repeat")) suffix5 = "Simple repeat";
+					else if(v5.startsWith("LTR")) suffix5 = "LTR";
+					else suffix5 = "Other repeat";
+				}
 				String k5 = getGenomicRegion(p, true, suffix5);
 				if(p.hasMatchingMiRNA()) k5 = "miRNA";
 				
@@ -335,11 +337,13 @@ public class CheckRepeat {
 				HashMap<String, Integer> mv3p = stat3p.get(mKey);
 				
 				String suffix3 = "";
-				//if(v3 != null){
-				//	if(v3.startsWith("SINE")) suffix3 = "SINE";
-				//	else if(v3.startsWith("LINE")) suffix3 = "LINE";
-				//	else suffix3 = "R";
-				//}
+				if(v3 != null){
+					if(v3.startsWith("SINE")) suffix3 = "SINE";
+					else if(v3.startsWith("LINE")) suffix3 = "LINE";
+					else if(v3.startsWith("Simple_repeat")) suffix3 = "Simple repeat";
+					else if(v3.startsWith("LTR")) suffix3 = "LTR";
+					else suffix3 = "Other repeat";
+				}
 				String k3 = getGenomicRegion(p, false, suffix3);
 				if(p.hasMatchingMiRNA()) k3 = "miRNA";
 				
@@ -392,6 +396,7 @@ public class CheckRepeat {
 				
 				statp.println(mKey);
 				int sum = 0;
+				HashSet<String> regionKeys = new HashSet<String>();
 				for(String k5 : mv5p.keySet()){
 					sum += mv5p.get(k5);
 				}
@@ -400,8 +405,13 @@ public class CheckRepeat {
 					sum += mv3p.get(k3);
 				}
 				
-				for(String k5 : mv5p.keySet()){
-					statp.println(k5 + "\t" + ( mv3p.get(k5) + mv5p.get(k5)) + "\t" + ((double)(mv3p.get(k5) + mv5p.get(k5)) * 100 / sum));
+				regionKeys.addAll(mv5p.keySet());
+				regionKeys.addAll(mv3p.keySet());
+				
+				for(String k : regionKeys){
+					int n = mv3p.get(k) == null? 0 : mv3p.get(k);
+					int m = mv5p.get(k) == null? 0 : mv5p.get(k);
+					statp.println(k + "\t" + ( n + m ) + "\t" + ((double)(n + m) * 100 / sum));
 				}
 				//	
 				statp.println("total\t" + sum + "\n\n");
@@ -613,7 +623,6 @@ public class CheckRepeat {
 			String k5 = getGenomicRegion(p, true, suffix5);
 			if(!mv5p.containsKey(k5)) mv5p.put(k5, 0);
 			mv5p.put(k5, mv5p.get(k5)+1);
-			
 			
 			HashMap<String, Integer> mv3p = stat3p.get(mKey);
 			

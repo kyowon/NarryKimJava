@@ -47,7 +47,6 @@ public class IsotopeDistributionGenerator {
          ArrayList<ArrayList<Integer>> initcomb = new ArrayList<ArrayList<Integer>>();
          initcomb.add(new ArrayList<Integer>());
          possibleIsotopeCombinations.add(initcomb);
-            //Arrays.equals(ary1,ary2)      
          for (int i = 1; i <= max ; i++)
          {
         	ArrayList<ArrayList<Integer>> comb = new ArrayList<ArrayList<Integer>>();
@@ -186,7 +185,9 @@ public class IsotopeDistributionGenerator {
 	
 	
 	static public void main(String[] args){
-		for(double d : new IsotopeDistributionGenerator(new Peptide("LRGM+15.995NEHQC+57.021ELR").getComposition(),1560.7356f, 6, 0).getDist()){
+		String seq = "MLGLALNFSK";
+		
+		for(double d : new IsotopeDistributionGenerator(new Peptide(seq).getComposition(),new Peptide(seq).getMass(), 10, 0).getDist()){
 			System.out.println(d);
 		}
 	}

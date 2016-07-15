@@ -11,7 +11,7 @@ public class RNAfoldLauncher {
 	private double energy = 0;
 	private double energyPerNT = 0;
 	
-	private int flankingNTnumber = 11;
+	private int flankingNTnumber = 15;
 	private int depth = 0;
 	private int numberOfHairPins = 0;
 	private int overHang = -1000;
@@ -21,6 +21,9 @@ public class RNAfoldLauncher {
 	private double structureEntropy = 0;
 	public final static int[] overhanglimit = {0,5};
 	public final static int[] pairedNumberlimit = {8,6};
+	private String structure;
+	private boolean useCentroid = false;
+	
 	
 	public double getSeqEntropy() {
 		return seqEntropy;
@@ -64,11 +67,19 @@ public class RNAfoldLauncher {
 	public int getNumberOfHairPins(){
 		return numberOfHairPins;
 	}
-	
 	public RNAfoldLauncher(String seq, int flankingNTnumber){
+		this(seq, flankingNTnumber, false);
+	}
+	
+	public RNAfoldLauncher(String seq, int flankingNTnumber, boolean useCentroid){
 		this.flankingNTnumber = flankingNTnumber;
+		this.useCentroid = useCentroid;
 		if(seq != null && !seq.isEmpty())
 			run(seq);
+	}
+	
+	public String getStructureString(){
+		return structure;
 	}
 	
 	private void run(String seq){//seq = pre + flanking.
@@ -78,7 +89,7 @@ public class RNAfoldLauncher {
 			String[] cmd = {
 					"/bin/sh",
 					"-c",
-					"echo "+ pseq + " | RNAfold --noPS"
+					"echo "+ pseq + " | RNAfold --noPS -p"
 					};
 			ProcessBuilder pr = new ProcessBuilder(cmd);		 
 			Process p = pr.start();
@@ -94,12 +105,14 @@ public class RNAfoldLauncher {
 			String[] re = builder.toString().split("\n");
 		//	String[] result = re[1].split(" ");
 			
-			//for(String kk : result) 
-			//System.out.println(builder.toString());
+		//	for(String kk : re) 
+		//		System.out.println(builder.toString());
 			
 			int maxDepth = 0;
 		//	int maxCenterDepth = 0;
-			String st = re[1].substring(0, re[1].indexOf(' '));
+			String st = re[1].substring(0, re[1].indexOf(' ')); 
+			if(useCentroid) st = re[3].substring(0, re[3].indexOf(' '));
+			
 			int d = 0;
 			int l = 0;
 			int r = 0;
@@ -133,8 +146,13 @@ public class RNAfoldLauncher {
 				if(st.charAt(i) == ')') //break;
 					r++;
 			}
+			structure = st;
+			//System.out.println(st);
+		//	if(nh == 1){	
 			
-		//	if(nh == 1){			
+			
+			/*
+			
 				this.overHang = 0;
 				
 				String fst = st.substring(0, st.length()/2);
@@ -185,8 +203,59 @@ public class RNAfoldLauncher {
 										
 					}
 				}
-				
-				
+				*/
+			this.overHang = 0;
+			
+			String fst = st.substring(0, st.length()/2);
+			//fst = fst.replace("&", "");
+			//System.out.println(st);
+			String tst = st.substring(st.length()/2);
+			//System.out.println(fst);
+			//System.out.println(tst);
+			//fst tst
+			int fivePaired = 0;
+			for(int i=fst.length()-1; i>=flankingNTnumber; i--){
+				if(fst.charAt(i) == '(') fivePaired ++;
+				else if(fst.charAt(i) == ')') fivePaired--;
+			}
+			//.((((..(((((. .(((((.(((..(..((((((((.(((.((.(.
+			//...).))))).)))))))).)))).))))).  .))))))))).....
+			int threePaired = 0;
+			for(int i=0; i<tst.length() - flankingNTnumber; i++){
+				if(tst.charAt(i) == ')') threePaired ++;
+				else if(tst.charAt(i) == '(') threePaired--;
+			}
+			
+			//int diff = fivePaired - threePaired;
+		//	int fp = 0;
+			//System.out.println(threePaired + " " + fivePaired);
+			for(int i=flankingNTnumber;i<fst.length();i++){
+				if(fst.charAt(i)=='.') this.overHang--;
+				else{
+					if(threePaired >= fivePaired) break;
+					if(fst.charAt(i) == '('){
+						fivePaired --;
+					}else if(fst.charAt(i) == ')'){
+						fivePaired++;
+					}					
+					this.overHang--;					
+				}
+			}
+		//	System.out.println(this.overHang);
+		//	int tp = 0;
+			for(int i=tst.length() - flankingNTnumber-1;i>=0;i--){
+				if(tst.charAt(i)=='.') this.overHang++;
+				else{
+					if(threePaired <= fivePaired) break;	
+					if(tst.charAt(i) == ')'){
+						threePaired --;
+					}else if(tst.charAt(i) == '('){
+						threePaired++;
+					}
+					this.overHang++;									
+				}
+			}
+			//System.out.println(this.overHang);
 				/*int[] threePPairedIndices = new int[500];
 				int[] fivePPairedIndices = new int[500];
 				
@@ -292,6 +361,223 @@ public class RNAfoldLauncher {
 	//(((...((.(((((....(((.(((.(((.(((..(((....)))..))).))).))).)))))))).)).))).......(((((....((((.((((.....)))).)))))))))..
 	 
 	
+	
+	public String getBalancedStructure(char cleavageChar){
+		String ustr = getUnWindedStructureStr(structure);
+		StringBuilder sbl = new StringBuilder();
+		StringBuilder sbr = new StringBuilder();
+		
+		int lindex = 0;
+		int rindex = ustr.length();
+		
+		while(ustr.charAt(lindex) != '('){
+			sbl.append(ustr.charAt(lindex++));
+		}
+		
+		while(ustr.charAt(rindex) != ')'){
+			sbr.insert(0, ustr.charAt(rindex--));
+		}
+		
+		boolean[] cleavageSpecified = new boolean[2];
+		while(lindex < rindex){
+			char l = ustr.charAt(lindex);
+			char r = ustr.charAt(rindex);
+			if(l == r){
+				sbl.append(l);
+				sbr.insert(0,r);
+				lindex++;
+				rindex--;
+			}else if(l == '('){
+				rindex--;
+			}else if(r == ')'){
+				lindex++;
+			}
+			
+			if(!cleavageSpecified[0] && lindex == flankingNTnumber){
+				sbl.append(cleavageChar);
+				cleavageSpecified[0] = true;
+			}
+			if(!cleavageSpecified[1] && rindex == ustr.length() - flankingNTnumber){
+				sbr.insert(0,r);
+				cleavageSpecified[1] = true;
+			}
+			
+		}
+		if(lindex == rindex) sbl.append(ustr.charAt(lindex));
+		
+		return sbl.toString();
+	}
+	
+	
+	
+	
+
+	public static String getUnWindedStructureStr(String str){
+		//"(((...((.(((((....(((.(((.(((.(((..(((....)))..))).))).))).)))))))).)).))).......(((((....((((.((((.....)))).))))))))).."
+		StringBuffer unWindedStr = new StringBuffer();
+		boolean startScan = false;
+		int c = 0;
+		for(int i=str.length()/2-1;i>=0;i--){
+			char toput = str.charAt(i);
+			if(!startScan && toput == '('){
+				startScan = true;
+			}
+			if(startScan){
+				if(toput == ')') // local hairpin
+				{
+					toput = '.';
+					c++;
+				}
+				if(c>0 && toput == '('){
+					toput = '.';
+					c--;
+				}
+			}
+			unWindedStr.insert(0, toput);
+		}
+		
+		c = 0;
+		startScan = false;
+		
+		for(int i=str.length()/2;i<str.length();i++){
+			char toput = str.charAt(i);
+			if(!startScan && toput == ')'){
+				startScan = true;
+			}
+			if(startScan){
+				if(toput == '(') // local hairpin
+				{
+					toput = '.';
+					c++;
+				}
+				if(c>0 && toput == ')'){
+					toput = '.';
+					c--;
+				}
+			}
+			unWindedStr.append(toput);
+		}
+		
+		
+		return unWindedStr.toString();
+	}
+	
+
+	
+	public int[] getBulgeMatrix5p(int l, int r, boolean unwind){ 
+		String str = structure;
+		if(unwind) str = getUnWindedStructureStr(str);
+		//if(!structure.equals(str)) System.out.println(structure+"\n"+str);
+		int[] unpaired5p = new int[l+r+1];
+		
+		for(int i=0;i<unpaired5p.length-1;i++){
+			unpaired5p[i] = 1;
+		}
+		
+		int index = l-1; // index for paired5p
+		boolean unpairedExist = false;
+		boolean countStart = false;
+		for(int i=0; i<l;i++){//5p flnaking region
+			if(index < 0) break;			
+			if(str.charAt(l-i-1) == '('){
+				if(countStart){
+					unpaired5p[index] = unpairedExist? 1 : 0;
+					
+				}
+				index--;
+				unpairedExist = false;
+				countStart = true;
+			}else{
+				unpairedExist = true;
+			}			
+		}
+		
+		index = l-1; // right side
+		unpairedExist = false;
+		
+		for(int i=0;i<str.length()/2-l-1;i++){
+		//	System.out.println((l+i) + " " + str.charAt(l+i));	
+			if(index >= unpaired5p.length-1) break;
+			if(str.charAt(l+i) == '('){
+				unpaired5p[index++] = unpairedExist? 1 : 0;
+				unpairedExist = false;
+			
+			}else{
+				unpairedExist = true;
+			}	
+		}
+		
+		return unpaired5p;
+		
+	}
+	
+	public int[] getBulgeMatrix3p(int l, int r, boolean unwind){ 
+		int[] unpaired3p = new int[l+r+1];
+		String str = structure;
+		if(unwind) str = getUnWindedStructureStr(str);
+		//System.out.println(l+ " " + r);
+		
+		for(int i=0;i<unpaired3p.length-1;i++){
+			unpaired3p[i] = 1;
+		}
+		
+		int paircntr = 0;
+		for(int i=0; i<l ; i++){
+			if(str.charAt(i) == '(') paircntr ++;
+			else if(str.charAt(i) == ')') paircntr --;
+		}
+		int pairoffset = 0;
+		int indexInitValue = 0;
+		for(; paircntr>0 && indexInitValue<str.length(); indexInitValue++){
+			char c = str.charAt(str.length()-indexInitValue-1);
+			if(c == '('){
+				paircntr++;
+				if(indexInitValue >= l) pairoffset++;
+			}
+			else if(c == ')'){
+				paircntr--;
+				if(indexInitValue >= l) pairoffset--;
+			}
+		}
+			
+		int index = l - 1; // index for paired5p
+		//System.out.println(pairoffset);
+		
+		boolean unpairedExist = false;
+		boolean countStart = false;
+		for(int i=0; i<indexInitValue;i++){//5p flnaking region
+			if(index < 0) break;
+			if(str.charAt(str.length() - indexInitValue + i) == ')'){
+				if(countStart){
+					unpaired3p[index] = unpairedExist? 1 : 0;
+					
+				}
+				index--;
+				unpairedExist = false;
+				countStart = true;
+			}else{
+				unpairedExist = true;
+			}			
+		}
+		
+		index = l - 1; // right side
+		unpairedExist = false;
+		
+		for(int i=0;i<str.length()/2-indexInitValue-1;i++){
+		//	System.out.println((l+i) + " " + str.charAt(l+i));		
+			if(index >= unpaired3p.length-1) break;
+			if(str.charAt(str.length() - indexInitValue - 1 - i) == ')'){
+				unpaired3p[index++] = unpairedExist? 1 : 0;
+				unpairedExist = false;
+			}else{
+				unpairedExist = true;
+			}	
+		}	
+		unpaired3p[unpaired3p.length-1] = pairoffset;
+		return unpaired3p;
+		
+	}
+	
 	private double getEntropy(String seq, int stepSize){
 		HashMap<String, Double> freqMap = new HashMap<String, Double>();
 		for(int i=0;i<seq.length() - stepSize + 1;i+=stepSize){
@@ -309,15 +595,20 @@ public class RNAfoldLauncher {
 	
 	
 	static public void main(String[] args){
-		String seq = "CGCCACGCCTCCGCTGGCGACGGGACATTATTACTTTTGGTACGCGCTGTGACACTTCAAACTCGTACCGTGAGTAATAATGCGCCGTCCACGGCACCGCATCGAAAAC";
+		String seq = "TGTGTGCACATGTGC CCAGGGCCCGGGACAGCGCCACGGAAGAGGACGCACCCGGCTGTGTGC ACATGTGCCCAGGGC"; // f
+		seq = "AAAGGACCCTTCCAG AGGGCCCCCCCTCAATCCTGTTGTGCCTAATTCAGAGGGTTGGGTGGAGGCTCTCC TGAAGGGCTCTGAAG";
+		seq = "TGAGAGCTGCAGGGT GGGTGGGCCCCTGGCTGTGCTGGGCCCTTCTCGATCATCTGAGGACCTGGCCGGCCCCCTCCC TTCCTCAGTCTCTTC";
 		seq = seq.replaceAll(" ", "");
 		String seqw = "";
 		for(char s : seq.toCharArray()){
 			seqw = s + seqw;
-		}
-//		System.out.println(seq);
+		}//ACGGAGGGGTAGAGC AGCCCTCGGCGGCCCGGGGGGCGGGCGGCGGTGCCCGTCCCGGGGCTGCGCGAGGCACAGGC GCCGCGCCCAGCGGA
+
+//		System.out.println(seq);  
 //		System.out.println(seqw);
-		RNAfoldLauncher test = new RNAfoldLauncher(seq , 20);
+		RNAfoldLauncher test = new RNAfoldLauncher(seq , 15);
+		
+		
 		//ACCTATCCATTTATCATCCATCTACGAGGTGTCTGGGATGTAATGGATGG
 		//ACCUAUCCAUUUAUCAUCCAUCUACAGGUGGACCAAAAUGUAGGAGAUCU
 		//TGCTCAGGCATAACCCCTCG GAACGGCTGCCCCTGGCCCAGGTCTCAGCCCACCCTTGGGTCCGGGCCAACTCTCGG AGGGTGCTGCCTCCCTCTGC
@@ -330,6 +621,25 @@ public class RNAfoldLauncher {
 		System.out.println(test.numberOfHairPins);
 		//System.out.println(test.centerDepth);
 		System.out.println(test.overHang);
+		System.out.println(seq);
+		System.out.println(test.getStructureString());
+		for(int b : test.getBulgeMatrix5p(25, 30, true))
+			System.out.print(b + "");
+		System.out.println();
+		for(int b : test.getBulgeMatrix3p(25, 30, true))
+			System.out.print(b + "");
+		System.out.println();
+	//	1 1 1 1 0 0 0 0 0 0 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 1 0 
+	//	17 15
+	//	1 1 1 1 0 0 0 0 0 1 0 0 0 1 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 1 0 
+		
+		
+	//	(.((.((((((((((.((.((((.(((...(((((........)).))).))))))).)).)))))))))).)).)..
+	//	1 1 1 0 1 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 1 0 0 1 0 0 0 0 1 1 1 1 1 1 1 0 
+	//	17 15
+	//	1 1 1 0 1 0 0 0 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 1 0 0 1 0 1 1 1 1 1 1 1 0 
+	//	1 1 1 1 1 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 1 0 0 1 0 
+	//	1 1 1 1 1 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 1 0 1 0 0 0 0 0 0 0 0 0 0 0 1 -1 
 	}
 	
 }

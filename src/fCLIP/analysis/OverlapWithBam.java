@@ -1,7 +1,5 @@
 package fCLIP.analysis;
 
-import java.util.HashMap;
-
 import fCLIP.parser.ScoredPairOutputParser;
 import fCLIP.parser.ScoredPositionOutputParser;
 

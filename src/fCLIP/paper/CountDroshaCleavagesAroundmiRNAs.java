@@ -1,7 +1,5 @@
 package fCLIP.paper;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.HashSet;
@@ -12,31 +10,34 @@ import parser.Bed12Parser;
 import parser.BufferedLineReader;
 import parser.MirGff3FileParser;
 import parser.MirGff3FileParser.MiRNA;
-import fCLIP.FCLIP_Scorer;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SamReader;
-import htsjdk.samtools.SamReaderFactory;
 
 public class CountDroshaCleavagesAroundmiRNAs {
 
-	public static void main(String[] args) {
+	public static void run(String fCLIPbed, String miRNAgff3, String miRNAsorted, String outFile, String annotationFile, int flankingLength, int preLength, String mirGeneDB){
+		/*String fCLIPbed = args[0];//"/media/kyowon/Data1/fCLIP/samples/sample13_HelaH/bed/Hela.se.bed";//"/media/kyowon/Data1/fCLIP/samples/sample8/bed/bamMerged.se.bed";
+		String miRNAgff3 = args[1];//"/media/kyowon/Data1/fCLIP/genomes/hsa_hg38.gff3";
+		String miRNAsorted = args[2];//"/media/kyowon/Data1/fCLIP/pri-miRNAs_sorted.txt"; // retreive ... paired or unpaired
+		String outFile = args[3];// "/media/kyowon/Data1/fCLIP/NoFCLIPCalculatedRNA_ReadEnd_unpairedIncludedHela.txt";
+		//"/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt");
 		
-		String fCLIPBam = "/media/kyowon/Data1/fCLIP/samples/sample4/alignments/merged.sorted.bam";
-		String miRNAgff3 = "/media/kyowon/Data1/fCLIP/genomes/hsa_hg38.gff3";
+		int flankingLength = Integer.parseInt(args[5]);//10;
+		int preLength = Integer.parseInt(args[6]);//10;
+		*/
+		AnnotationFileParser annotationParser = new AnnotationFileParser(annotationFile);
 		MirGff3FileParser mirParser = new MirGff3FileParser(miRNAgff3);
-		String outFile = "/media/kyowon/Data1/fCLIP/miRNA_ReadEnd_unpairedIncluded.txt";
-		String miRNAsorted = "/media/kyowon/Data1/fCLIP/pri-miRNAs_sorted.txt"; // retreive ... paired or unpaired
-		int flankingLength = 10;
-		int preLength = 10;
-		String fCLIPbed = "/media/kyowon/Data1/fCLIP/samples/sample4/bed/merged.se.bed";
-		AnnotationFileParser annotationParser = new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt");
-		String parameterFileName = "/media/kyowon/Data1/fCLIP/samples/sample4/results/training/merged.param";
+		if(mirGeneDB!=null) mirParser.correctAnnotationUsignMirGeneDB(mirGeneDB);
+		//"/media/kyowon/Data1/fCLIP/genomes/mirgenedb.txt"
+		
+		
+		
+		
 		String prevContig = null;
 		Bed12Parser bedParser = null;
+		boolean calculateForUnannotated = true;
 		
-		//flankingLength--;
-		SamReader reader = SamReaderFactory.makeDefault().open(new File(fCLIPBam));
 		try {
 			BufferedLineReader oin = new BufferedLineReader(miRNAsorted);
 			HashSet<String> miRNAs = new HashSet<String>();
@@ -60,66 +61,58 @@ public class CountDroshaCleavagesAroundmiRNAs {
 				
 				Integer f = mi.get5p();
 				Integer t = mi.get3p();
+				if(f == null && t == null) continue;
 				
 				out.print(mi.getName() + "\t" + contig + "\t" + (f != null) + ";" + (t != null) + "\t");
 				
 				
 				int[][] fsignal  = new int[2][preLength+flankingLength];
 				int[][] tsignal  = new int[2][preLength+flankingLength];
-				
+				if(prevContig == null || !prevContig.equals(contig)){
+					bedParser = new Bed12Parser(fCLIPbed, annotationParser,	contig, true);
+					prevContig = contig;
+				}
 				if(f!=null){
 					int tmpf = f;
 					if(isPlusStrand) tmpf -= 1;
-					fsignal = getRead5p3pSignal(reader, contig, tmpf - flankingLength + 1, tmpf + preLength, isPlusStrand);
-				}else{ // get five location..
-					if(prevContig == null || !prevContig.equals(contig)){
-						bedParser = new Bed12Parser(fCLIPbed, annotationParser,	contig, true);
-						prevContig = contig;
-					}
-					FCLIP_Scorer scorer = new FCLIP_Scorer(bedParser, null, null, parameterFileName);
-					double maxScore = -100;
-					int maxf = 0;
-					for(int i=40;i<150;i++){
-						int tf = t - (isPlusStrand? i:-i);
-						double score = scorer.getScore(tf, isPlusStrand, false);
-						if(maxScore < score){
-							maxScore = score;
-							maxf = tf;
+					fsignal = getRead5p3pSignal(bedParser, tmpf - flankingLength + 1, tmpf + preLength, isPlusStrand);//getRead5p3pSignal(reader, contig, tmpf - flankingLength + 1, tmpf + preLength, isPlusStrand);					
+				}else if(calculateForUnannotated){ // get five location..					
+					int maxf = -1;
+					int maxDepth = -1;
+					for(int i=40;i<=160;i++){
+						int tmpf = t - (isPlusStrand? i : -i);						
+						int depth = (bedParser.get5pDepth(isPlusStrand, tmpf) +1 ) * (bedParser.get3pDepth(isPlusStrand, tmpf - (isPlusStrand? 1 : -1))+1);
+						if(maxDepth < depth){
+							maxDepth = depth;
+							maxf = tmpf;
 						}
 					}
 					f = maxf;
-					if(maxf > 0){
-						if(isPlusStrand) maxf -= 1;
-						fsignal = getRead5p3pSignal(reader, contig, maxf - flankingLength + 1, maxf + preLength, isPlusStrand);
-					}
+					if(isPlusStrand) maxf -= 1;
+					fsignal = getRead5p3pSignal(bedParser, maxf - flankingLength + 1, maxf + preLength, isPlusStrand);//getRead5p3pSignal(reader, contig, tmpf - flankingLength + 1, tmpf + preLength, isPlusStrand);
+					
 				}
 				
 				if(t!=null){
 					int tmpt = t;
 					if(!isPlusStrand) tmpt -= 1;
-					tsignal = getRead5p3pSignal(reader, contig, tmpt - preLength + 1, tmpt + flankingLength, isPlusStrand);
-				}else{
-					if(prevContig == null || !prevContig.equals(contig)){
-						bedParser = new Bed12Parser(fCLIPbed, annotationParser,	contig, true);
-						prevContig = contig;
-					}
-					//bedParser = new Bed12Parser(fCLIPbed, annotationParser,	contig, true);
-					FCLIP_Scorer scorer = new FCLIP_Scorer(bedParser, null, null, parameterFileName);
-					double maxScore = -100;
-					int maxt = 0;
-					for(int i=40;i<150;i++){
-						int tt = f + (isPlusStrand? i:-i);
-						double score = scorer.getScore(tt, isPlusStrand, true);
-						if(maxScore < score){
-							maxScore = score;
-							maxt = tt;
+					tsignal = getRead5p3pSignal(bedParser, tmpt - preLength + 1, tmpt + flankingLength, isPlusStrand);
+				}else if(calculateForUnannotated){	
+					
+					int maxt = -1;
+					int maxDepth = -1;
+					for(int i=40;i<=160;i++){
+						int tmpt = f + (isPlusStrand? i : -i);						
+						int depth = (bedParser.get3pDepth(isPlusStrand, tmpt)+1 )* (bedParser.get5pDepth(isPlusStrand, tmpt + (isPlusStrand? 1 : -1))+1);
+						if(maxDepth < depth){
+							maxDepth = depth;
+							maxt = tmpt;
 						}
 					}
 					t = maxt;
-					if(maxt > 0){
-						if(!isPlusStrand) maxt -= 1;
-						tsignal = getRead5p3pSignal(reader, contig, maxt - preLength + 1, maxt + flankingLength, isPlusStrand);
-					}
+					if(!isPlusStrand) maxt -= 1;
+					tsignal = getRead5p3pSignal(bedParser, maxt - preLength + 1, maxt + flankingLength, isPlusStrand);				
+					
 				}
 				
 				out.print(f + "\t" + t + "\t" + (isPlusStrand? "+" : "-") + "\t");
@@ -154,7 +147,7 @@ public class CountDroshaCleavagesAroundmiRNAs {
 
 	
 	
-	private static int[][] getRead5p3pSignal(SamReader reader, String contig, int start, int end, boolean isPlusStrand){ // inclusive 0-based begin end
+	public static int[][] getRead5p3pSignal(SamReader reader, String contig, int start, int end, boolean isPlusStrand){ // inclusive 0-based begin end
 		int[][] signal = new int[2][end-start+1];
 		SAMRecordIterator iterator = reader.query(contig, start+1, end+1, false);
 		
@@ -178,5 +171,18 @@ public class CountDroshaCleavagesAroundmiRNAs {
 		iterator.close();
 		return signal;
 	}
+	
+	
+	public static int[][] getRead5p3pSignal(Bed12Parser parser, int start, int end, boolean isPlusStrand){ // inclusive 0-based begin end
+		int[][] signal = new int[2][end-start+1];
+		
+		for(int l=start;l<=end;l++){
+			signal[0][isPlusStrand? l-start : end - l] = parser.get5pDepth(isPlusStrand, l);
+			signal[1][isPlusStrand? l-start : end - l] = parser.get3pDepth(isPlusStrand, l);
+		}	
+		
+		return signal;
+	}
+	
 	
 }

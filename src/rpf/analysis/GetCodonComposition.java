@@ -1,6 +1,5 @@
 package rpf.analysis;
 
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;

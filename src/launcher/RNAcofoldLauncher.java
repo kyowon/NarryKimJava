@@ -3,25 +3,26 @@ package launcher;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.HashMap;
 
-import fCLIP.Classifier;
-import fCLIP.parser.ScoredPositionOutputParser.ScoredPosition;
-
 public class RNAcofoldLauncher {
+	public final int upperStemLength = 22;
+	public final int lowerStemLength = 11;
 	private double energy = 0;
 	private double energyPerNT = 0;
 	
 	private int flankingNTnumber = 25;
 	private int depth = 0;
-	private int numberOfHairPins = 0;
+	private int numberOfHairPinsInStem = 0;
 	private int overHang = -1000;
 	private int leftPaired = 0;
 	private int rightPaired = 0;
 	private int loopLength = 0;
 	private int leftUpstreamPaired = 0;
 	private int rightUpstreamPaired = 0;
-	
+	private String structure;
+	private String pstructure;
 	
 	private double seqEntropy = 0;
 	private double structureEntropy = 0;
@@ -33,7 +34,6 @@ public class RNAcofoldLauncher {
 	private boolean has22Burge3pDown = false;
 	private boolean has22Burge5pUp = false;
 	private boolean has22Burge5pDown = false;
-	
 	
 	static private int seqLength = 100000;
 	
@@ -50,6 +50,10 @@ public class RNAcofoldLauncher {
 
 	public double getSeqEntropy() {
 		return seqEntropy;
+	}
+	
+	public String getStructureString(){
+		return structure;
 	}
 	
 	public double getStructureEntropy(){
@@ -88,8 +92,8 @@ public class RNAcofoldLauncher {
 		return overHang;
 	}
 
-	public int getNumberOfHairPins(){
-		return numberOfHairPins;
+	public int getNumberOfHairPinsInStem(){
+		return numberOfHairPinsInStem;
 	}
 	
 	public int getLoopLength(){
@@ -100,6 +104,7 @@ public class RNAcofoldLauncher {
 		this.flankingNTnumber = flankingNTnumber;
 		if(seq != null && !seq.isEmpty())
 			run(seq);
+		//System.out.println(seq + " " + this.numberOfHairPinsInStem + " " + flankingNTnumber);
 	}
 	
 	public boolean isFeasibleFold(){
@@ -118,8 +123,6 @@ public class RNAcofoldLauncher {
 			pseqb.append(fivePString);
 			
 			
-	
-			
 			pseqb.append("\\&");
 			String threePString = seq.substring(Math.max(seq.length() - flankingNTnumber - seqLength/2 , seq.length()/2)); 
 			
@@ -127,7 +130,7 @@ public class RNAcofoldLauncher {
 			
 			pseqb.append(threePString);
 			
-			
+			//System.out.println(pseqb);
 			
 			String pseq = pseqb.toString();
 		//	System.out.println(pseq);
@@ -135,7 +138,7 @@ public class RNAcofoldLauncher {
 			String[] cmd = {
 				"/bin/sh",
 				"-c",
-				"echo "+ pseq + " | RNAcofold --noPS"
+				"echo "+ pseq + " | RNAcofold --noPS -p"
 			};
 			ProcessBuilder pr = new ProcessBuilder(cmd);		 
 			Process p = pr.start();
@@ -149,12 +152,13 @@ public class RNAcofoldLauncher {
 			   builder.append(System.getProperty("line.separator"));
 			}
 			String[] re = builder.toString().split("\n");
-			//for(String kk : re) 
-			//	System.out.println(builder.toString());
-			
+		
 			int maxDepth = 0;
-			String st = re[1].substring(0, re[1].indexOf(' ')).replace("&", "");;
-		//	System.out.println(st);
+			String st = re[1].substring(0, re[1].indexOf(' ')).replace("&", "");
+			structure = st;
+			pstructure = re[2].substring(0, re[2].indexOf(' ')).replace("&", "");
+			if(pstructure.contains("|")) pstructure = structure; // TODO
+			
 			String fst = st.substring(0, st.length()/2);
 			//fst = fst.replace("&", "");
 			//System.out.println(fst);
@@ -222,9 +226,10 @@ public class RNAcofoldLauncher {
 			int lu = 0;
 			int ru = 0;
 			
-			int nh = 0;
+			int tnh = 0;
+			
 			int ln = 0;
-			boolean left = true;
+			boolean left = false;
 			for(int i=0;i<st.length();i++){
 				char c = st.charAt(i);
 				if(c == '('){
@@ -234,7 +239,6 @@ public class RNAcofoldLauncher {
 				}else if(c == ')'){
 					d --;
 					if(left){
-						nh++;
 						loopLength = loopLength > ln ? loopLength : ln;
 					}
 					ln = 0;
@@ -242,18 +246,42 @@ public class RNAcofoldLauncher {
 				}else if(c == '.'){
 					ln++;
 				}
-				//else if(c == '.'){
-				//	if(i >= flankingNTnumber) r++;
-				//	if(i< st.length() - flankingNTnumber) l++;
-				//}
 				maxDepth = maxDepth > d ? maxDepth : d;
 			}
+			//System.out.println(tnh + " " + hnh);
+			
+			
+			left = false;
+			for(int i=flankingNTnumber-lowerStemLength;i<flankingNTnumber+upperStemLength;i++){
+				char c = st.charAt(i);
+				if(c == '('){
+					left = true;
+				}else if(c == ')'){
+					if(left){
+						tnh++;
+					}
+					left = false;
+				}
+			}
+			left = false;
+			for(int i=st.length() - flankingNTnumber - upperStemLength;i<st.length() - flankingNTnumber + lowerStemLength;i++){
+				char c = st.charAt(i);
+				if(c == '('){
+					left = true;
+				}else if(c == ')'){
+					if(left){
+						tnh++;
+					}
+					left = false;
+				}
+			}
+			
 			
 			for(int i=flankingNTnumber-1;i>=0;i--){
 			//	System.out.println("l");
 				if(st.charAt(i) == '(')//break;
 					l++;
-				if(st.charAt(i) == '.' && st.charAt(st.length() - 1 - i) == '.') break;
+				//if(st.charAt(i) == '.' && st.charAt(st.length() - 1 - i) == '.') break;
 			}
 			
 			for(int i=flankingNTnumber;i<st.length()/2;i++){
@@ -264,7 +292,7 @@ public class RNAcofoldLauncher {
 			for(int i=st.length() - flankingNTnumber;i<st.length();i++){ //st.length()-1
 				if(st.charAt(i) == ')') //break;
 					r++;
-				if(st.charAt(i) == '.' && st.charAt(st.length() - 1 - i) == '.') break;
+				//if(st.charAt(i) == '.' && st.charAt(st.length() - 1 - i) == '.') break;
 			}
 			
 			for(int i=st.length() - 1 - flankingNTnumber;i>st.length()/2;i--){
@@ -290,7 +318,7 @@ public class RNAcofoldLauncher {
 			}
 			
 			//int diff = fivePaired - threePaired;
-			
+		//	System.out.println(fivePaired + " " + threePaired);
 		//	int fp = 0;
 			for(int i=flankingNTnumber;i<fst.length();i++){
 				if(fst.charAt(i)=='.') this.overHang--;
@@ -350,13 +378,15 @@ public class RNAcofoldLauncher {
 			*/
 			
 			this.depth = maxDepth;
-			this.numberOfHairPins = nh;
+			this.numberOfHairPinsInStem = tnh;
 		//	this.centerDepth = maxCenterDepth;
 			this.energy = Double.parseDouble(re[1].substring(re[1].indexOf(' ')+2, re[1].length()-1).trim());
 			
 			pseq = pseq.replace("\\&", "");
 			this.energyPerNT = energy/pseq.length();
 		//	System.out.println(pseq.length());
+			if( pseq.length() - flankingNTnumber <=0) System.out.println(pseq);
+			
 			this.seqEntropy = getEntropy(pseq.substring(flankingNTnumber, pseq.length() - flankingNTnumber), 2);
 			this.structureEntropy = getEntropy(st.substring(flankingNTnumber, st.length() - flankingNTnumber), 4);
 			
@@ -392,19 +422,476 @@ public class RNAcofoldLauncher {
 	}
 	
 	
+	
+	
+	
+	
+	public static String getUnWindedStructureStr(String str){
+		//"(((...((.(((((....(((.(((.(((.(((..(((....)))..))).))).))).)))))))).)).))).......(((((..,.(({(.((((.....)))).))))})))).."
+		StringBuffer unWindedStr = new StringBuffer();
+		boolean startScan = false;
+		int c = 0;
+		for(int i=str.length()/2-1;i>=0;i--){
+			char toput = str.charAt(i);
+			if(!startScan && (toput == '(')){
+				startScan = true;
+			}
+			if(startScan){
+				if(toput == ')') // local hairpin
+				{
+					toput = '.';
+					c++;
+				}else if(c>0){					
+					if(toput == '(') c--;
+					toput = '.';
+				}
+			}
+			unWindedStr.insert(0, toput);
+		}
+		
+		
+		startScan = false;
+		c = 0;
+		for(int i=str.length()/2;i<str.length();i++){
+			char toput = str.charAt(i);
+			if(!startScan && (toput == ')')){
+				startScan = true;
+			}
+			if(startScan){
+				if(toput == '(') // local hairpin
+				{
+					toput = '.';
+					c++;
+				}else if(c>0){					
+					if(toput == ')' ) c--;
+					toput = '.';
+				}
+			}
+			unWindedStr.append(toput);
+		}
+		
+		
+		return unWindedStr.toString();
+	}
+	
+	
+	public float[] getBulgeMatrix5p(int l, int r, boolean unwind, boolean correspondTo3p){ 
+		String str = structure;
+		if(unwind) str = getUnWindedStructureStr(str);
+		float[] unpaired5p = new float[l+r+1];
+		for(int i=0;i<unpaired5p.length-1;i++){
+			unpaired5p[i] = 1;
+		}
+		
+		int paircntr = 0;
+		for(int i=str.length()-1; i>=str.length()-l ; i--){
+			if(str.charAt(i) == ')') paircntr ++;
+			else if(str.charAt(i) == '(') paircntr --;
+		}
+		//int indexInitValue = 0;
+		int pairOffset = 0;
+		
+		for(int i=0; i<l || paircntr>0; i++){
+			char c = str.charAt(i);
+			if(c == ')'){
+				paircntr++;				
+			}
+			else if(c == '('){
+				paircntr--;
+			}
+			if(i == l-1) pairOffset = paircntr;
+			//if(paircntr>=0) indexInitValue++;
+		}
+		
+		ArrayList<Float> tmp = new ArrayList<Float>();
+		float pairProb  = 0;
+		int offset = 0;
+		for(int i=0;i<r+l;i++){
+			char pc = str.charAt(i);
+			if(pc == '('){
+				tmp.add(pairProb);	
+				pairProb = 0;
+			}
+			if(pc != '('){
+				if(pc == '.') pairProb = Math.max(pairProb, 1);
+				else if(pc == ',') pairProb = Math.max(pairProb, 2f/3f);
+				else pairProb = Math.max(pairProb, 1f/3f);
+			}
+			if(i == l-1) offset = tmp.size() + (correspondTo3p ? pairOffset : 0);
+		}
+		//System.out.println(offset);
+		for(int i=0;i<Math.min(tmp.size(), r+offset);i++){
+			unpaired5p[i+l-offset] =  tmp.get(i);
+		}
+		
+		if(correspondTo3p) unpaired5p[unpaired5p.length-1] = -pairOffset;		
+		return unpaired5p;
+		
+	}
+	/*public float[] getBulgeMatrix5p(int l, int r, boolean unwind, boolean correspondTo3p){ 
+		String str = pstructure;
+		if(unwind) str = getUnWindedStructureStr(str);
+		float[] unpaired5p = new float[l+r+1];
+		
+		for(int i=0;i<unpaired5p.length-1;i++){
+			unpaired5p[i] = 1;
+		}
+		
+		int paircntr = 0;
+		for(int i=str.length()-1; i>=str.length()-l ; i--){
+			if(str.charAt(i) == ')') paircntr ++;
+			else if(str.charAt(i) == '(') paircntr --;
+		}
+		int indexInitValue = 0;
+		int pairOffset = 0;
+		//System.out.println(structure);
+		//System.out.println(getUnWindedStructureStr(structure);
+		//System.out.println(pstructure);
+		//System.out.println(str);
+		for(int i=0; i<l || paircntr>0; i++){
+			char c = str.charAt(i);
+			if(c == ')'){
+				paircntr++;				
+			}
+			else if(c == '('){
+				paircntr--;
+			}
+			if(i == l-1) pairOffset = paircntr;
+			if(paircntr>=0) indexInitValue++;
+		}
+		
+		int index = l-1; // index for paired5p
+		float pairProb = 0;
+		boolean countStart = false;
+		int ll = correspondTo3p? indexInitValue : l;
+		//System.out.println(ll);
+		for(int i=0; i<ll;i++){//5p flnaking region
+			if(index < 0) break;			
+			if(str.charAt(ll-i-1) == '('){
+				if(countStart){
+					unpaired5p[index] = pairProb;
+					
+				}
+				index--;
+				pairProb = 0;
+				countStart = true;
+			}else{
+				char pc = str.charAt(ll-i-1);
+				if(pc == '.') pairProb = Math.max(pairProb, 1);
+				else if(pc == ',') pairProb = Math.max(pairProb, 2f/3f);
+				else pairProb = Math.max(pairProb, 1f/3f);
+			}			
+		}
+		
+		index = l-1; // right side
+		pairProb = 0;
+		//System.out.println(str.length()/2-ll-1);
+		for(int i=0;i<str.length()/2-ll-1;i++){
+			//System.out.println((ll+i) + " " + str.charAt(ll+i));	
+			if(index >= unpaired5p.length-1) break;
+			if(str.charAt(ll+i) == '('){
+				unpaired5p[index++] = pairProb;	
+				pairProb = 0;
+			}else{
+				char pc = str.charAt(ll+i);
+				if(pc == '.') pairProb = Math.max(pairProb, 1);
+				else if(pc == ',') pairProb = Math.max(pairProb, 2f/3f);
+				else pairProb = Math.max(pairProb, 1f/3f);
+			}	
+		}
+		if(correspondTo3p) unpaired5p[unpaired5p.length-1] = -pairOffset;
+		return unpaired5p;
+		
+	}*/
+
+
+	
+	public String getBalancedStructure(char cleavageChar, boolean unwind){
+		String ustr = unwind ? getUnWindedStructureStr(structure) : structure;
+		StringBuilder sbl = new StringBuilder();
+		StringBuilder sbr = new StringBuilder();
+		//System.out.println(ustr);
+		int lindex = 0;
+		int rindex = ustr.length()-1;
+		boolean[] cleavageSpecified = new boolean[2];
+		
+		while(ustr.charAt(lindex) != '(' && lindex < ustr.length()){
+			sbl.append(ustr.charAt(lindex++));
+			if(!cleavageSpecified[0] && lindex == flankingNTnumber){
+				sbl.append(cleavageChar);
+				cleavageSpecified[0] = true;
+			}
+		}
+		
+		while(ustr.charAt(rindex) != ')' && rindex >=0){
+			sbr.insert(0, ustr.charAt(rindex--));
+			if(!cleavageSpecified[1] && rindex == ustr.length() - flankingNTnumber - 1){
+				sbr.insert(0,cleavageChar);
+				cleavageSpecified[1] = true;
+			}
+		}
+		//System.out.println(sbl + " " + sbr);
+		while(lindex < rindex){
+			char l = ustr.charAt(lindex);
+			char r = ustr.charAt(rindex);
+			//System.out.println(lindex + " " + rindex + " " + l + " " + r ); //48 113 . (
+			if(l == '(' && r == ')' || l == r){
+				sbl.append(l);
+				sbr.insert(0,r);
+				lindex++;
+				rindex--;
+			}else if(l == '('){
+				rindex--;
+			}else if(r == ')'){
+				lindex++;
+			}
+			
+			if(!cleavageSpecified[0] && lindex == flankingNTnumber){
+				sbl.append(cleavageChar);
+				cleavageSpecified[0] = true;
+			}
+			if(!cleavageSpecified[1] && rindex == ustr.length() - flankingNTnumber - 1){
+				sbr.insert(0,cleavageChar);
+				cleavageSpecified[1] = true;
+			}
+			
+		}
+		if(lindex == rindex) sbl.append(ustr.charAt(lindex));
+		
+		return sbl.toString() + sbr.toString();
+	}
+	
+	
+	
+	public int[] getBulgeNTcountsAround(int l, int r){
+		int[] c = new int[2];
+		
+		for(int i=l-1;i>=0;i--){
+			if(structure.charAt(i) == '.') c[0]++;
+			else break;
+		}
+		
+		for(int i=l;i<structure.length();i++){
+			if(structure.charAt(i) == '.') c[0]++;
+			else break;
+		}
+		
+		for(int i=r-1;i>=0;i--){
+			if(structure.charAt(i) == '.') c[1]++;
+			else break;
+		}
+		
+		for(int i=r;i<structure.length();i++){
+			if(structure.charAt(i) == '.') c[1]++;
+			else break;
+		}
+		
+		return c;
+	}
+	
+	public float[][] getBulgeMatrices(int l, int r, boolean unwind){
+		float[][] bms = new float[2][l+r];		
+		String bs = getBalancedStructure(' ', unwind);
+		
+		for(int i=0;i<bms.length;i++){
+			for(int j=0;j<bms[i].length;j++){
+				bms[i][j] = 1;
+			}
+		}
+		
+		int lc = bs.indexOf(' ');
+		int rc = bs.lastIndexOf(' ');
+		
+		int offset = 0;
+		char prevC = '.';
+		for(int i=0;i<bms[0].length;i++){
+			int index = i - l + lc;
+			if(index <0) continue;
+			if(index >= bs.length()) break;
+			if(bs.charAt(index) == ' '){
+				offset = 1;
+				continue;
+			}
+			if(bs.charAt(index) == '(' && prevC == '(') bms[0][i-offset] = 0;	
+			prevC = bs.charAt(index);
+		}
+		
+		prevC = '.';
+		offset = -1;
+		for(int i=0;i<bms[1].length;i++){
+			int index = rc + l - i - 1; //bs.length() - 
+			
+			if(index <0) break;
+			if(index >= bs.length()) continue;;	
+			if(bs.charAt(index) == ' '){
+				offset = 0;
+				continue;
+			}
+			//System.out.println(index);
+			if(bs.charAt(index) == ')' && prevC == ')') bms[1][(i-offset)] = 0;
+			prevC = bs.charAt(index);
+		}
+		
+		return bms;
+		
+	}
+	
+	
+	public float[] getBulgeMatrix3p(int l, int r, boolean unwind, boolean correspondTo5p){ 
+		float[] unpaired3p = new float[l+r+1];
+		String str = structure;
+		if(unwind) str = getUnWindedStructureStr(str);
+		
+		for(int i=0;i<unpaired3p.length-1;i++){
+			unpaired3p[i] = 1;
+		}
+		
+		int paircntr = 0;
+		for(int i=0; i<l ; i++){
+			if(str.charAt(i) == '(') paircntr ++;
+			else if(str.charAt(i) == ')') paircntr --;
+		}
+		//int indexInitValue = 0;
+		int pairOffset = 0;
+		for(int i=0; i<l || paircntr > 0 ; i++){
+			char c = str.charAt(str.length()-i-1);
+			if(c == '('){
+				paircntr++;				
+			}
+			else if(c == ')'){
+				paircntr--;				
+			}
+			if(i == l-1) pairOffset = paircntr;
+		//	if(paircntr>=0) indexInitValue++;
+		}
+	
+		ArrayList<Float> tmp = new ArrayList<Float>();
+		float pairProb  = 0;
+		int offset = 0;
+		for(int i=0;i<r+l;i++){
+			char pc = str.charAt(str.length() - i - 1);
+			if(pc == ')'){
+				tmp.add(pairProb);	
+				pairProb = 0;
+			}
+			if(pc != ')'){
+				if(pc == '.') pairProb = Math.max(pairProb, 1);
+				else if(pc == ',') pairProb = Math.max(pairProb, 2f/3f);
+				else pairProb = Math.max(pairProb, 1f/3f);
+			}
+			if(i == l-1) offset = tmp.size() + (correspondTo5p ? pairOffset : 0);
+		}
+		//System.out.println(offset);
+		for(int i=0;i<Math.min(tmp.size(), r+offset);i++){
+			unpaired3p[i+l-offset] =  tmp.get(i);
+		}
+		
+		if(correspondTo5p) unpaired3p[unpaired3p.length-1] = -pairOffset;
+		return unpaired3p;
+		
+	}
+	
+	/* 1111111110000000000010100   1000000000000000000100111111110
+	public float[] getBulgeMatrix3p(int l, int r, boolean unwind, boolean correspondTo5p){ 
+		float[] unpaired3p = new float[l+r+1];
+		String str = pstructure;
+		if(unwind) str = getUnWindedStructureStr(str);
+		
+		for(int i=0;i<unpaired3p.length-1;i++){
+			unpaired3p[i] = 1;
+		}
+		
+		int paircntr = 0;
+		for(int i=0; i<l ; i++){
+			if(str.charAt(i) == '(') paircntr ++;
+			else if(str.charAt(i) == ')') paircntr --;
+		}
+		int indexInitValue = 0;
+		int pairOffset = 0;
+	//	System.out.println(pstructure);
+	//	System.out.println(str);
+		for(int i=0; i<l || paircntr > 0 ; i++){
+			char c = str.charAt(str.length()-i-1);
+			if(c == '('){
+				paircntr++;				
+			}
+			else if(c == ')'){
+				paircntr--;				
+			}
+			if(i == l-1) pairOffset = paircntr;
+			if(paircntr>=0) indexInitValue++;
+		}
+		//System.out.println(indexInitValue);
+
+		
+		int index = l - 1; // index for paired5p
+		
+		float pairProb = 0;
+		boolean countStart = false;
+		int ll = correspondTo5p? indexInitValue : l;
+		for(int i=0; i<ll;i++){//5p flnaking region
+			if(index < 0) break;
+			if(str.charAt(str.length() - ll + i) == ')'){
+				if(countStart){
+					unpaired3p[index] = pairProb;
+					
+				}
+				index--;
+				pairProb = 0;
+				countStart = true;
+			}else{
+				char pc = str.charAt(str.length() - ll + i);
+				if(pc == '.') pairProb = Math.max(pairProb, 1);
+				else if(pc == ',') pairProb = Math.max(pairProb, 2f/3f);
+				else pairProb = Math.max(pairProb, 1f/3f);
+			}			
+		}
+		
+		index = l - 1; // right side
+		pairProb = 0;
+		
+		for(int i=0;i<str.length()/2-ll-1;i++){
+		//	System.out.println((l+i) + " " + str.charAt(l+i));		
+			if(index >= unpaired3p.length-1) break;
+			if(str.charAt(str.length() - ll - 1 - i) == ')'){
+				unpaired3p[index++] = pairProb;
+				pairProb = 0;
+			}else{
+				char pc = str.charAt(str.length() - ll - 1 - i);
+				if(pc == '.') pairProb = Math.max(pairProb, 1);
+				else if(pc == ',') pairProb = Math.max(pairProb, 2f/3f);
+				else pairProb = Math.max(pairProb, 1f/3f);
+			}	
+		}	
+		if(correspondTo5p) unpaired3p[unpaired3p.length-1] = -pairOffset;
+		return unpaired3p;
+		
+	}
+	
+	TTGTTCAGAAAGTCTGTTGTTGTAAACATCCCCGACTGGAAGCTGTAAGACACAGCTAAGCTTTCAGTCAGATGTTTGCTGCTACCGGCTATTCACAGACAT
+TGATGATGCTGCTGATGCTG GCGGTGATCCCGATGGTGTGAGCTGGAAATGGGGTGCTACGtcatcgttgtcatcgtca tcatcatcatcCGAGCagcc
+TGATGATGCTGCTGATGCTGGCGGTGATCCCGATGGTGTGAGCTGGAAATGGGGTGCTACGtcatcgttgtcatcgtcatcatcatcatcCGAGCagcc
+TATGTGGGCAGGGCCCTGGG GAGCTGAGGCTCTGGGGGTGGCCGGGGCTGACCCTGGGCCTCTGCTCCC CAGTGTCTGACCGCGACCGC
+TATGTGGGCAGGGCCCTGGGGAGCTGAGGCTCTGGGGGTGGCCGGGGCTGACCCTGGGCCTCTGCTCCCCAGTGTCTGACCGCGACCGC
+AAAAAAATGGGTTCCTAGGA AGAGGTAGTAGGTTGCATAGTTTTAGGGCAGGGATTTTGCCCACAAGGAGGTAACTATACGACCTGCTGCCTTTC TTAGGGCCTTATTATTCACC
+AAAAAAATGGGTTCCTAGGAAGAGGTAGTAGGTTGCATAGTTTTAGGGCAGGGATTTTGCCCACAAGGAGGTAACTATACGACCTGCTGCCTTTCTTAGGGCCTTATTATTCACC
+TGACCTCTCTAACAAGGTGC AGAGCTTAGCTGATTGGTGAACAGTGATTGGTTTCCGCTTTGTTCACAGTGGCTAAGTTCTGC ACCTGAAGAGAAGGTGAGAT
+TGACCTCTCTAACAAGGTGCAGAGCTTAGCTGATTGGTGAACAGTGATTGGTTTCCGCTTTGTTCACAGTGGCTAAGTTCTGCACCTGAAGAGAAGGTGAGAT
+TCGATTGGACCCGCCCTCCG GTGCCTACTGAGCTGATATCAGTTCTCATTTTACACACTGGCTCAGTTCAGCAGGAACAG GAGTCGAGCCCTTGAGCAAA
+	*/
 	static public void main(String[] args){
-		String seq = "CTTCAGCAAACATTAGGAGAGTATC TTCTCTGTTTTGGCCATGTGTGTACTCACAGCCCCTCACACATGGCCGAAACAGAGAAGT TACTTTCCTAATATTtgcctccttg";
+		String seq = "cgagccgccgccgcccggg ccgatgcccccggcgccgcggcgcggcggaggtgtgggcgtgggcggcggcggcacgggcg tgggcggcggcgATCGCGAC"; // f
+		//seq = "AAAGGACCCTTCCAG AGGGCCCCCCCTCAATCCTGTTGTGCCTAATTCAGAGGGTTGGGTGGAGGCTCTCC TGAAGGGCTCTGAAG";
 		//System.out.println(seq);
 		//setSeqLength(20);
+		//seq = "GCUGGAAGGUGUAGGUACCCUCAAU GGCUCAGUAGCCAGUGUAGAUCCUGUCUUUCGUAAUCAGCAGCUACAUCUGGCUACUGGGUCUC UGAUGGCAUCUUCUAGCUUCUGCUU";
+		System.out.println(seq);
 		seq = seq.replaceAll(" ", "");
-		String seqw = "";
-		for(char s : seq.toCharArray()){
-			seqw = s + seqw;
-		}
+		int flanking = 20;
 		
 //		System.out.println(seq);
 //		System.out.println(seqw);
-		RNAcofoldLauncher test = new RNAcofoldLauncher(seq , 25);
+		RNAcofoldLauncher test = new RNAcofoldLauncher(seq , flanking);
 		
 		
 	//	Classifier classifier = new Classifier("/media/kyowon/Data1/fCLIP/samples/sample4/results/training/merged.arff");
@@ -424,8 +911,33 @@ public class RNAcofoldLauncher {
 		//System.out.println(test.structureEntropy);
 		//System.out.println(test.numberOfHairPins);
 		//System.out.println(test.centerDepth);
+		System.out.println(test.energyPerNT);
+		System.out.println(test.numberOfHairPinsInStem);
+		System.out.println(test.leftPaired);
+		System.out.println(test.rightPaired);
+		System.out.println(test.seqEntropy);
+		System.out.println(test.structureEntropy);
+		System.out.println(test.getNumberOfHairPinsInStem());
+		//System.out.println(test.centerDepth);
 		System.out.println(test.overHang);
-		System.out.println(test.loopLength);
+		System.out.println(seq);
+		System.out.println(test.getStructureString());
+		//System.out.println(test.pstructure);
+		
+		System.out.println(test.getBalancedStructure(' ', true));
+	
+//  	11111111000000000001    01001  0000000000000000001001111111110
+//	    11111111110000000000    00100  1000000000000010000100111111110
+
+	//  1111111110000000000110010000000000000000001001111111111-1
+	//  11111111100000000000010010000000000000100000111111111110
+		for(float b : test.getBulgeMatrices(flanking, 30, true)[0])
+			System.out.print((int)b + "");
+		System.out.println();
+		for(float b : test.getBulgeMatrices(flanking, 30, true)[1])
+			System.out.print((int)b + "");
+		System.out.println();
+		//System.out.println(test.pstructure);
 		/*System.out.println(test.has11Burge3pDown());
 		System.out.println(test.has11Burge3pUp());
 		System.out.println(test.has22Burge3pDown());

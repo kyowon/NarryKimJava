@@ -2,6 +2,7 @@ package rpf.analysis;
 
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -14,8 +15,9 @@ import util.Codon;
 public class SmORFselector {
 
 	public static void main(String[] args) throws FileNotFoundException {
-		String sample = "sample5";
-		MergedFileParser test = new MergedFileParser("/media/kyowon/Data1/RPF_Project/samples/" + sample + "/results/out_new_0.3.csv");
+		String sample = "sample3"; // sample4 e, sample3, 5 h h2
+		String fastaPrefix = "h";
+		MergedFileParser test = new MergedFileParser("/media/kyowon/Data1/RPF_Project/samples/" + sample + "/results/out_ssh_0.3.csv");
 		PrintStream out = new PrintStream("/media/kyowon/Data1/RPF_Project/samples/" + sample + "/results/out_0.3_smORF.csv");
 		PrintStream outfasta = new PrintStream("/media/kyowon/Data1/RPF_Project/samples/" + sample + "/results/out_0.3_smORF.fasta");
 		AnnotationFileParser anntationParser = new AnnotationFileParser("/media/kyowon/Data1/RPF_Project/genomes/mm9.refFlat.txt");
@@ -26,71 +28,88 @@ public class SmORFselector {
 		int j=2;
 		int num = 0;
 		HashMap<String, Double> codonUsage = new HashMap<String, Double>();
+		HashSet<String> seqs = new HashSet<String>();
+		HashMap<String, Integer> regionCountMap = new HashMap<String, Integer>();
 		
 		for(MergedResult result: test.getList()){
+			String region = "";
+			
 			if(start){
 				out.println(result.getSimpleHeader());
 				start = false;
 			}
-					
-			//if(result.getGene()==null || !result.getGene().getGeneName().contains("LINC")) continue;
-			//String region = result.getGenomicRegion();
-			//if(region.equals("InterGenic")) System.out.println(result.getStopPosition() + " " + result.getLength());
+			if(result.getGene()!=null && !result.getGenomicRegion().startsWith("NR")){
+				if(result.getAnnotatedClass().equals("TS") || result.getAnnotatedClass().equals("T")){
+					if(result.getFrameShift().equals("0") && result.getGene().isPlusStrand() == result.isPlusStrand()){
+						ArrayList<String> gr = anntationParser.getGenomicRegionNameAndFrameShift(result.getContig(), result.isPlusStrand(), result.getStopPosition()+ (result.isPlusStrand()?-2:2), result.getGene(), true);
+						
+						//if(result.getGene().getGeneName().equals("Mterf1a")){
+						//	System.out.println(gr);
+						//}
+						
+						if(gr.get(0).equals("NM_ORF") && gr.get(1).equals("0")){
+							region = "ORF";
+							continue;	
+						}
+						else region = "ExomSpanning/NovelIsoform";
+					}else if(!result.getFrameShift().equals("0")){
+						region = "FrameShifted";
+					}else{
+						region = "StrandReversed";
+					}
+				}else{
+					if(result.getGenomicRegion().contains("5_UTR")) region = "5UTR";
+					else if(result.getGenomicRegion().contains("3_UTR")) region = "3UTR";
+					else if(result.getGenomicRegion().contains("Intron")){
+						System.out.println(result.getGenomicRegion());
+						region = "Intron";
+					}
+					else{
+						//System.out.println(result);
+						region = "ExomSpanning/NovelIsoform";
+					}
+				}
+			}else if(result.getGene() == null){
+				region = "Intergenic";
+			}else if(result.getGenomicRegion().startsWith("NR")){
+				region = "NR";
+			}else{
+				
+			}
 			
-			if(result.getAnnotatedClass().equals("TS") || result.getAnnotatedClass().equals("T") || result.getAnnotatedClass().equals("_")) continue; 
-			//if(region.contains("ORF") && !region.contains("Intron")) continue;
+			if(!regionCountMap.containsKey(region)) regionCountMap.put(region, 0);
+			regionCountMap.put(region, regionCountMap.get(region)+1);
+			
+			//
 			String[] predicted = result.getPredictedClasses();
-			double[] predictionScores = result.getPredictedClassesScores();
 			
-			if(result.getStopPosition() < 20 || result.getStopPosition() > 450 && result.getLength() > 450) continue;
+			//System.out.println(result.getStopPosition() + " " + result.getLength() );
+			//if(result.getStopPosition() < 20 || (result.getStopPosition() > 450 && result.getLength() > 450)) continue;
+			if(result.getLength() > 600) continue;
 			boolean keep = true;
 			//if(pp!=null && result.getGene().equals(pp.getGene())) 
 			//	System.out.println(pp.getPosition() + "\n* " + result.getPosition() +"\n " + pp.equals(result.getScoredPosition()));
+			
 			if(pp.contains(result.getScoredPosition())){
 				continue;
 			}
+			
 			//boolean containingTS = false;
 			int n = 0;
-			int m = 0;
 			for(int i=0; i< predicted.length;i++){
-				if(result.getRpfStartScores()[i]<.25) continue;
-				//if(n++ > 3) break;
 				String p = predicted[i];
-				//if(p.equals("TS")) containingTS = true;
-				if(p.toUpperCase().equals("TS") || p.toUpperCase().equals("T")){
+				if(!p.toUpperCase().equals("NC")){
 					n++;
-				//	continue;
 				}
-				//if(m++>3) break;
-			//	break;
-				//keep = false;
-				//break;
 			}
 			
-			if(n<1) keep = false;
-			//if(((float)n) / predicted.length < .3) keep = false;
-			//if(n != m) keep = false;
-			if(result.getScoredPosition().isPlusStrand()){
-			//	if(result.getGene() != null && result.getStopPosition() > result.getGene().getCdsStart() ) 
-					//keep = false;
-			}else{
-			//	if(result.getGene() != null && result.getStopPosition() <= result.getGene().getCdsEnd()) 
-					//keep = false;
-			}
-				
-			if(!keep) continue;
+			if(n<1) keep = false;			
+			
+			//if(!keep) continue;
 			
 			String frame = anntationParser.getGenomicRegionNameAndFrameShift(result.getContig(), result.isPlusStrand(), result.getPosition(), result.getGene(), true).get(1);
 			result.setFrameShift(frame);
 			pp.add(result.getScoredPosition());
-			
-		//	list.add(result);
-			//if(r.getGene() != null){
-				
-				//	if(Math.abs(r.getPosition() - r.getGene().getCdsStart())<30) continue;
-				//	if(Math.abs(r.getPosition() - r.getGene().getCdsEnd())<30) continue;
-				//}
-			out.print(result.toSimpleString());
 					
 			String seq = result.getSequence();
 			
@@ -98,8 +117,6 @@ public class SmORFselector {
 			for(int k=0;k<seq.toUpperCase().length();k++){
 				if(seq.charAt(k) == 'G' || seq.charAt(k) == 'C') gc ++; 
 			}
-			if(Codon.getAminoAcids(seq).startsWith("L")) continue; // TODO 
-			//System.out.println(Codon.getAminoAcids(seq));
 			
 			for(int k=0;k<seq.length()-2;k+=3){
 				String codon = seq.toUpperCase().substring(k, k+3);
@@ -112,17 +129,22 @@ public class SmORFselector {
 			for(String codon : codonUsage.keySet()){
 				codonUsage.put(codon, codonUsage.get(codon) / sum);
 			}
+			String translated = Codon.getAminoAcids(seq);
+			if(seqs.contains(translated)) continue;
+			if(translated.length() < 7) continue;
+			seqs.add(translated);
 			num++;
-			out.println("\t" + (gc/seq.length()) + "\t"+ Codon.getAminoAcids(seq));
-			outfasta.println(">e_" + j++);
-			outfasta.println(Codon.getAminoAcids(seq));
+			out.print(result.toSimpleString());
 			
-			if(Codon.getAminoAcids(seq).contains("SSPVFQVPKDDTTELDSLGLASPPK")) System.out.println(seq);
-		//	if(Codon.getAminoAcids(seq).contains("WDYPE")) System.out.println("seq");
+			out.println("\t" + (gc/seq.length()) + "\t"+ translated);
+			outfasta.println(">"+fastaPrefix+"_" + j++);
+			outfasta.println(translated);
+			
 		}
-		//for(String codon : codonUsage.keySet()){
-		//	System.out.println(codon + "\t" + codonUsage.get(codon));
-		//}
+		for(String region : regionCountMap.keySet()){
+			System.out.println(region+ " " + regionCountMap.get(region));
+		}
+		
 		System.out.println(num);
 		outfasta.close();
 		out.close();

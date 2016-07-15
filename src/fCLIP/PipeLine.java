@@ -208,7 +208,7 @@ public class PipeLine {
 		runCis(cisOutFileName, arffTrainOutFileName, bedFileName, fastaParser, annotationParser, mirParser, parameterFileName, unpairedScoreThreshold, pairedScoreThreshold);
 
 		ScoredPositionOutputParser.generateBedFromCsv(cisOutFileName, cisBed5pFileName, cisBed3pFileName, false); // for fold change..
-		ScoredPositionOutputParser.generateFastaForMotif(cisOutFileName, cisOutFileName + ".5p.motif.fa", cisOutFileName + ".3p.motif.fa", "M");
+	//	ScoredPositionOutputParser.generateFastaForMotif(cisOutFileName, cisOutFileName + ".5p.motif.fa", cisOutFileName + ".3p.motif.fa",cisOutFileName + ".motif.m", "M");
 		
 		runTrans(transOutFileNameM, transOutFileNameU, cisOutFileName, arffTrainOutFileName, blatHitThreshold, transPairSeqLength, false);
 		CheckRepeat.generate(cisOutFileName, transOutFileNameM, cisBed5pFileName, cisBed3pFileName, rmskBed);

@@ -1,11 +1,14 @@
 package rpf;
 
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
-
 import launcher.PhyloPLauncher;
 import parser.AnnotationFileParser;
 import parser.Bed12Parser;
@@ -17,13 +20,16 @@ import util.DnDsCalculator;
 
 public class RPFPipeLine {
 	//private static String[] harrScoreOutFiles;
-	private static String[] harrParamFiles;
-	private static String[] harrBedFiles; 
-	
+	private static String harrParamFiles;
+	private static SamReader[] harrBamReaders; 
+	private static String[] harrBedFiles;
 	private static String[] rpfScoreOutFiles;
-	private static String[] rpfParamFiles;
+	private static String rpfParamFiles;
 	private static String[] rpfBedFiles; 
-	private static String[] rnaBedFiles; 
+	//private static String[] rnaBedFiles;
+	private static SamReader[] rnaBamReaders;
+	private static SamReader[] rpfBamReaders;
+	
 	private static HashSet<String> allowedCodons;
 	private static String mafFolder;
 	private static ZeroBasedFastaParser fastaParser = null;
@@ -37,12 +43,14 @@ public class RPFPipeLine {
 	private static String outFile = null;
 	private static int[][] groups = null;
 	//private static String outControlFile = null;// RPKM 6.8 ...
-	private static int leftWindowSize = 90;
-	private static int rightWindowSize = 300;
+	private static int leftWindowSize = 30;
+	private static int rightWindowSize = 50;
 	
+	private static int numberOfNonZeroElements = 7;
 	private static int positionQuantityChangeLength = 51; // should be 3 mult
 	private static int positionQuantityOffset = 13; //TODO automation
-	private static int maxLengthUntilStopcodon = 13000;
+	private static int maxLengthUntilStopcodon = 700;
+	private static int nt = 1;
 	//TODO : memeory efficient + RNA coordinate calculation + union scoredPosition considering long splices...
 	
 	private static boolean parseSegment(String s, int mode){
@@ -57,6 +65,14 @@ public class RPFPipeLine {
 				System.out.print(token[i] + " ");
 			}
 			System.out.println();
+		}else if(mode == 2){
+			harrBamReaders = new SamReader[token.length];
+			System.out.print("Harr bam files : ");
+			for(int i=0; i<token.length; i++){
+				harrBamReaders[i] = SamReaderFactory.makeDefault().open(new File(token[i]));
+				System.out.print(token[i] + " ");
+			}
+			System.out.println();
 		}else if(mode == 3){
 			rpfBedFiles = new String[token.length];
 			System.out.print("RPF bed files : ");		
@@ -65,14 +81,21 @@ public class RPFPipeLine {
 				System.out.print(token[i] + " ");
 			}
 			System.out.println();
-		}else if(mode == 5){
-			rnaBedFiles = new String[token.length];
-			System.out.print("RNA bed files : ");					
+		}else if(mode == 4){
+			rpfBamReaders = new SamReader[token.length];
+			System.out.print("RPF bam files : ");		
 			for(int i=0; i<token.length; i++){
-				rnaBedFiles[i] = token[i];
+				rpfBamReaders[i] = SamReaderFactory.makeDefault().open(new File(token[i]));
 				System.out.print(token[i] + " ");
 			}
 			System.out.println();
+		}else if(mode == 5){
+			rnaBamReaders = new SamReader[token.length];
+			System.out.print("RNA bam files : ");		
+			for(int i=0; i<token.length; i++){
+				rnaBamReaders[i] = SamReaderFactory.makeDefault().open(new File(token[i]));
+				System.out.print(token[i] + " ");
+			}
 		}else if(mode == 7){
 			fastaParser = new ZeroBasedFastaParser(s);
 			System.out.println("Fasta file: " + s);
@@ -125,6 +148,9 @@ public class RPFPipeLine {
 			System.out.println();
 		}else if(mode == 19) {
 			PhyloPLauncher.setModFile(s);
+		}else if(mode == 20) {
+			nt = Integer.parseInt(s);
+			System.out.println("Number of threads: " + s);
 		} else ret = false;
 		
 		
@@ -146,8 +172,12 @@ public class RPFPipeLine {
 			}
 			if(args[i].equals("-harr")){
 				mode = 1;
+			}else if(args[i].equals("-harrBam")){
+				mode = 2;
 			}else if(args[i].equals("-rpf")){
 				mode = 3;
+			}else if(args[i].equals("-rpfBam")){
+				mode = 4;
 			}else if(args[i].equals("-rna")){
 				mode = 5;
 			}else if(args[i].equals("-fasta")){
@@ -182,6 +212,8 @@ public class RPFPipeLine {
 				mode = 18;
 			}else if(args[i].equals("-phyloPModFile")){
 				mode = 19;
+			}else if(args[i].equals("-numThreshold")){
+				mode = 20;
 			}
 			
 			
@@ -194,19 +226,12 @@ public class RPFPipeLine {
 		if(rpfBedFiles == null || rpfBedFiles == null || fastaParser == null || annotationFileParser == null || outFile == null) return false;
 		//if(harrCovPlusFiles.length != harrCovMinusFiles.length) return false;
 		
-		if(harrBedFiles != null){
-			harrParamFiles = new String[harrBedFiles.length];
-			//harrScoreOutFiles = new String[harrCovPlusFiles.length];
-			for(int i=0;i<harrParamFiles.length;i++){
-				harrParamFiles[i] = harrBedFiles[i] +".param";
-				//harrScoreOutFiles[i] = harrCovPlusFiles[i]+".score"+ scoreThreshold +".tsv";
-			}
-		}
-		
-		rpfParamFiles = new String[rpfBedFiles.length];
+		if(harrBedFiles != null)
+			harrParamFiles = harrBedFiles[0] +".param";
+				
 		rpfScoreOutFiles = new String[rpfBedFiles.length];
-		for(int i=0;i<rpfParamFiles.length;i++){
-			rpfParamFiles[i] = rpfBedFiles[i] +".param";
+		rpfParamFiles = rpfBedFiles[0] +".param";
+		for(int i=0;i<rpfBedFiles.length;i++){
 			rpfScoreOutFiles[i] = rpfBedFiles[i] +".score"+ scoreThreshold +".tsv";
 		}
 		
@@ -215,6 +240,24 @@ public class RPFPipeLine {
 		
 		return true;
 	}
+	public static class RunnerForContig implements Runnable{
+		private Scorer scorer;
+		private ArrayList<ScoredPosition> scoredPositions;
+		//private Quantifier rpfQuantifier, rnaQuantifier, harrQuantifier;
+		//private Quantifier[] harrQuantifiers;
+		
+		//private PrintStream out;
+		
+		public RunnerForContig(Scorer scorer, ArrayList<ScoredPosition> scoredPositions){			
+			this.scorer = scorer;	
+			this.scoredPositions = scoredPositions;
+		}
+		
+		public void run() {
+			scoredPositions.addAll(scorer.getScoredPositions(scoreThreshold, allowedCodons));			
+		}
+		
+	}
 	
 	public static void main(String[] args){
 		//ClassLoader classLoader = ExcelFile.class.getClassLoader();
@@ -222,74 +265,121 @@ public class RPFPipeLine {
 		if(!parseArgs(args)){
 			printUsage();
 			System.exit(0);
-		}
-				
+		}				
 		if(allowedCodons == null){
 			allowedCodons = new HashSet<String>();
-			allowedCodons.add("ATG"); allowedCodons.add("CTG");			
+			allowedCodons.add("ATG"); allowedCodons.add("CTG");	
+			allowedCodons.add("GTG"); allowedCodons.add("TTG");		
 		}
 		if(harrBedFiles!=null){
 			for(int i=0;i<harrBedFiles.length;i++){
-				if(!new File(harrParamFiles[i]).exists()){
-					ScorerTrainer trainer = new ScorerTrainer(harrBedFiles[i], annotationFileParser, harrParamFiles[i]);
+				if(!new File(harrParamFiles).exists())
+				{
+					ScorerTrainer trainer = new ScorerTrainer(harrBedFiles[i], annotationFileParser, harrParamFiles);
 					System.out.println("Training for " + harrBedFiles[i]);
-					trainer.train(leftWindowSize, rightWindowSize, 30); // harr
+					trainer.train(leftWindowSize, rightWindowSize, numberOfNonZeroElements, maxLengthUntilStopcodon); // harr
 					System.out.println("Training done..");
-				}				
+				}	
+				break;
 			}
 		}
 		for(int i=0;i<rpfBedFiles.length;i++){
-			if(!new File(rpfParamFiles[i]).exists()){
-				ScorerTrainer trainer = new ScorerTrainer(rpfBedFiles[i], annotationFileParser, rpfParamFiles[i]);
+			if(!new File(rpfParamFiles).exists())
+			{
+				ScorerTrainer trainer = new ScorerTrainer(rpfBedFiles[i], annotationFileParser, rpfParamFiles);
 				System.out.println("Training for " + rpfBedFiles[i]);
-				trainer.train(leftWindowSize, rightWindowSize, 30); // rpf
+				trainer.train(leftWindowSize, rightWindowSize, numberOfNonZeroElements, maxLengthUntilStopcodon); // rpf
 				System.out.println("Training done..");
 			}
+			break;
 		}
 		for(int i=0;i<rpfBedFiles.length;i++){
-			if(!new File(rpfScoreOutFiles[i]).exists()){
-				System.out.println("Scoring for " + rpfBedFiles[i]);
+			if(!new File(rpfScoreOutFiles[i]).exists())
+			{
 				PrintStream out;
 				try {
-					out = new PrintStream(rpfScoreOutFiles[i]);				
+					System.out.println("Init Quantifiers.. ");
+					
+					Quantifier rpfQuantifier = new Quantifier(rpfBamReaders[i]);
+					Quantifier rnaQuantifier = new Quantifier(rnaBamReaders[i]);
+					Quantifier harrQuantifier = null;
+					Quantifier[] harrQuantifiers = null;
+					if(harrBamReaders!=null){
+						if(harrBamReaders.length == rpfBedFiles.length){ // synced
+							harrQuantifier = new Quantifier(harrBamReaders[i]);
+						}else{
+							harrQuantifiers = new Quantifier[harrBamReaders.length];
+							for(int j=0;j<harrQuantifiers.length;j++){
+								harrQuantifiers[j] = new Quantifier(harrBamReaders[j]);
+							}	
+						}
+					}
+					System.out.println("Scoring for " + rpfBedFiles[i]);
+					
+					ArrayList<Thread> threads = new ArrayList<Thread>();
+					out = new PrintStream(rpfScoreOutFiles[i]);
+					
+					
+					
 					for(String contig: annotationFileParser.getContigs()){
-						ArrayList<ScoredPosition> scoredPositions = new ArrayList<ScoredPosition>();
+						long startTime = System.nanoTime();
+						
 						Bed12Parser rpfBedParser = new Bed12Parser(rpfBedFiles[i], annotationFileParser, contig);
-						Bed12Parser rnaBedParser = new Bed12Parser(rnaBedFiles[i], annotationFileParser, contig);
-						
-						Scorer scorer = new Scorer(rpfBedParser, rpfParamFiles[i], annotationFileParser, fastaParser);
-						scoredPositions.addAll(scorer.getScoredPositions(scoreThreshold, allowedCodons));
-						
-						Quantifier rpfQuantifier = new Quantifier(rpfBedParser, annotationFileParser, fastaParser);
-						ArrayList<ScoredPosition> rpfFilteredScoredPositions = ScoringOutputParser.getQuantityFilteredPositions(scoredPositions, rpfQuantifier, rpfRPKMThreshold);
-						
-						Quantifier rnaQuantifier = new Quantifier(rnaBedParser, annotationFileParser, fastaParser);
-						ArrayList<ScoredPosition> rnaFilteredScoredPositions = ScoringOutputParser.getQuantityFilteredPositions(rpfFilteredScoredPositions, rnaQuantifier, rnaRPKMThreshold);
-						
-						ArrayList<ScoredPosition> quantityFilteredScoredPositions = rnaFilteredScoredPositions;
-						
-						if(harrBedFiles!=null){
-							if(harrBedFiles.length == rpfBedFiles.length){ // synced
-								Bed12Parser harrBedParser = new Bed12Parser(harrBedFiles[i], annotationFileParser, contig);
-								
-								Quantifier harrQuantifier = new Quantifier(harrBedParser, annotationFileParser, fastaParser);
-								quantityFilteredScoredPositions = ScoringOutputParser.getQuantityFilteredPositions(rnaFilteredScoredPositions, harrQuantifier, harrRPKMThreshold);
-							
-								
-							}else{
-								Quantifier[] harrQuantifiers = new Quantifier[harrBedFiles.length];
-								for(int j=0;j<harrQuantifiers.length;j++){
-									Bed12Parser harrBedParser = new Bed12Parser(harrBedFiles[j], annotationFileParser, contig);
-									harrQuantifiers[j] = new Quantifier(harrBedParser, annotationFileParser, fastaParser);
-								}	
-								quantityFilteredScoredPositions = ScoringOutputParser.getQuantityFilteredPositions(rnaFilteredScoredPositions, harrQuantifiers, harrRPKMThreshold);
+						ArrayList<ArrayList<ScoredPosition>> subScoredPositions = new ArrayList<ArrayList<ScoredPosition>>();
+						for(int n=0;n<nt;n++){
+							ArrayList<ScoredPosition> ss = new ArrayList<ScoringOutputParser.ScoredPosition>();
+							Scorer scorer = new Scorer(rpfBedParser, rpfParamFiles, annotationFileParser, fastaParser, nt, n);							
+							RunnerForContig runner = new RunnerForContig(scorer, ss);
+							Thread thread = new Thread(runner, n + "th ConfigRunner " + contig + " for file " + rpfBedFiles[i]); //Thread created       
+							thread.start();
+							threads.add(thread);
+							subScoredPositions.add(ss);
+						}
+						for(Thread thread : threads){
+							try {
+								thread.join();
+							} catch (InterruptedException e) {						
+								e.printStackTrace();
 							}
+						}	
+						HashSet<ScoredPosition> scoredPositions = new HashSet<ScoredPosition>();						
+						for(ArrayList<ScoredPosition> ss : subScoredPositions){
+							scoredPositions.addAll(ss);
 						}
 						
+						ArrayList<ScoredPosition> scoredPositionList = new ArrayList<ScoringOutputParser.ScoredPosition>(scoredPositions);
+						
+						System.out.println("# Unique scored positions " + scoredPositionList.size());
+						scoredPositions = null;
+						Collections.sort(scoredPositionList);
+						
+						//System.out.println(scoredPositionList.get(0).equals(scoredPositionList.get(1)));
+						//System.out.println(scoredPositionList.get(0).mappedRegionStartsEnds.equals(scoredPositionList.get(1).mappedRegionStartsEnds));
+						//System.out.println(scoredPositionList.get(0).getContig().equals(scoredPositionList.get(1).getContig()));
+						//System.out.println(scoredPositionList.get(0).isPlusStrand() == (scoredPositionList.get(1).isPlusStrand()));
+						//System.out.println(scoredPositionList.get(0).getPosition() == (scoredPositionList.get(1).getPosition()));
+						
+						//System.out.println(scoredPositionList.get(0) + "\n" + scoredPositionList.get(1));
+						
+						ArrayList<ScoredPosition> rpfFilteredScoredPositions = ScoringOutputParser.getQuantityFilteredPositions(scoredPositionList, rpfQuantifier, rpfRPKMThreshold);
+						System.out.println("RPF filtered: " + rpfFilteredScoredPositions.size());
+						ArrayList<ScoredPosition> rnaFilteredScoredPositions = ScoringOutputParser.getQuantityFilteredPositions(rpfFilteredScoredPositions, rnaQuantifier, rnaRPKMThreshold);
+						System.out.println("RNA filtered: " + rnaFilteredScoredPositions.size());
+						ArrayList<ScoredPosition> quantityFilteredScoredPositions = rnaFilteredScoredPositions;
+						
+						if(harrBamReaders!=null){
+							if(harrBamReaders.length == rpfBedFiles.length){ // synced
+								quantityFilteredScoredPositions = ScoringOutputParser.getQuantityFilteredPositions(rnaFilteredScoredPositions, harrQuantifier, harrRPKMThreshold);								
+							}else{							
+								quantityFilteredScoredPositions = ScoringOutputParser.getQuantityFilteredPositions(rnaFilteredScoredPositions, harrQuantifiers, harrRPKMThreshold);
+							}
+						}						
 						for(ScoredPosition position : quantityFilteredScoredPositions){
 							out.println(position);
-						}						
-					}
+						}					
+						long estimatedTime = System.nanoTime() - startTime;
+						System.out.println("Elapsed time : " + estimatedTime/1e9 + " seconds");
+					}					
 					out.close();
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
@@ -300,12 +390,12 @@ public class RPFPipeLine {
 				System.out.println("Scoring done..");
 			}
 		}
-		MafParser mafParser = new MafParser(mafFolder);
-		mafParser.generateIndexFile();
-		mafParser.readIndexFile();
+		MafParser mafParser = null;//new MafParser(mafFolder);
+	//	mafParser.generateIndexFile();
+	//	mafParser.readIndexFile();
 		//DsDnOutParser dsdnParser = new DsDnOutParser(dsdnFile, annotationFileParser);
 		
-		MergeResults merge = new MergeResults(rpfScoreOutFiles, harrBedFiles, rpfBedFiles, rnaBedFiles, harrParamFiles, rpfParamFiles, groups, annotationFileParser, fastaParser, mafParser); 
+		MergeResults merge = new MergeResults(rpfScoreOutFiles, harrBedFiles, rpfBedFiles, rpfBamReaders, rnaBamReaders, harrParamFiles, rpfParamFiles, groups, annotationFileParser, fastaParser, mafParser); 
 
 		System.out.println("Merging results");
 		merge.merge(outFile, scoreThreshold, positionQuantityChangeLength, positionQuantityOffset, maxLengthUntilStopcodon, allowedCodons);

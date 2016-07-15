@@ -26,9 +26,9 @@ public class TransDuplexFinder {
 			FCLIP_Scorer.setFlankingNTNumber(flankingLength);
 			FCLIP_Scorer.setMaxReadDiff(maxpre);
 			FCLIP_Scorer.setMinReadDiff(minpre);
-			RNAcofoldLauncher.setSeqLength(minpre);			
+			RNAcofoldLauncher.setSeqLength(maxpre);			
 			
-			int seqLength = (minpre + flankingLength * 2); 
+			int seqLength = (80 + flankingLength * 2); 
 			
 			boolean sameDirection = Boolean.parseBoolean(args[7]);
 			int numPositions = Integer.parseInt(args[8]);

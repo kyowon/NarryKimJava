@@ -17,7 +17,7 @@ public class MatchedFilter {
 			sum += v;
 		}
 		for(int i=0;i<avg.length;i++){
-			avg[i] /= sum;
+			avg[i] /= Math.abs(sum);
 		}
 		
 		double[][] ret = new double[avg.length][1];
@@ -46,6 +46,7 @@ public class MatchedFilter {
 	private static double[][] getCovMatrix(ArrayList<double[]> noise){
 		double num = 0;
 		double[][] cov = new double[noise.get(0).length][noise.get(0).length];
+		//double[][] avg = getAvg(noise);
 		for(double[] v : noise){
 			double[][] arg = new double[v.length][1];
 			for(int i=0;i<v.length;i++){
@@ -54,7 +55,7 @@ public class MatchedFilter {
 			num ++;
 			cov = MC.sum(cov, MC.multiply(arg, MC.transpose(arg)),1);
 		}
-		cov = MC.multiply(cov, 1/num);
+		cov = MC.multiply(cov, 1/(num-1));
 		return cov;
 	}
 	

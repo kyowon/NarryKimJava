@@ -18,13 +18,15 @@ import parser.ZeroBasedFastaParser;
 import parser.MirGff3FileParser.MiRNA;
 public class FCLIP_Scorer {
 	
-	static private int leftWindowSize = 40;
-	static private int rightWindowSize = 40;
+	static private final int mirBaseSearchMargin = 5;
+	
+	static private int leftWindowSize = 10;
+	static private int rightWindowSize = 20;
 	static private int maxDepthThreshold = 0;
 	static private int flankingNTNumber = 25; // inclusive.. 
-	static private int minReadDiff = 50;
-	static private int maxReadDiff = 350;
-	
+	static private int minReadDiff = 40;
+	static private int maxReadDiff = 160;
+	static private boolean ignoreDepth = false;
 	
 	private Bed12Parser bedParser;
 	private double[] filter5p;
@@ -70,12 +72,15 @@ public class FCLIP_Scorer {
 				String[] token = null;
 				if(s.startsWith("#")) token = s.split("\t");
 				
+				
 				if(s.startsWith("#LEFT")){
 					leftWindowSize = Integer.parseInt(token[1]);
 				}else if(s.startsWith("#RIGHT")){
 					rightWindowSize = Integer.parseInt(token[1]);
 				}else if(s.startsWith("#MAXDEPTHTHRESHOLD")){
 					maxDepthThreshold = Integer.parseInt(token[1]);
+				}else if(s.startsWith("#IGNOREDEPTH")){
+					ignoreDepth = token[1].equals("1");
 				}else if(s.startsWith("#FILTER5P")){
 					filter5p = new double[Integer.parseInt(token[1])];
 					mode = 1;
@@ -135,8 +140,8 @@ public class FCLIP_Scorer {
 			else coordinate.add(currentPosition + (isPlusStrand? i : -i));
 		}
 		
-		double[] depth = is5p ? bedParser.get5pSignalForfCLIP(isPlusStrand, coordinate) :
-			bedParser.get3pSignalForfCLIP(isPlusStrand, coordinate);
+		double[] depth = is5p ? bedParser.get5pSignalForfCLIP(isPlusStrand, coordinate, ignoreDepth) :
+			bedParser.get3pSignalForfCLIP(isPlusStrand, coordinate, ignoreDepth);
 		
 		//System.out.println(maxDepthThreshold);
 		return getRawScore(is5p? filter5p : filter3p, depth, is5p? filter5pNorm : filter3pNorm);
@@ -178,7 +183,9 @@ public class FCLIP_Scorer {
 		ArrayList<Integer> positionListToConsider = new ArrayList<Integer>(positionsToConsider);
 		Collections.sort(positionListToConsider);
 		
-
+		//System.out.println();
+		//System.out.println(positionListToConsider.contains(28866494));
+		//System.out.println(positionListToConsider.contains(28866496));
 		//windowFilter(positionListToConsider, 3, 1, isPlusStrand, is5p);
 		
 		for(int currentPosition : positionListToConsider){			
@@ -190,6 +197,8 @@ public class FCLIP_Scorer {
 			for(ArrayList<Integer> co : bedParser.getCoordinates(currentPosition + (isPlusStrand == is5p ? 1 :  -1), rightWindowSize, isPlusStrand, is5p)){ // should be left inclusive..
 				if(!Bed12Parser.getSplices(co).isEmpty()) continue;
 				double score = getScore(co, currentPosition, isPlusStrand, is5p);
+				//if(currentPosition == 28866494) System.out.println(currentPosition + " " + score + " " +is5p );
+				//if(currentPosition == 28866496) System.out.println(currentPosition + " " + score + " " + is5p);
 				if(score > scoreThreshold){
 					ScoredPosition scoredPosition = is5p? new ScoredPosition(bedParser.getContig(), isPlusStrand, currentPosition, -1, score, -1, parser):
 						new ScoredPosition(bedParser.getContig(), isPlusStrand, -1, currentPosition, -1, score, parser);
@@ -205,6 +214,9 @@ public class FCLIP_Scorer {
 			int position = is5p? s.getFivePPosition() : s.getThreePPosition();
 			if(!scoredPositionMap.containsKey(position)) scoredPositionMap.put(position, new ArrayList<ScoredPosition>());
 			scoredPositionMap.get(position).add(s);
+			
+			//if(position == 28866494) System.out.println(position);
+			//if(position == 28866496) System.out.println(position);
 		}
 		
 		return scoredPositionMap;
@@ -292,17 +304,19 @@ public class FCLIP_Scorer {
 		
 		RNAcofoldLauncher fold = new RNAcofoldLauncher(seq, flankingNTNumber);
 			for(ScoredPosition s3 : sp3p.get(p3p)){
-			for(ScoredPosition s5 : sp5p.get(p5p)){
-				//if(s5.getFivePScore() < unpairedScoreThreshold && s3.getThreePScore() < unpairedScoreThreshold) continue;
-				ScoredPosition sp = new ScoredPosition(bedParser.getContig(), isPlusStrand, p5p, p3p, s5.getFivePScore(), s3.getThreePScore(), parser);
-				sp.set(fold).setSeq(seq);
-				sp.addGenes(s5);
-				sp.addGenes(s3);
-				//sp.se
-				sp.setGeneInfo(parser);
-				positionSet.add(sp);
-			}
+				for(ScoredPosition s5 : sp5p.get(p5p)){
+					//if(s5.getFivePScore() < unpairedScoreThreshold && s3.getThreePScore() < unpairedScoreThreshold) continue;
+					ScoredPosition sp = new ScoredPosition(bedParser.getContig(), isPlusStrand, p5p, p3p, s5.getFivePScore(), s3.getThreePScore(), parser);
+					sp.set(fold).setSeq(seq);
+					sp.addGenes(s5);
+					sp.addGenes(s3);
+					//sp.se
+					sp.setGeneInfo(parser);
+					positionSet.add(sp);
+				}
 		}
+			
+			//28866494
 	}
 	
 	private void updateUnPaired(HashSet<ScoredPosition> positionSet, int p, HashMap<Integer, ArrayList<ScoredPosition>> sp, double unpairedScoreThreshold,
@@ -363,6 +377,8 @@ public class FCLIP_Scorer {
 		Collections.sort(positions5p);
 		Collections.sort(positions3p);
 		
+		//System.out.println(positions5p.contains(28866494));
+		//System.out.println(positions5p.contains(28866496));
 		HashSet<ScoredPosition> tPositionSet = new HashSet<ScoredPositionOutputParser.ScoredPosition>();
 		
 		for(int p3p : positions3p){
@@ -394,7 +410,8 @@ public class FCLIP_Scorer {
 			}
 			for(int p : paired5pList){
 				updatePaired(tPositionSet, p3p, p, sp3p, sp5p, unpairedScoreThreshold, isPlusStrand, annotationParser);
-					
+				//if(p == 28866494) System.out.println(p);
+				//if(p == 28866496) System.out.println(p);
 			}
 			if(paired5pList.isEmpty() && classifier!= null) updateUnPaired(tPositionSet, p3p, sp3p, unpairedScoreThreshold, isPlusStrand, true, annotationParser);
 		}
@@ -487,8 +504,10 @@ public class FCLIP_Scorer {
 			}
 			
 			int off = p.isPlusStrand()? 1 : -1;
-			int preLength = p.getPreLength();
+			//int preLength = p.getPreLength();
 		//	boolean toPut = true;
+			double fpscore = p.getFivePScore();
+			double tpscore = p.getThreePScore();
 			
 			paired3ps.add(p.getThreePPosition());
 			paired5ps.add(p.getFivePPosition());
@@ -500,14 +519,14 @@ public class FCLIP_Scorer {
 			
 			if(paired3pMap.containsKey(p.getThreePPosition())){
 				ScoredPosition bp = paired3pMap.get(p.getThreePPosition());
-				if(preLength < bp.getPreLength()){
+				if(fpscore > bp.getFivePScore()){
 					paired3pMap.put(p.getThreePPosition(), p);
 				}//else toPut = false;
 			}else paired3pMap.put(p.getThreePPosition(), p);
 			
 			if(paired5pMap.containsKey(p.getFivePPosition())){
 				ScoredPosition bp = paired5pMap.get(p.getFivePPosition());
-				if(preLength < bp.getPreLength()){
+				if(tpscore > bp.getThreePScore()){
 					paired5pMap.put(p.getFivePPosition(), p);
 				}//else toPut = false;
 			}else paired5pMap.put(p.getFivePPosition(), p);
@@ -542,7 +561,7 @@ public class FCLIP_Scorer {
 				ScoredPosition tp = paired3pMap.get(p.getThreePPosition());
 				if(fp != null && tp != null && fp.equals(tp) && tp.equals(p));
 				else if(classifier == null) continue;
-				else if(p.getClassification().equals("M")){ // among "MT" choose smallest pairs..
+				else if(p.getClassification().equals("M")){ // among "MT" choose high scoring pair..
 					continue;
 				}
 			}else{ // unpaired
@@ -575,17 +594,17 @@ public class FCLIP_Scorer {
 			ArrayList<MiRNA> miRNAs = null;
 			if(sp.is5pScored()){
 				miRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
-				ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getFivePPosition());
+				ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getFivePPosition(),mirBaseSearchMargin);
 				if(matched != null) miRNAs.addAll(matched);
 			}
 			if(sp.is3pScored()){
 				if(miRNAs == null){
 					miRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
-					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getThreePPosition());
+					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getThreePPosition(),mirBaseSearchMargin);
 					if(matched != null) miRNAs.addAll(matched);
 				}else{
 					ArrayList<MiRNA> intersectedMiRNAs = new ArrayList<MirGff3FileParser.MiRNA>();
-					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getThreePPosition());
+					ArrayList<MiRNA> matched = mirParser.getContainingMiRNAs(bedParser.getContig(), isPlusStrand, sp.getThreePPosition(),mirBaseSearchMargin);
 					if(matched != null){
 						for(MiRNA miRNA : matched){
 							if(miRNAs.contains(miRNA)){

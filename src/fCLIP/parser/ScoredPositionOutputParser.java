@@ -6,8 +6,6 @@ import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
@@ -15,6 +13,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.Deflater;
 
 import launcher.RNAcofoldLauncher;
@@ -48,7 +48,7 @@ public class ScoredPositionOutputParser {
 		private double threePScore = -1;
 		private int depth;
 		private double energy;
-		private int hairpinNum;
+		private int hairpinNumInStem;
 		private int leftPaired;
 		private int rightPaired;
 		private int overHang;
@@ -59,8 +59,8 @@ public class ScoredPositionOutputParser {
 		private ArrayList<String> containingGeneNames;
 		private ArrayList<String> genomicRegions5p;
 		private ArrayList<String> genomicRegions3p;
-		private ArrayList<Integer> distFromExon5p;
-		private ArrayList<Integer> distFromExon3p;
+		private ArrayList<Integer> distToNextExon5p;
+		private ArrayList<Integer> distToNextExon3p;
 		//private double complexity = 0;
 		private String classification;
 		private double predictionScore;
@@ -71,15 +71,32 @@ public class ScoredPositionOutputParser {
 		private double structureEntropy = 0;
 		private double hetero = 0;
 		private String misc = "";
+		private boolean isALU3p = false;
+		private boolean isALU5p = false;
 		private boolean isRepeat3p = false;
-	
-
 		private boolean isRepeat5p = false;
+		
+		private int longestGeneIndex = -1;
 		
 		static int rmsk3pHeaderColumnNumber = -1;
 		static int rmsk5pHeaderColumnNumber = -1;
 		
+		public void setLongestGeneIndex(AnnotationFileParser aparser){
+			if(getContainingGeneAccessions() == null) return;
+			int maxSize = 0;
+			for(int i=0;i<getContainingGeneAccessions().size();i++){
+				String acc = getContainingGeneAccessions().get(i);
+				AnnotatedGene gene = aparser.getGeneByAccession(acc);
+				int size = gene.getExonSize();
+				if(maxSize < size){
+					maxSize = size;
+					longestGeneIndex = i;
+				}
+			}			
+		}
 			
+		public int getLongestGeneIndex(){ return longestGeneIndex; }
+		
 		public static ScoredPosition get3p5pSwappedPosition(ScoredPosition p, int flankingNTNumber){
 			ScoredPosition sp = new ScoredPosition();
 			sp.contig = p.contig;
@@ -106,8 +123,8 @@ public class ScoredPositionOutputParser {
 			sp.containingGeneNames = p.containingGeneNames;
 			sp.genomicRegions3p = p.genomicRegions5p;
 			sp.genomicRegions5p = p.genomicRegions3p;
-			sp.distFromExon5p = p.distFromExon5p;
-			sp.distFromExon3p = p.distFromExon3p;
+			sp.distToNextExon5p = p.distToNextExon5p;
+			sp.distToNextExon3p = p.distToNextExon3p;
 			
 			sp.classification = p.classification;
 			sp.predictionScore = 0;
@@ -119,7 +136,9 @@ public class ScoredPositionOutputParser {
 		//private double readLengthVariance = -1;
 		
 		public static String getHeader(){
-			return "Contig\t5p\t3p\tStrand\tPreLength\tPaired\tClass\tPredictionScore\t5p5preads\t5p3preads\t3p5preads\t3p3preads\tMatching miRNAs\tBlatHits\tAccession\tGeneName\tGenomicRegion5p\tGenomicRegion3p\tDistFromExon5p\tDistFromExon3p\t5pSocre\t3pScore\tDepth\tEnergy\tHairpinNum\tLeftPaired\tRightPaired\tOverhang\tSeqEntropy\tStructureEntropy\tHetero\tSeq";
+			return "Contig\t5p\t3p\tStrand\tPreLength\tPaired\tClass\tPredictionScore\t5p5preads\t5p3preads\t3p5preads\t"
+					+ "3p3preads\tMatching miRNAs\tBlatHits\tAccession\tGeneName\tGenomicRegion5p\tGenomicRegion3p\tDistToNextExon5p"
+					+ "\tDistToNextExon3p\t5pSocre\t3pScore\tDepth\tEnergy\tHairpinNumInStem\tLeftPaired\tRightPaired\tOverhang\tSeqEntropy\tStructureEntropy\tHetero\tSeq";
 		}
 		
 		public ArrayList<String> getContainingGeneAccessions() {
@@ -130,11 +149,19 @@ public class ScoredPositionOutputParser {
 			return containingGeneNames;
 		}
 		
-		public boolean isRepeat3p() {
-			return isRepeat3p;
+		public boolean isALU3p() {
+			return isALU3p;
 		}
 
-		public boolean isRepeat5p() {
+		public boolean isALU5p() {
+			return isALU5p;
+		}
+		
+		public boolean isRepeat3p(){
+			return isRepeat3p;
+		}
+		
+		public boolean isRepeat5p(){
 			return isRepeat5p;
 		}
 		
@@ -174,12 +201,12 @@ public class ScoredPositionOutputParser {
 			return genomicRegions3p;
 		}
 		
-		public ArrayList<Integer> getDistFromExon5p(){
-			return distFromExon5p;
+		public ArrayList<Integer> getDistToNextExon5p(){
+			return distToNextExon5p;
 		}
 		
-		public ArrayList<Integer> getDistFromExon3p(){
-			return distFromExon3p;
+		public ArrayList<Integer> getDistToNextExon3p(){
+			return distToNextExon3p;
 		}
 		//public double getReadLengthVariance(){
 		//	return readLengthVariance;
@@ -197,8 +224,8 @@ public class ScoredPositionOutputParser {
 			return predictionScore;
 		}
 		
-		public int getHairpinNumber(){
-			return hairpinNum;
+		public int getHairpinNumberInStem(){
+			return hairpinNumInStem;
 		}
 		
 		public ArrayList<String> getMiRNAs(){
@@ -311,19 +338,19 @@ public class ScoredPositionOutputParser {
 			i++;
 			if(!token[i].startsWith(" ")){
 				String[] dists = token[i].split(";");
-				this.distFromExon3p = new ArrayList<Integer>();
+				this.distToNextExon3p = new ArrayList<Integer>();
 				for(String d : dists){
-					if(d.equals(" ")) distFromExon3p.add(null);
-					else distFromExon3p.add(Integer.parseInt(d));
+					if(d.equals(" ")) distToNextExon3p.add(null);
+					else distToNextExon3p.add(Integer.parseInt(d));
 				}
 			}
 			i++;
 			if(!token[i].startsWith(" ")){
 				String[] dists = token[i].split(";");
-				this.distFromExon5p = new ArrayList<Integer>();
+				this.distToNextExon5p = new ArrayList<Integer>();
 				for(String d : dists){
-					if(d.equals(" ")) distFromExon5p.add(null);
-					else distFromExon5p.add(Integer.parseInt(d));
+					if(d.equals(" ")) distToNextExon5p.add(null);
+					else distToNextExon5p.add(Integer.parseInt(d));
 				}
 			}
 			i++;
@@ -361,7 +388,7 @@ public class ScoredPositionOutputParser {
 			this.fivePScore = Double.parseDouble(token[i++]);
 			this.depth = Integer.parseInt(token[i++]);
 			this.energy = Double.parseDouble(token[i++]);
-			this.hairpinNum = Integer.parseInt(token[i++]);
+			this.hairpinNumInStem = Integer.parseInt(token[i++]);
 			this.leftPaired = Integer.parseInt(token[i++]);
 			this.rightPaired = Integer.parseInt(token[i++]);
 			this.overHang = Integer.parseInt(token[i++]);
@@ -375,10 +402,12 @@ public class ScoredPositionOutputParser {
 			}
 			
 			if(rmsk3pHeaderColumnNumber> 0){
-				this.isRepeat3p = !token[rmsk3pHeaderColumnNumber].equals("_");
+				this.isALU3p = token[rmsk3pHeaderColumnNumber].toUpperCase().contains("ALU");
+				this.isRepeat3p = !token[rmsk3pHeaderColumnNumber].equals("_");// toUpperCase().contains("ALU");
 			}
 			
 			if(rmsk5pHeaderColumnNumber> 0){
+				this.isALU5p = token[rmsk5pHeaderColumnNumber].toUpperCase().contains("ALU");
 				this.isRepeat5p = !token[rmsk5pHeaderColumnNumber].equals("_");
 			}
 		}
@@ -475,8 +504,8 @@ public class ScoredPositionOutputParser {
 			writeStringArray(sb, containingGeneNames, "_");
 			writeStringArray(sb, genomicRegions3p, "_");
 			writeStringArray(sb, genomicRegions5p, "_");
-			writeStringArray(sb, distFromExon3p, " ");
-			writeStringArray(sb, distFromExon5p, " ");
+			writeStringArray(sb, distToNextExon3p, " ");
+			writeStringArray(sb, distToNextExon5p, " ");
 			//System.out.println(sb);
 			//toMappedRegionString(sb, threePcoordinate); sb.append('\t');
 			//toMappedRegionString(sb, fivePcoordinate); sb.append('\t');
@@ -484,7 +513,7 @@ public class ScoredPositionOutputParser {
 			sb.append(fivePScore); sb.append('\t');
 			sb.append(depth); sb.append('\t');
 			sb.append(energy); sb.append('\t');
-			sb.append(hairpinNum); sb.append('\t');
+			sb.append(hairpinNumInStem); sb.append('\t');
 			sb.append(leftPaired); sb.append('\t');
 			sb.append(rightPaired); sb.append('\t');
 			sb.append(overHang); sb.append('\t');
@@ -519,12 +548,12 @@ public class ScoredPositionOutputParser {
 			writeStringArray(sb, containingGeneNames, "_");
 			writeStringArray(sb, genomicRegions3p, "_");
 			writeStringArray(sb, genomicRegions5p, "_");
-			writeStringArray(sb, distFromExon3p, " ");
-			writeStringArray(sb, distFromExon5p, " ");
+			writeStringArray(sb, distToNextExon3p, " ");
+			writeStringArray(sb, distToNextExon5p, " ");
 			
 			sb.append(depth); sb.append('\t');
 			sb.append(energy); sb.append('\t');
-			sb.append(hairpinNum); sb.append('\t');
+			sb.append(hairpinNumInStem); sb.append('\t');
 			
 			sb.append(overHang);
 			return sb.toString();
@@ -581,25 +610,25 @@ public class ScoredPositionOutputParser {
 			i++;
 			if(!token[i].startsWith(" ")){
 				String[] dists = token[i].split(";");
-				p.distFromExon3p = new ArrayList<Integer>();
+				p.distToNextExon3p = new ArrayList<Integer>();
 				for(String d : dists){
-					if(d.equals(" ")) p.distFromExon3p.add(null);
-					else p.distFromExon3p.add(Integer.parseInt(d));
+					if(d.equals(" ")) p.distToNextExon3p.add(null);
+					else p.distToNextExon3p.add(Integer.parseInt(d));
 				}
 			}
 			i++;
 			if(!token[i].startsWith(" ")){
 				String[] dists = token[i].split(";");
-				p.distFromExon5p = new ArrayList<Integer>();
+				p.distToNextExon5p = new ArrayList<Integer>();
 				for(String d : dists){
-					if(d.equals(" ")) p.distFromExon5p.add(null);
-					else p.distFromExon5p.add(Integer.parseInt(d));
+					if(d.equals(" ")) p.distToNextExon5p.add(null);
+					else p.distToNextExon5p.add(Integer.parseInt(d));
 				}
 			}
 			i++;
 			p.depth = Integer.parseInt(token[i++]);
 			p.energy = Double.parseDouble(token[i++]);
-			p.hairpinNum = Integer.parseInt(token[i++]);
+			p.hairpinNumInStem = Integer.parseInt(token[i++]);
 		
 			p.overHang = Integer.parseInt(token[i++]);
 			return p;
@@ -651,22 +680,27 @@ public class ScoredPositionOutputParser {
 		}
 		
 		public void setGeneInfo(AnnotationFileParser annotationParser){
+			setGeneInfo(annotationParser, 0);
+		}
+		
+		public void setGeneInfo(AnnotationFileParser annotationParser, int offset){
+			if(!isPlusStrand) offset = - offset;
 			if(annotationParser != null){
 				HashMap<AnnotatedGene, Integer> genes5p = new HashMap<AnnotatedGene, Integer>();
 				HashMap<AnnotatedGene, Integer> genes3p = new HashMap<AnnotatedGene, Integer>();
 				if(fivePposition >= 0){
-					ArrayList<AnnotatedGene> ag = annotationParser.getContainingGenes(contig, isPlusStrand, fivePposition);
+					ArrayList<AnnotatedGene> ag = annotationParser.getContainingGenes(contig, fivePposition + offset);
 					if(ag != null){
 						for(AnnotatedGene a : ag){
-							genes5p.put(a, fivePposition);
+							genes5p.put(a, fivePposition + offset);
 						}
 					}
 				}
 				if(threePposition>= 0){
-					ArrayList<AnnotatedGene> ag = annotationParser.getContainingGenes(contig, isPlusStrand, threePposition);
+					ArrayList<AnnotatedGene> ag = annotationParser.getContainingGenes(contig, threePposition - offset);
 					if(ag != null){
 						for(AnnotatedGene a : ag){
-							genes3p.put(a, threePposition);
+							genes3p.put(a, threePposition - offset);
 						}
 					}
 				}
@@ -674,8 +708,8 @@ public class ScoredPositionOutputParser {
 				this.containingGeneNames = new ArrayList<String>();
 				this.genomicRegions3p = new ArrayList<String>();
 				this.genomicRegions5p = new ArrayList<String>();
-				this.distFromExon3p = new ArrayList<Integer>();
-				this.distFromExon5p = new ArrayList<Integer>();
+				this.distToNextExon3p = new ArrayList<Integer>();
+				this.distToNextExon5p = new ArrayList<Integer>();
 				HashSet<AnnotatedGene> genes = new HashSet<AnnotationFileParser.AnnotatedGene>();
 				genes.addAll(genes5p.keySet());
 				genes.addAll(genes3p.keySet());
@@ -684,8 +718,8 @@ public class ScoredPositionOutputParser {
 					this.containingGeneNames.add(gene.getGeneName());
 					this.genomicRegions3p.add(genes3p.containsKey(gene) ? annotationParser.getGenomicRegionNameAndFrameShift(contig, isPlusStrand, genes3p.get(gene), gene, true).get(0) : "_");
 					this.genomicRegions5p.add(genes5p.containsKey(gene) ? annotationParser.getGenomicRegionNameAndFrameShift(contig, isPlusStrand, genes5p.get(gene), gene, true).get(0) : "_");
-					this.distFromExon3p.add(genes3p.containsKey(gene) ? gene.getDistFromClosestExon(threePposition) : null);
-					this.distFromExon5p.add(genes5p.containsKey(gene) ? gene.getDistFromClosestExon(fivePposition) : null);
+					this.distToNextExon3p.add(genes3p.containsKey(gene) ? gene.getDistToNextExon(threePposition - offset) : null);
+					this.distToNextExon5p.add(genes5p.containsKey(gene) ? gene.getDistToNextExon(fivePposition + offset ) : null);
 					//this.genomicRegions.add(annotationParser.getGenomicRegionNameAndFrameShift(contig, isPlusStrand, fivePScore >=0? fivePposition : threePposition , gene, true).get(0));
 				}
 			}	
@@ -717,7 +751,7 @@ public class ScoredPositionOutputParser {
 		public ScoredPosition set(RNAcofoldLauncher fold){
 			depth = fold.getDepth();
 			energy = fold.getEnergyPerNT();
-			hairpinNum = fold.getNumberOfHairPins();
+			hairpinNumInStem = fold.getNumberOfHairPinsInStem();
 			leftPaired = fold.getLeftPaired();
 			rightPaired = fold.getRightPaired();
 			overHang = fold.getOverHang();
@@ -812,6 +846,29 @@ public class ScoredPositionOutputParser {
 			return rightPaired;
 		}
 			
+		
+		public boolean overlapped(ScoredPosition other){ // simple overlapping not considering splices
+			if(!this.contig.equals(other.contig)) return false;
+			int s = this.getThreePPosition();
+			int l = this.getFivePPosition();
+			if(s>l){
+				int t = s;
+				s = l;
+				l = t;
+			}
+			
+			int so = other.getThreePPosition();
+			int lo = other.getFivePPosition();
+			if(so>lo){
+				int t = so;
+				so = lo;
+				lo = t;
+			}
+			
+			return (s>=so && s<=lo) || (l>=so && l<=lo);
+			
+		}
+		
 //		public double getSeedConservation(){
 //			return seedConservation;
 //		}
@@ -871,6 +928,11 @@ public class ScoredPositionOutputParser {
 		read(inFile);
 	}
 	
+	public void setLongestGeneIndex(AnnotationFileParser aparser){
+		for(ScoredPosition sp : getPositions()){
+			sp.setLongestGeneIndex(aparser);
+		}		
+	}
 
 	private void read(String outFile){
 		positionMap = new HashMap<String, ArrayList<ScoredPosition>>();
@@ -1042,7 +1104,7 @@ public class ScoredPositionOutputParser {
 					while(true){
 						if(isInterGenic){
 							rd = new Random().nextInt(fastaParser.getLength(sp.getContig()));
-							ArrayList<AnnotatedGene> genes = annotationParser.getContainingGenes(sp.getContig(), sp.isPlusStrand(), rd);
+							ArrayList<AnnotatedGene> genes = annotationParser.getContainingGenes(sp.getContig(), rd);
 							if(genes == null){
 								regionID = 0;
 								break;
@@ -1078,30 +1140,103 @@ public class ScoredPositionOutputParser {
 		}		
 	}
 	
-	static public void generateFastaForMotif(String csv, String fasta5p, String fasta3p, String classification){
+	static public void generateFastaForMotif(String csv, ZeroBasedFastaParser fastaParser, int flankingNTNumber, String fasta5p, String fasta3p, 
+			String mfile, String classification, int option, int aluOption){
 		ScoredPositionOutputParser parser = new ScoredPositionOutputParser(csv);
 		PrintStream out5p, out3p;
+		PrintStream mout;
 	//	double threshold = 0;// .15;
 		try {
 			out5p = new PrintStream(fasta5p);
 			out3p = new PrintStream(fasta3p);
+			mout = new PrintStream(mfile);
 			int i = 0;
 			int k = 0;
+			int motiflenth  = 2;
 			HashSet<String> fseqs = new HashSet<String>();
 			HashSet<String> tseqs = new HashSet<String>();
-			for(ScoredPosition sp : parser.getPositions()){
-				if(sp.miRNAs != null && !sp.miRNAs.isEmpty()) continue;
-				//if(sp.miRNAs == null || sp.miRNAs.isEmpty()) continue;
+			String[][] motifset = {{"A", "C", "G", "T", },
+				{"AA", "AC", "AG", "AT","CA", "CC", "CG", "CT","GA", "GC", "GG", "GT","TA", "TC", "TG", "TT",},
+				{"A..A", "A..C", "A..G", "A..T","C..A", "C..C", "C..G", "C..T","G..A", "G..C", "G..G", "G..T","T..A", "T..C", "T..G", "T..T",},
+				{"AAA", "AAC", "AAG", "AAT","ACA", "ACC", "ACG", "ACT","AGA", "AGC", "AGG", "AGT","ATA", "ATC", "ATG", "ATT","CAA", "CAC", "CAG", "CAT","CCA", "CCC", "CCG", "CCT","CGA", "CGC", "CGG", "CGT","CTA", "CTC", "CTG", "CTT","GAA", "GAC", "GAG", "GAT","GCA", "GCC", "GCG", "GCT","GGA", "GGC", "GGG", "GGT","GTA", "GTC", "GTG", "GTT","TAA", "TAC", "TAG", "TAT","TCA", "TCC", "TCG", "TCT","TGA", "TGC", "TGG", "TGT","TTA", "TTC", "TTG", "TTT",},
+				{"A.A", "A.C", "A.G", "A.T","C.A", "C.C", "C.G", "C.T","G.A", "G.C", "G.G", "G.T","T.A", "T.C", "T.G", "T.T",},
 				
-				if(!sp.isPaired() || !sp.getClassification().equals(classification)) continue;
+			};
+			int soff = 0;
+			int eoff = 30; // inclusive
+			
+			String[] motifs = null;
+		//	soff = -15;
+		//	eoff = 0;
+			boolean is5pCleavage = true;
+			String titleprefix = classification.equals("miRNA")? "miRNA " : "MT ";
+			String titlesuffix = null;// " loop region ALU removed";
+			//titlesuffix = " stem region only ALU";
+			
+			if(option == 0){ // 5p stem
+				motifs = motifset[1];
+				soff = -15;
+				eoff = 0;
+				motiflenth = 2;
+				titlesuffix = " 5'' stem region";
+			}else if(option == 1){ // 5p loop
+				motifs = motifset[3];
+				soff = 18;
+				eoff = 25;
+				motiflenth = 3;
+				titlesuffix = " loop region";
+			}else if(option == 2){// 3p stem
+				is5pCleavage = false;
+				soff = 0;
+				eoff = flankingNTNumber - 5;
+				motifs = motifset[2];
+				motiflenth = 2;
+				titlesuffix = " 3'' stem region";
+			}else if(option == 3){
+				is5pCleavage = false;
+				soff = -10;
+				eoff = 0;//flankingNTNumber - 5;
+				motifs = motifset[4];
+				motiflenth = 2;
+				titlesuffix = " 3'' stem region";
+			}
+			if(aluOption == 0);// titlesuffix += 
+			else if(aluOption == 1){// remove ALU
+				titlesuffix += " ALU removed";
+			}else{ // only ALU
+				titlesuffix += " only ALU retained";
+			}
+			
+			double[][] hm = new double[motifs.length][eoff - soff + 1];			
+			
+			int sum = 0;
+						
+			for(ScoredPosition sp : parser.getPositions()){
+				boolean ismiRNA = false;
+				if(sp.miRNAs != null && !sp.miRNAs.isEmpty()){
+					ismiRNA = true;
+				}
+				if(ismiRNA){
+					if(!classification.equals("miRNA")) continue;
+					
+				}else if(!sp.isPaired() || !sp.getClassification().equals(classification)) continue;
+				if(aluOption==1 && (sp.isALU3p() && sp.isALU5p())) continue; // no alu
+				if(aluOption==2 && !(sp.isALU3p() && sp.isALU5p())) continue; // only alu
+					
+				
+				
 				//else
 				//System.out.println(sp);
 				//	continue;
 				if(sp.getOverHang() != 2) continue;
+				String seq = sp.isPlusStrand()? fastaParser.getSequence(sp.getContig(), sp.getThreePPosition() - flankingNTNumber, sp.getFivePPosition() + flankingNTNumber + 1)
+					    : ZeroBasedFastaParser.getComplementarySequence(fastaParser.getSequence(sp.getContig(), sp.getFivePPosition()-flankingNTNumber, sp.getThreePPosition() + flankingNTNumber + 1), true);
+				
+				String cseq = ScoredPosition.getCleavedSequence(seq, flankingNTNumber);
 				//if(sp.getClassification().equals("M") && sp.getFivePScore() > threshold && sp.getThreePScore() > threshold)//  
 				{
-					String seq = ScoredPosition.getCleavedSequence(sp.getSeq(), FCLIP_Scorer.getFlankingNTNumber());
-					String fseq = seq.substring(0, seq.indexOf(' '));
+					//String seq = ScoredPosition.getCleavedSequence(sp.getSeq(), flankingNTNumber);
+					String fseq = cseq.substring(0, cseq.indexOf(' '));
 					//System.out.println(fseq);
 					if(!fseqs.contains(fseq)){
 						fseqs.add(fseq);
@@ -1113,8 +1248,11 @@ public class ScoredPositionOutputParser {
 				
 				//if(sp.getClassification().equals("M") && sp.getFivePScore() > threshold && sp.getThreePScore() > threshold)//  && sp.getFivePScore() > 0.45
 				{
-					String seq = ScoredPosition.getCleavedSequence(sp.getSeq(), FCLIP_Scorer.getFlankingNTNumber());
-					String tseq = seq.substring(seq.lastIndexOf(' ') + 1);
+					//String seq = ScoredPosition.getCleavedSequence(sp.getSeq(), flankingNTNumber);
+					String tseq = cseq.substring(cseq.indexOf(' ') + 1, Math.min(cseq.length(), cseq.indexOf(' ') + 28));//seq.substring(seq.lastIndexOf(' ') + 1);
+					//System.out.println(k+ " " + seq);
+					//System.out.println("                          " + tseq);
+					
 					if(!tseqs.contains(tseq)){
 						tseqs.add(tseq);
 						out3p.println(">"+ k);
@@ -1122,10 +1260,59 @@ public class ScoredPositionOutputParser {
 						k++;
 					}
 				}
+				
+				{
+					/*int soff = -15;
+			int eoff = 0; // inclusive
+			boolean is5pCleavage = true;
+			*/
+					//String seq = sp.isPlusStrand()? fastaParser.getSequence(sp.getContig(), sp.getThreePPosition() - flankingNTNumber, sp.getFivePPosition() + flankingNTNumber + 1)
+					//		    : ZeroBasedFastaParser.getComplementarySequence(fastaParser.getSequence(sp.getContig(), sp.getFivePPosition()-flankingNTNumber, sp.getThreePPosition() + flankingNTNumber + 1), true);
+						
+					String tseq = is5pCleavage? seq.toUpperCase().substring(flankingNTNumber+soff, flankingNTNumber + eoff+1+5) :
+						seq.toUpperCase().substring(seq.length() - flankingNTNumber + soff , seq.length() - flankingNTNumber + eoff + 1+3);
+					System.out.println(k+ " " + seq.toUpperCase());
+					System.out.println("                          " + tseq);
+					for(int j=0; j<motifs.length;j++){
+						String motif = motifs[j];
+						Pattern p = Pattern.compile(motif);
+						Matcher m = p.matcher(tseq);
+						while(m.find()){
+							int ms = m.start();
+							if(ms < hm[j].length)
+								hm[j][m.start()]++;
+						}						
+					}					
+				}
+				sum++;
 			}
+			
+			for(int j=0;j<motifs.length;j++){
+				mout.println(motifs[j].replace('.', 'N') + " = [");
+				for(double l : hm[j]) mout.print(l + " ");
+				mout.println("];");
+			}
+			
+			mout.print("t=[");
+			for(String motif : motifs) mout.print(motif.replace('.', 'N') + "; ");
+			mout.println("];");
+			mout.print("motif={");
+			for(String motif : motifs) mout.print("'" + motif.replace('T', 'U').replace('.', 'N') + "', ");
+			mout.println("};");
+			mout.print("xtick=[" );
+			mout.println(is5pCleavage ? soff + ":" +eoff+"];" : "-" +soff + ":-1:-" +eoff+"];");
+			mout.print("titlestr = '");
+			mout.print(titleprefix);
+			mout.print("motif frequency : " + titlesuffix + " (n = " + sum + ")';");
+			mout.print("totaln="+sum+";");
+			mout.print("motiflenth = " + motiflenth);
+			mout.println(";xstr='Position from " + (is5pCleavage? "5''" : "3''") + " cleavage';");
+				
+			mout.close();
 			
 			out5p.close();
 			out3p.close();
+			mout.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}	
@@ -1152,6 +1339,7 @@ public class ScoredPositionOutputParser {
 	
 	static public void intersectWithBam(String csvOut, String csv, String bamfile, boolean contained){
 		SamReader reader = SamReaderFactory.makeDefault().open(new File(bamfile));
+				
 		ScoredPositionOutputParser parser = new ScoredPositionOutputParser(csv);		
 		
 		try {	
@@ -1189,16 +1377,80 @@ public class ScoredPositionOutputParser {
 		}
 	}
 	
-	
-	static public void main(String[] args){
-		ScoredPositionOutputParser.intersectWithBam("/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/cis/merged.complete.agodicerIntersected.csv", "/media/kyowon/Data1/fCLIP/samples/sample4/results/lists/cis/merged.complete.agoIntersected.csv", "/media/kyowon/Data1/fCLIP/Data/Dicer_PAR-CLIP_Aligned_Sorted.bam", true);
+	static public void main(String[] args) throws IOException{
+		ScoredPositionOutputParser parser  = new ScoredPositionOutputParser("/media/kyowon/Data1/fCLIP/samples/sample8/results/lists/cis/bamMerged.completeNoverlapped.mt.csv");
+		int counter = 0;
+		for(ScoredPosition sp : parser.getPositions()){
+			boolean count = false;
+			if(sp.getGenomicRegions3p() != null){
+				for(String rg : sp.getGenomicRegions3p()){
+					if(rg.endsWith("ORF") || rg.endsWith("UTR")){
+						count = true;
+						break;
+					}
+				}
+			}
+			if(sp.getGenomicRegions5p() != null){				
+				for(String rg : sp.getGenomicRegions5p()){
+					if(rg.endsWith("ORF") || rg.endsWith("UTR")){
+						count = true;
+						break;
+					}
+				}
+			}
+			if(count)counter++;
+		}
+		System.out.println(counter);
 	}
-	//	ScoredPositionOutputParser.reClassify("/media/kyowon/Data1/Dropbox/fCLIP/new/h19x2.csv", "/media/kyowon/Data1/Dropbox/fCLIP/new/h19x2n.csv", "/media/kyowon/Data1/Dropbox/fCLIP/new/h19x2.train.arff");
+	/*
+	static public void main(String[] args) throws IOException{
+		int maxOffset = 11;
+		String csv = "/media/kyowon/Data1/fCLIP/samples/sample8/results/lists/cis/bamMerged.completeNoverlapped.csv";
+		String outCsv = "/media/kyowon/Data1/fCLIP/samples/sample8/results/lists/cis/bamMerged.completeNoverlapped.regionWithOffset"+maxOffset+".txt";
+		//ZeroBasedFastaParser fparser = new ZeroBasedFastaParser("/media/kyowon/Data1/fCLIP/genomes/hg38.fa");
+		ScoredPositionOutputParser parser = new ScoredPositionOutputParser(csv);
+		AnnotationFileParser annotationParser = new AnnotationFileParser("/media/kyowon/Data1/fCLIP/genomes/hg38.refFlat.txt");
+		PrintStream out = new PrintStream(outCsv);
+		HashSet<ScoredPosition> sps = new HashSet<ScoredPositionOutputParser.ScoredPosition>();
+		out.println(parser.getHeader());
+		for(ScoredPosition sp : parser.getPositions()){
+			if(!sp.getClassification().toUpperCase().equals("M")) continue;
+			for(int o=0;o<=maxOffset;o++){
+				sp.setGeneInfo(annotationParser, o);
+				if(sp.getGenomicRegions3p() == null || sp.getGenomicRegions5p() == null) continue;
+				boolean toPut = false;
+				for(int i=0;i<sp.getGenomicRegions3p().size();i++){
+					if(sp.getGenomicRegions3p().get(i).endsWith("Intron") && !sp.getGenomicRegions5p().get(i).endsWith("Intron")) toPut = true;
+					if(sp.getGenomicRegions5p().get(i).endsWith("Intron") && !sp.getGenomicRegions3p().get(i).endsWith("Intron")) toPut = true;
+					if(toPut) break;					
+				}
+				if(toPut) {
+					System.out.println(sp.getGenomicRegions3p() + " " + sp.getGenomicRegions5p());
+					if(!sps.contains(sp)) sps.add(sp);
+					break;
+				}
+			}
+		}
+		for(ScoredPosition sp : sps){
+			out.println(sp);
+			
+		}
+		out.close();		
+		*/
+		/*String classification = "M";
+	
 		
-	//	ScoringOutputParser.generateBedFromCsv("/media/kyowon/Data1/Dropbox/h19x2.sorted.out.csv", 
-	//			"/media/kyowon/Data1/Dropbox/h19x2.out.5p.bed",
-	//			"/media/kyowon/Data1/Dropbox/h19x2.out.3p.bed", false); // then use sort -V to get h19x2.sorted.out.xx.bed
-	//	ScoringOutputParser.generateFastaForMEME("/media/kyowon/Data1/Dropbox/h19x2.sorted.out.csv", 
-	//			"/media/kyowon/Data1/Dropbox/h19x2.sorted.out.5p.fa", "/media/kyowon/Data1/Dropbox/h19x2.sorted.out.3p.fa");
-//	}
+		
+		String fasta5p = "/media/kyowon/Data1/fCLIP/samples/sample8/results/lists/cis/bamMerged.completeNoverlapped.motif5p." + classification + ".txt";
+		String fasta3p = "/media/kyowon/Data1/fCLIP/samples/sample8/results/lists/cis/bamMerged.completeNoverlapped.motifloop." + classification + ".txt";
+		int region = 0;
+		ZeroBasedFastaParser fparser = new ZeroBasedFastaParser("/media/kyowon/Data1/fCLIP/genomes/hg38.fa");
+		int flankingNT = 25;
+		int aluOption = 2;
+		for(;region<3;region++){
+			String mout = "/media/kyowon/Data1/fCLIP/motif_" + classification + region + (aluOption>0? "_" + aluOption : "") +".m";
+			ScoredPositionOutputParser.generateFastaForMotif(csv, fparser, flankingNT, fasta5p, fasta3p, mout, classification, region, aluOption);
+		}*/
+
+
 }
